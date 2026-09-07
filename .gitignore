@@ -1,0 +1,26 @@
+# Dependências e builds (Sprint 1+)
+node_modules/
+.expo/
+dist/
+build/
+ios/
+android/
+*.jks
+*.p8
+*.p12
+*.mobileprovision
+
+# Segredos
+.env
+.env.*
+!.env.example
+supabase/.temp/
+
+# SO / editores
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Conteúdo bíblico bruto (nunca versionar textos licenciados)
+content-pipeline/raw/
