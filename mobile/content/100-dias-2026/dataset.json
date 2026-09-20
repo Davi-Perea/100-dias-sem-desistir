@@ -1,0 +1,3382 @@
+{
+  "campaign": {
+    "id": "lagoinha-100-dias-2026",
+    "title": "100 Dias",
+    "subtitle": "Palavra • Consagração • Adoração • Intercessão",
+    "start_date": "2026-09-23",
+    "timezone": "America/Sao_Paulo",
+    "utc_offset_minutes": -180,
+    "total_days": 100,
+    "status": "active"
+  },
+  "days": [
+    {
+      "campaign_id": "lagoinha-100-dias-2026",
+      "day_number": 1,
+      "title": "Igreja chamada para abençoar",
+      "theme": null,
+      "theme_highlight": null,
+      "sphere": "igreja",
+      "key_verse_reference": "GEN 12:2-3",
+      "official_direction": null,
+      "prayer_focus": "Identidade e chamado; santidade; evangelização; crescimento saudável; Igreja brasileira abençoando as nações.",
+      "prayer_points": [
+        "Identidade e chamado",
+        "santidade",
+        "evangelização",
+        "crescimento saudável",
+        "Igreja brasileira abençoando as nações"
+      ],
+      "altar": {
+        "ministry": "Intercessão/Bálsamo",
+        "leaders_label": "Prs. Leandra e Daniel"
+      },
+      "milestone": null,
+      "next_day_teaser": null,
+      "publish_status": "published",
+      "readings": [
+        {
+          "sort_order": 1,
+          "canonical_reference": "GEN 1-12"
+        }
+      ]
+    },
+    {
+      "campaign_id": "lagoinha-100-dias-2026",
+      "day_number": 2,
+      "title": "Famílias que ensinam os caminhos do Senhor",
+      "theme": null,
+      "theme_highlight": null,
+      "sphere": "familia",
+      "key_verse_reference": "GEN 18:19",
+      "official_direction": null,
+      "prayer_focus": "Altares familiares; casamentos; pais e filhos; transmissão da fé; cura geracional.",
+      "prayer_points": [
+        "Altares familiares",
+        "casamentos",
+        "pais e filhos",
+        "transmissão da fé",
+        "cura geracional"
+      ],
+      "altar": {
+        "ministry": "À Mesa",
+        "leaders_label": "Edson e Rejane"
+      },
+      "milestone": null,
+      "next_day_teaser": null,
+      "publish_status": "published",
+      "readings": [
+        {
+          "sort_order": 1,
+          "canonical_reference": "GEN 13-24"
+        }
+      ]
+    },
+    {
+      "campaign_id": "lagoinha-100-dias-2026",
+      "day_number": 3,
+      "title": "Uma geração guardada em sua formação",
+      "theme": null,
+      "theme_highlight": null,
+      "sphere": "educacao",
+      "key_verse_reference": "GEN 28:15",
+      "official_direction": null,
+      "prayer_focus": "Crianças e jovens; professores; escolas; universidades; formação fundamentada na verdade.",
+      "prayer_points": [
+        "Crianças e jovens",
+        "professores",
+        "escolas",
+        "universidades",
+        "formação fundamentada na verdade"
+      ],
+      "altar": {
+        "ministry": "Acolher",
+        "leaders_label": "Prs. Paula e Gabriel"
+      },
+      "milestone": null,
+      "next_day_teaser": null,
+      "publish_status": "published",
+      "readings": [
+        {
+          "sort_order": 1,
+          "canonical_reference": "GEN 25-36"
+        }
+      ]
+    },
+    {
+      "campaign_id": "lagoinha-100-dias-2026",
+      "day_number": 4,
+      "title": "Sabedoria para governar",
+      "theme": null,
+      "theme_highlight": null,
+      "sphere": "governo",
+      "key_verse_reference": "GEN 41:39-40",
+      "official_direction": null,
+      "prayer_focus": "Autoridades; integridade; discernimento; administração pública; pessoas preparadas para posições estratégicas.",
+      "prayer_points": [
+        "Autoridades",
+        "integridade",
+        "discernimento",
+        "administração pública",
+        "pessoas preparadas para posições estratégicas"
+      ],
+      "altar": {
+        "ministry": "Capelania",
+        "leaders_label": "Prs. Francisco e Milena"
+      },
+      "milestone": null,
+      "next_day_teaser": null,
+      "publish_status": "published",
+      "readings": [
+        {
+          "sort_order": 1,
+          "canonical_reference": "GEN 37-48"
+        }
+      ]
+    },
+    {
+      "campaign_id": "lagoinha-100-dias-2026",
+      "day_number": 5,
+      "title": "Crises transformadas em provisão",
+      "theme": null,
+      "theme_highlight": null,
+      "sphere": "economia",
+      "key_verse_reference": "GEN 50:20",
+      "official_direction": null,
+      "prayer_focus": "Empregos; empresas; empreendedores; famílias endividadas; recursos servindo a bons propósitos.",
+      "prayer_points": [
+        "Empregos",
+        "empresas",
+        "empreendedores",
+        "famílias endividadas",
+        "recursos servindo a bons propósitos"
+      ],
+      "altar": {
+        "ministry": "Intercessão/Bálsamo",
+        "leaders_label": "Prs. Leandra e Daniel"
+      },
+      "milestone": null,
+      "next_day_teaser": null,
+      "publish_status": "published",
+      "readings": [
+        {
+          "sort_order": 1,
+          "canonical_reference": "GEN 49-50"
+        },
+        {
+          "sort_order": 2,
+          "canonical_reference": "EXO 1-10"
+        }
+      ]
+    },
+    {
+      "campaign_id": "lagoinha-100-dias-2026",
+      "day_number": 6,
+      "title": "Uma voz que represente o Reino",
+      "theme": null,
+      "theme_highlight": null,
+      "sphere": "midia_comunicacao",
+      "key_verse_reference": "EXO 19:5-6",
+      "official_direction": null,
+      "prayer_focus": "Verdade; comunicadores; redes sociais; combate à manipulação; proclamação responsável.",
+      "prayer_points": [
+        "Verdade",
+        "comunicadores",
+        "redes sociais",
+        "combate à manipulação",
+        "proclamação responsável"
+      ],
+      "altar": {
+        "ministry": "Carisma",
+        "leaders_label": "Prs. Fernando e Nahália"
+      },
+      "milestone": null,
+      "next_day_teaser": null,
+      "publish_status": "published",
+      "readings": [
+        {
+          "sort_order": 1,
+          "canonical_reference": "EXO 11-22"
+        }
+      ]
+    },
+    {
+      "campaign_id": "lagoinha-100-dias-2026",
+      "day_number": 7,
+      "title": "Criatividade cheia do Espírito",
+      "theme": null,
+      "theme_highlight": null,
+      "sphere": "artes_entretenimento",
+      "key_verse_reference": "EXO 31:2-5",
+      "official_direction": null,
+      "prayer_focus": "Artistas; músicos; escritores; produtores; criatividade consagrada a Deus.",
+      "prayer_points": [
+        "Artistas",
+        "músicos",
+        "escritores",
+        "produtores",
+        "criatividade consagrada a Deus"
+      ],
+      "altar": {
+        "ministry": "Central de Voluntários",
+        "leaders_label": "Prs. Leo e Marcia"
+      },
+      "milestone": "Primeira semana",
+      "next_day_teaser": null,
+      "publish_status": "published",
+      "readings": [
+        {
+          "sort_order": 1,
+          "canonical_reference": "EXO 23-34"
+        }
+      ]
+    },
+    {
+      "campaign_id": "lagoinha-100-dias-2026",
+      "day_number": 8,
+      "title": "Uma Igreja marcada pela presença",
+      "theme": null,
+      "theme_highlight": null,
+      "sphere": "igreja",
+      "key_verse_reference": "EXO 40:34-35",
+      "official_direction": null,
+      "prayer_focus": "Presença de Deus; reverência; altares santos; culto; ministros sensíveis ao Espírito.",
+      "prayer_points": [
+        "Presença de Deus",
+        "reverência",
+        "altares santos",
+        "culto",
+        "ministros sensíveis ao Espírito"
+      ],
+      "altar": {
+        "ministry": "Centuriões",
+        "leaders_label": "Filipe e Tatá"
+      },
+      "milestone": null,
+      "next_day_teaser": null,
+      "publish_status": "published",
+      "readings": [
+        {
+          "sort_order": 1,
+          "canonical_reference": "EXO 35-40"
+        },
+        {
+          "sort_order": 2,
+          "canonical_reference": "LEV 1-6"
+        }
+      ]
+    },
+    {
+      "campaign_id": "lagoinha-100-dias-2026",
+      "day_number": 9,
+      "title": "Santidade dentro de casa",
+      "theme": null,
+      "theme_highlight": null,
+      "sphere": "familia",
+      "key_verse_reference": "LEV 18:5",
+      "official_direction": null,
+      "prayer_focus": "Pureza; fidelidade conjugal; limites saudáveis; proteção sexual; famílias vivendo princípios bíblicos.",
+      "prayer_points": [
+        "Pureza",
+        "fidelidade conjugal",
+        "limites saudáveis",
+        "proteção sexual",
+        "famílias vivendo princípios bíblicos"
+      ],
+      "altar": {
+        "ministry": "Champions",
+        "leaders_label": "Alessandro e Jennifer"
+      },
+      "milestone": null,
+      "next_day_teaser": null,
+      "publish_status": "published",
+      "readings": [
+        {
+          "sort_order": 1,
+          "canonical_reference": "LEV 7-18"
+        }
+      ]
+    },
+    {
+      "campaign_id": "lagoinha-100-dias-2026",
+      "day_number": 10,
+      "title": "Honra entre as gerações",
+      "theme": null,
+      "theme_highlight": null,
+      "sphere": "educacao",
+      "key_verse_reference": "LEV 19:32",
+      "official_direction": null,
+      "prayer_focus": "Respeito; formação de caráter; valorização dos idosos; educadores; cultura de honra.",
+      "prayer_points": [
+        "Respeito",
+        "formação de caráter",
+        "valorização dos idosos",
+        "educadores",
+        "cultura de honra"
+      ],
+      "altar": {
+        "ministry": "Intercessão/Bálsamo",
+        "leaders_label": "Prs. Leandra e Daniel"
+      },
+      "milestone": null,
+      "next_day_teaser": null,
+      "publish_status": "published",
+      "readings": [
+        {
+          "sort_order": 1,
+          "canonical_reference": "LEV 19-27"
+        },
+        {
+          "sort_order": 2,
+          "canonical_reference": "NUM 1-3"
+        }
+      ]
+    },
+    {
+      "campaign_id": "lagoinha-100-dias-2026",
+      "day_number": 11,
+      "title": "Liderança compartilhada",
+      "theme": null,
+      "theme_highlight": null,
+      "sphere": "governo",
+      "key_verse_reference": "NUM 11:16-17",
+      "official_direction": null,
+      "prayer_focus": "Conselheiros sábios; equipes de governo; responsabilidade; cooperação; autoridades não sobrecarregadas.",
+      "prayer_points": [
+        "Conselheiros sábios",
+        "equipes de governo",
+        "responsabilidade",
+        "cooperação",
+        "autoridades não sobrecarregadas"
+      ],
+      "altar": {
+        "ministry": "Consolidação",
+        "leaders_label": "Watson e Loiane"
+      },
+      "milestone": null,
+      "next_day_teaser": null,
+      "publish_status": "published",
+      "readings": [
+        {
+          "sort_order": 1,
+          "canonical_reference": "NUM 4-15"
+        }
+      ]
+    },
+    {
+      "campaign_id": "lagoinha-100-dias-2026",
+      "day_number": 12,
+      "title": "Honrar a Deus com o melhor",
+      "theme": null,
+      "theme_highlight": null,
+      "sphere": "economia",
+      "key_verse_reference": "NUM 18:29",
+      "official_direction": null,
+      "prayer_focus": "Mordomia; honestidade financeira; generosidade; justiça; administração responsável.",
+      "prayer_points": [
+        "Mordomia",
+        "honestidade financeira",
+        "generosidade",
+        "justiça",
+        "administração responsável"
+      ],
+      "altar": {
+        "ministry": "Dança - DNA",
+        "leaders_label": "Pra. Rebeca"
+      },
+      "milestone": null,
+      "next_day_teaser": null,
+      "publish_status": "published",
+      "readings": [
+        {
+          "sort_order": 1,
+          "canonical_reference": "NUM 16-27"
+        }
+      ]
+    },
+    {
+      "campaign_id": "lagoinha-100-dias-2026",
+      "day_number": 13,
+      "title": "Comunicação sem parcialidade",
+      "theme": null,
+      "theme_highlight": null,
+      "sphere": "midia_comunicacao",
+      "key_verse_reference": "DEU 1:17",
+      "official_direction": null,
+      "prayer_focus": "Imprensa responsável; justiça na informação; combate à distorção; coragem para a verdade; discernimento público.",
+      "prayer_points": [
+        "Imprensa responsável",
+        "justiça na informação",
+        "combate à distorção",
+        "coragem para a verdade",
+        "discernimento público"
+      ],
+      "altar": {
+        "ministry": "Diaconia",
+        "leaders_label": "Prs. Higor e Fernanda"
+      },
+      "milestone": null,
+      "next_day_teaser": null,
+      "publish_status": "published",
+      "readings": [
+        {
+          "sort_order": 1,
+          "canonical_reference": "NUM 28-36"
+        },
+        {
+          "sort_order": 2,
+          "canonical_reference": "DEU 1-3"
+        }
+      ]
+    },
+    {
+      "campaign_id": "lagoinha-100-dias-2026",
+      "day_number": 14,
+      "title": "Cultura que transmite valores",
+      "theme": null,
+      "theme_highlight": null,
+      "sphere": "artes_entretenimento",
+      "key_verse_reference": "DEU 6:6-7",
+      "official_direction": null,
+      "prayer_focus": "Conteúdo para crianças; famílias; produtores culturais; narrativas saudáveis; transmissão de valores.",
+      "prayer_points": [
+        "Conteúdo para crianças",
+        "famílias",
+        "produtores culturais",
+        "narrativas saudáveis",
+        "transmissão de valores"
+      ],
+      "altar": {
+        "ministry": "Intercessão/Bálsamo",
+        "leaders_label": "Prs. Leandra e Daniel"
+      },
+      "milestone": null,
+      "next_day_teaser": null,
+      "publish_status": "published",
+      "readings": [
+        {
+          "sort_order": 1,
+          "canonical_reference": "DEU 4-15"
+        }
+      ]
+    },
+    {
+      "campaign_id": "lagoinha-100-dias-2026",
+      "day_number": 15,
+      "title": "Um povo separado para Deus",
+      "theme": null,
+      "theme_highlight": null,
+      "sphere": "igreja",
+      "key_verse_reference": "DEU 26:18-19",
+      "official_direction": null,
+      "prayer_focus": "Santidade; identidade; testemunho; fidelidade à Palavra; Igreja distinta da cultura sem se isolar dela.",
+      "prayer_points": [
+        "Santidade",
+        "identidade",
+        "testemunho",
+        "fidelidade à Palavra",
+        "Igreja distinta da cultura sem se isolar dela"
+      ],
+      "altar": {
+        "ministry": "EBD",
+        "leaders_label": "Marcio e Débora"
+      },
+      "milestone": null,
+      "next_day_teaser": null,
+      "publish_status": "published",
+      "readings": [
+        {
+          "sort_order": 1,
+          "canonical_reference": "DEU 16-27"
+        }
+      ]
+    },
+    {
+      "campaign_id": "lagoinha-100-dias-2026",
+      "day_number": 16,
+      "title": "Casas governadas pela Palavra",
+      "theme": null,
+      "theme_highlight": null,
+      "sphere": "familia",
+      "key_verse_reference": "JOS 1:8",
+      "official_direction": null,
+      "prayer_focus": "Leitura bíblica familiar; pais discipuladores; filhos firmados na Palavra; obediência; prosperidade segundo Deus.",
+      "prayer_points": [
+        "Leitura bíblica familiar",
+        "pais discipuladores",
+        "filhos firmados na Palavra",
+        "obediência",
+        "prosperidade segundo Deus"
+      ],
+      "altar": {
+        "ministry": "Ephatá",
+        "leaders_label": "Jô Carvalho"
+      },
+      "milestone": null,
+      "next_day_teaser": null,
+      "publish_status": "published",
+      "readings": [
+        {
+          "sort_order": 1,
+          "canonical_reference": "DEU 28-34"
+        },
+        {
+          "sort_order": 2,
+          "canonical_reference": "JOS 1-5"
+        }
+      ]
+    },
+    {
+      "campaign_id": "lagoinha-100-dias-2026",
+      "day_number": 17,
+      "title": "Uma geração de coragem",
+      "theme": null,
+      "theme_highlight": null,
+      "sphere": "educacao",
+      "key_verse_reference": "JOS 14:10-12",
+      "official_direction": null,
+      "prayer_focus": "Jovens perseverantes; vocação; coragem; sonhos alinhados; conquista responsável do futuro.",
+      "prayer_points": [
+        "Jovens perseverantes",
+        "vocação",
+        "coragem",
+        "sonhos alinhados",
+        "conquista responsável do futuro"
+      ],
+      "altar": {
+        "ministry": "Evangelismo",
+        "leaders_label": "Matheus e Eduarda"
+      },
+      "milestone": null,
+      "next_day_teaser": null,
+      "publish_status": "published",
+      "readings": [
+        {
+          "sort_order": 1,
+          "canonical_reference": "JOS 6-17"
+        }
+      ]
+    },
+    {
+      "campaign_id": "lagoinha-100-dias-2026",
+      "day_number": 18,
+      "title": "Governar começando pela própria casa",
+      "theme": null,
+      "theme_highlight": null,
+      "sphere": "governo",
+      "key_verse_reference": "JOS 24:15",
+      "official_direction": null,
+      "prayer_focus": "Integridade privada; famílias das autoridades; decisões firmes; serviço; temor do Senhor.",
+      "prayer_points": [
+        "Integridade privada",
+        "famílias das autoridades",
+        "decisões firmes",
+        "serviço",
+        "temor do Senhor"
+      ],
+      "altar": {
+        "ministry": "Intercessão/Bálsamo",
+        "leaders_label": "Prs. Leandra e Daniel"
+      },
+      "milestone": null,
+      "next_day_teaser": null,
+      "publish_status": "published",
+      "readings": [
+        {
+          "sort_order": 1,
+          "canonical_reference": "JOS 18-24"
+        },
+        {
+          "sort_order": 2,
+          "canonical_reference": "JDG 1-5"
+        }
+      ]
+    },
+    {
+      "campaign_id": "lagoinha-100-dias-2026",
+      "day_number": 19,
+      "title": "Força para reconstruir",
+      "theme": null,
+      "theme_highlight": null,
+      "sphere": "economia",
+      "key_verse_reference": "JDG 6:14",
+      "official_direction": null,
+      "prayer_focus": "Empreendedores; recuperação econômica; criatividade diante da crise; trabalho; coragem para recomeçar.",
+      "prayer_points": [
+        "Empreendedores",
+        "recuperação econômica",
+        "criatividade diante da crise",
+        "trabalho",
+        "coragem para recomeçar"
+      ],
+      "altar": {
+        "ministry": "Feira Missionária",
+        "leaders_label": "Pra. Marta"
+      },
+      "milestone": null,
+      "next_day_teaser": null,
+      "publish_status": "published",
+      "readings": [
+        {
+          "sort_order": 1,
+          "canonical_reference": "JDG 6-17"
+        }
+      ]
+    },
+    {
+      "campaign_id": "lagoinha-100-dias-2026",
+      "day_number": 20,
+      "title": "Aprender a ouvir antes de falar",
+      "theme": null,
+      "theme_highlight": null,
+      "sphere": "midia_comunicacao",
+      "key_verse_reference": "1SA 3:10",
+      "official_direction": null,
+      "prayer_focus": "Escuta; discernimento; comunicadores; responsabilidade com palavras; voz profética da Igreja.",
+      "prayer_points": [
+        "Escuta",
+        "discernimento",
+        "comunicadores",
+        "responsabilidade com palavras",
+        "voz profética da Igreja"
+      ],
+      "altar": {
+        "ministry": "Follow",
+        "leaders_label": "Pr. Leo Félix"
+      },
+      "milestone": null,
+      "next_day_teaser": null,
+      "publish_status": "published",
+      "readings": [
+        {
+          "sort_order": 1,
+          "canonical_reference": "JDG 18-21"
+        },
+        {
+          "sort_order": 2,
+          "canonical_reference": "RUT 1-4"
+        },
+        {
+          "sort_order": 3,
+          "canonical_reference": "1SA 1-4"
+        }
+      ]
+    },
+    {
+      "campaign_id": "lagoinha-100-dias-2026",
+      "day_number": 21,
+      "title": "Arte que serve e traz alívio",
+      "theme": null,
+      "theme_highlight": null,
+      "sphere": "artes_entretenimento",
+      "key_verse_reference": "1SA 16:23",
+      "official_direction": null,
+      "prayer_focus": "Músicos; ministros; saúde emocional dos artistas; ambientes culturais; dons usados para edificação.",
+      "prayer_points": [
+        "Músicos",
+        "ministros",
+        "saúde emocional dos artistas",
+        "ambientes culturais",
+        "dons usados para edificação"
+      ],
+      "altar": {
+        "ministry": "Future",
+        "leaders_label": "Guilherme"
+      },
+      "milestone": null,
+      "next_day_teaser": null,
+      "publish_status": "published",
+      "readings": [
+        {
+          "sort_order": 1,
+          "canonical_reference": "1SA 5-16"
+        }
+      ]
+    },
+    {
+      "campaign_id": "lagoinha-100-dias-2026",
+      "day_number": 22,
+      "title": "Uma Igreja que conhece sua fonte de vitória",
+      "theme": null,
+      "theme_highlight": null,
+      "sphere": "igreja",
+      "key_verse_reference": "1SA 17:47",
+      "official_direction": null,
+      "prayer_focus": "Fé; dependência de Deus; coragem; batalha espiritual; testemunho público.",
+      "prayer_points": [
+        "Fé",
+        "dependência de Deus",
+        "coragem",
+        "batalha espiritual",
+        "testemunho público"
+      ],
+      "altar": {
+        "ministry": "GC",
+        "leaders_label": "Prs. Cézar e Erica"
+      },
+      "milestone": null,
+      "next_day_teaser": null,
+      "publish_status": "published",
+      "readings": [
+        {
+          "sort_order": 1,
+          "canonical_reference": "1SA 17-28"
+        }
+      ]
+    },
+    {
+      "campaign_id": "lagoinha-100-dias-2026",
+      "day_number": 23,
+      "title": "Restauração e bondade dentro das relações",
+      "theme": null,
+      "theme_highlight": null,
+      "sphere": "familia",
+      "key_verse_reference": "2SA 9:7",
+      "official_direction": null,
+      "prayer_focus": "Reconciliação; acolhimento; órfãos; pessoas feridas; restauração de vínculos.",
+      "prayer_points": [
+        "Reconciliação",
+        "acolhimento",
+        "órfãos",
+        "pessoas feridas",
+        "restauração de vínculos"
+      ],
+      "altar": {
+        "ministry": "Intercessão/Bálsamo",
+        "leaders_label": "Prs. Leandra e Daniel"
+      },
+      "milestone": null,
+      "next_day_teaser": null,
+      "publish_status": "published",
+      "readings": [
+        {
+          "sort_order": 1,
+          "canonical_reference": "1SA 29-31"
+        },
+        {
+          "sort_order": 2,
+          "canonical_reference": "2SA 1-9"
+        }
+      ]
+    },
+    {
+      "campaign_id": "lagoinha-100-dias-2026",
+      "day_number": 24,
+      "title": "Verdade que confronta e transforma",
+      "theme": null,
+      "theme_highlight": null,
+      "sphere": "educacao",
+      "key_verse_reference": "2SA 12:7",
+      "official_direction": null,
+      "prayer_focus": "Professores íntegros; correção saudável; formação moral; coragem para confrontar erros; arrependimento.",
+      "prayer_points": [
+        "Professores íntegros",
+        "correção saudável",
+        "formação moral",
+        "coragem para confrontar erros",
+        "arrependimento"
+      ],
+      "altar": {
+        "ministry": "Gerações",
+        "leaders_label": "Prs. Richarde e Priscila"
+      },
+      "milestone": null,
+      "next_day_teaser": null,
+      "publish_status": "published",
+      "readings": [
+        {
+          "sort_order": 1,
+          "canonical_reference": "2SA 10-21"
+        }
+      ]
+    },
+    {
+      "campaign_id": "lagoinha-100-dias-2026",
+      "day_number": 25,
+      "title": "Coração sábio para governar",
+      "theme": null,
+      "theme_highlight": null,
+      "sphere": "governo",
+      "key_verse_reference": "1KI 3:9",
+      "official_direction": null,
+      "prayer_focus": "Sabedoria; discernimento entre bem e mal; justiça; decisões públicas; temor de Deus.",
+      "prayer_points": [
+        "Sabedoria",
+        "discernimento entre bem e mal",
+        "justiça",
+        "decisões públicas",
+        "temor de Deus"
+      ],
+      "altar": {
+        "ministry": "Hero",
+        "leaders_label": "Pr. Leo Félix"
+      },
+      "milestone": "Um quarto da jornada",
+      "next_day_teaser": null,
+      "publish_status": "published",
+      "readings": [
+        {
+          "sort_order": 1,
+          "canonical_reference": "2SA 22-24"
+        },
+        {
+          "sort_order": 2,
+          "canonical_reference": "1KI 1-9"
+        }
+      ]
+    },
+    {
+      "campaign_id": "lagoinha-100-dias-2026",
+      "day_number": 26,
+      "title": "Prosperidade submetida à sabedoria",
+      "theme": null,
+      "theme_highlight": null,
+      "sphere": "economia",
+      "key_verse_reference": "1KI 10:23-24",
+      "official_direction": null,
+      "prayer_focus": "Riqueza com propósito; empresários; combate à ganância; generosidade; responsabilidade econômica.",
+      "prayer_points": [
+        "Riqueza com propósito",
+        "empresários",
+        "combate à ganância",
+        "generosidade",
+        "responsabilidade econômica"
+      ],
+      "altar": {
+        "ministry": "Hero+",
+        "leaders_label": "Pr. Tamiozzo"
+      },
+      "milestone": null,
+      "next_day_teaser": null,
+      "publish_status": "published",
+      "readings": [
+        {
+          "sort_order": 1,
+          "canonical_reference": "1KI 10-21"
+        }
+      ]
+    },
+    {
+      "campaign_id": "lagoinha-100-dias-2026",
+      "day_number": 27,
+      "title": "Falar somente a verdade",
+      "theme": null,
+      "theme_highlight": null,
+      "sphere": "midia_comunicacao",
+      "key_verse_reference": "1KI 22:14",
+      "official_direction": null,
+      "prayer_focus": "Jornalistas; pregadores; influenciadores; coragem; resistência à pressão e manipulação.",
+      "prayer_points": [
+        "Jornalistas",
+        "pregadores",
+        "influenciadores",
+        "coragem",
+        "resistência à pressão e manipulação"
+      ],
+      "altar": {
+        "ministry": "Intercessão/Bálsamo",
+        "leaders_label": "Prs. Leandra e Daniel"
+      },
+      "milestone": null,
+      "next_day_teaser": null,
+      "publish_status": "published",
+      "readings": [
+        {
+          "sort_order": 1,
+          "canonical_reference": "1KI 22"
+        },
+        {
+          "sort_order": 2,
+          "canonical_reference": "2KI 1-11"
+        }
+      ]
+    },
+    {
+      "campaign_id": "lagoinha-100-dias-2026",
+      "day_number": 28,
+      "title": "Cultura reposicionada pela aliança",
+      "theme": null,
+      "theme_highlight": null,
+      "sphere": "artes_entretenimento",
+      "key_verse_reference": "2KI 23:3",
+      "official_direction": null,
+      "prayer_focus": "Purificação cultural; abandono da idolatria; artistas comprometidos; conteúdo saudável; transformação de valores.",
+      "prayer_points": [
+        "Purificação cultural",
+        "abandono da idolatria",
+        "artistas comprometidos",
+        "conteúdo saudável",
+        "transformação de valores"
+      ],
+      "altar": {
+        "ministry": "Host (Eventos)",
+        "leaders_label": "Alessandro e Jennifer"
+      },
+      "milestone": null,
+      "next_day_teaser": null,
+      "publish_status": "published",
+      "readings": [
+        {
+          "sort_order": 1,
+          "canonical_reference": "2KI 12-23"
+        }
+      ]
+    },
+    {
+      "campaign_id": "lagoinha-100-dias-2026",
+      "day_number": 29,
+      "title": "Ministros dedicados continuamente",
+      "theme": null,
+      "theme_highlight": null,
+      "sphere": "igreja",
+      "key_verse_reference": "1CH 9:33",
+      "official_direction": null,
+      "prayer_focus": "Adoradores; voluntários; constância; serviço; fidelidade ministerial.",
+      "prayer_points": [
+        "Adoradores",
+        "voluntários",
+        "constância",
+        "serviço",
+        "fidelidade ministerial"
+      ],
+      "altar": {
+        "ministry": "Integração",
+        "leaders_label": "Fabio e Emanuelly"
+      },
+      "milestone": null,
+      "next_day_teaser": null,
+      "publish_status": "published",
+      "readings": [
+        {
+          "sort_order": 1,
+          "canonical_reference": "2KI 24-25"
+        },
+        {
+          "sort_order": 2,
+          "canonical_reference": "1CH 1-10"
+        }
+      ]
+    },
+    {
+      "campaign_id": "lagoinha-100-dias-2026",
+      "day_number": 30,
+      "title": "Bênção sobre as casas",
+      "theme": null,
+      "theme_highlight": null,
+      "sphere": "familia",
+      "key_verse_reference": "1CH 17:27",
+      "official_direction": null,
+      "prayer_focus": "Lares; descendência; proteção; legado espiritual; presença de Deus nas famílias.",
+      "prayer_points": [
+        "Lares",
+        "descendência",
+        "proteção",
+        "legado espiritual",
+        "presença de Deus nas famílias"
+      ],
+      "altar": {
+        "ministry": "Kids",
+        "leaders_label": "Marcela e Karlton"
+      },
+      "milestone": null,
+      "next_day_teaser": null,
+      "publish_status": "published",
+      "readings": [
+        {
+          "sort_order": 1,
+          "canonical_reference": "1CH 11-22"
+        }
+      ]
+    },
+    {
+      "campaign_id": "lagoinha-100-dias-2026",
+      "day_number": 31,
+      "title": "Sabedoria e conhecimento",
+      "theme": null,
+      "theme_highlight": null,
+      "sphere": "educacao",
+      "key_verse_reference": "2CH 1:10",
+      "official_direction": null,
+      "prayer_focus": "Professores; gestores; alunos; pesquisa; conhecimento acompanhado de discernimento.",
+      "prayer_points": [
+        "Professores",
+        "gestores",
+        "alunos",
+        "pesquisa",
+        "conhecimento acompanhado de discernimento"
+      ],
+      "altar": {
+        "ministry": "Intercessão/Bálsamo",
+        "leaders_label": "Prs. Leandra e Daniel"
+      },
+      "milestone": null,
+      "next_day_teaser": null,
+      "publish_status": "published",
+      "readings": [
+        {
+          "sort_order": 1,
+          "canonical_reference": "1CH 23-29"
+        },
+        {
+          "sort_order": 2,
+          "canonical_reference": "2CH 1-5"
+        }
+      ]
+    },
+    {
+      "campaign_id": "lagoinha-100-dias-2026",
+      "day_number": 32,
+      "title": "Uma nação que se humilha",
+      "theme": null,
+      "theme_highlight": null,
+      "sphere": "governo",
+      "key_verse_reference": "2CH 7:14",
+      "official_direction": null,
+      "prayer_focus": "Arrependimento; autoridades; cura da terra; justiça; retorno aos caminhos corretos.",
+      "prayer_points": [
+        "Arrependimento",
+        "autoridades",
+        "cura da terra",
+        "justiça",
+        "retorno aos caminhos corretos"
+      ],
+      "altar": {
+        "ministry": "Legacy",
+        "leaders_label": "Prs. Júnior e Miriã"
+      },
+      "milestone": null,
+      "next_day_teaser": null,
+      "publish_status": "published",
+      "readings": [
+        {
+          "sort_order": 1,
+          "canonical_reference": "2CH 6-17"
+        }
+      ]
+    },
+    {
+      "campaign_id": "lagoinha-100-dias-2026",
+      "day_number": 33,
+      "title": "Prosperar buscando ao Senhor",
+      "theme": null,
+      "theme_highlight": null,
+      "sphere": "economia",
+      "key_verse_reference": "2CH 26:5",
+      "official_direction": null,
+      "prayer_focus": "Trabalho; produtividade; dependência de Deus; empresários; prosperidade sem corrupção.",
+      "prayer_points": [
+        "Trabalho",
+        "produtividade",
+        "dependência de Deus",
+        "empresários",
+        "prosperidade sem corrupção"
+      ],
+      "altar": {
+        "ministry": "Life Care",
+        "leaders_label": "Rones"
+      },
+      "milestone": null,
+      "next_day_teaser": null,
+      "publish_status": "published",
+      "readings": [
+        {
+          "sort_order": 1,
+          "canonical_reference": "2CH 18-29"
+        }
+      ]
+    },
+    {
+      "campaign_id": "lagoinha-100-dias-2026",
+      "day_number": 34,
+      "title": "Mensageiros que chamam ao retorno",
+      "theme": null,
+      "theme_highlight": null,
+      "sphere": "midia_comunicacao",
+      "key_verse_reference": "2CH 30:6",
+      "official_direction": null,
+      "prayer_focus": "Comunicação do Evangelho; convites à reconciliação; evangelismo digital; verdade; alcance.",
+      "prayer_points": [
+        "Comunicação do Evangelho",
+        "convites à reconciliação",
+        "evangelismo digital",
+        "verdade",
+        "alcance"
+      ],
+      "altar": {
+        "ministry": "Link",
+        "leaders_label": "Rafael e Lorena"
+      },
+      "milestone": null,
+      "next_day_teaser": null,
+      "publish_status": "published",
+      "readings": [
+        {
+          "sort_order": 1,
+          "canonical_reference": "2CH 30-36"
+        },
+        {
+          "sort_order": 2,
+          "canonical_reference": "EZR 1-5"
+        }
+      ]
+    },
+    {
+      "campaign_id": "lagoinha-100-dias-2026",
+      "day_number": 35,
+      "title": "Excelência fundamentada na Palavra",
+      "theme": null,
+      "theme_highlight": null,
+      "sphere": "artes_entretenimento",
+      "key_verse_reference": "EZR 7:10",
+      "official_direction": null,
+      "prayer_focus": "Formação dos artistas; estudo; caráter; prática; ensino através da criatividade.",
+      "prayer_points": [
+        "Formação dos artistas",
+        "estudo",
+        "caráter",
+        "prática",
+        "ensino através da criatividade"
+      ],
+      "altar": {
+        "ministry": "Intercessão/Bálsamo",
+        "leaders_label": "Prs. Leandra e Daniel"
+      },
+      "milestone": null,
+      "next_day_teaser": null,
+      "publish_status": "published",
+      "readings": [
+        {
+          "sort_order": 1,
+          "canonical_reference": "EZR 6-10"
+        },
+        {
+          "sort_order": 2,
+          "canonical_reference": "NEH 1-7"
+        }
+      ]
+    },
+    {
+      "campaign_id": "lagoinha-100-dias-2026",
+      "day_number": 36,
+      "title": "Uma Igreja fortalecida pela alegria do Senhor",
+      "theme": null,
+      "theme_highlight": null,
+      "sphere": "igreja",
+      "key_verse_reference": "NEH 8:10",
+      "official_direction": null,
+      "prayer_focus": "Renovação; Palavra; comunhão; restauração; força espiritual.",
+      "prayer_points": [
+        "Renovação",
+        "Palavra",
+        "comunhão",
+        "restauração",
+        "força espiritual"
+      ],
+      "altar": {
+        "ministry": "Meeting Grace",
+        "leaders_label": "Priscila e Yasmin"
+      },
+      "milestone": null,
+      "next_day_teaser": null,
+      "publish_status": "published",
+      "readings": [
+        {
+          "sort_order": 1,
+          "canonical_reference": "NEH 8-13"
+        },
+        {
+          "sort_order": 2,
+          "canonical_reference": "EST 1-6"
+        }
+      ]
+    },
+    {
+      "campaign_id": "lagoinha-100-dias-2026",
+      "day_number": 37,
+      "title": "Pais que intercedem pelos filhos",
+      "theme": null,
+      "theme_highlight": null,
+      "sphere": "familia",
+      "key_verse_reference": "JOB 1:5",
+      "official_direction": null,
+      "prayer_focus": "Cobertura espiritual; filhos; santidade; pais presentes; proteção das gerações.",
+      "prayer_points": [
+        "Cobertura espiritual",
+        "filhos",
+        "santidade",
+        "pais presentes",
+        "proteção das gerações"
+      ],
+      "altar": {
+        "ministry": "Min. de Pais",
+        "leaders_label": "Givanildo e Rivany"
+      },
+      "milestone": null,
+      "next_day_teaser": null,
+      "publish_status": "published",
+      "readings": [
+        {
+          "sort_order": 1,
+          "canonical_reference": "EST 7-10"
+        },
+        {
+          "sort_order": 2,
+          "canonical_reference": "JOB 1-8"
+        }
+      ]
+    },
+    {
+      "campaign_id": "lagoinha-100-dias-2026",
+      "day_number": 38,
+      "title": "A verdadeira fonte da sabedoria",
+      "theme": null,
+      "theme_highlight": null,
+      "sphere": "educacao",
+      "key_verse_reference": "JOB 12:12-13",
+      "official_direction": null,
+      "prayer_focus": "Conhecimento; humildade intelectual; pesquisadores; professores; sabedoria de Deus.",
+      "prayer_points": [
+        "Conhecimento",
+        "humildade intelectual",
+        "pesquisadores",
+        "professores",
+        "sabedoria de Deus"
+      ],
+      "altar": {
+        "ministry": "Missão Estrutural",
+        "leaders_label": "Luciano e Bruna"
+      },
+      "milestone": null,
+      "next_day_teaser": null,
+      "publish_status": "published",
+      "readings": [
+        {
+          "sort_order": 1,
+          "canonical_reference": "JOB 9-20"
+        }
+      ]
+    },
+    {
+      "campaign_id": "lagoinha-100-dias-2026",
+      "day_number": 39,
+      "title": "Justiça como vestimenta",
+      "theme": null,
+      "theme_highlight": null,
+      "sphere": "governo",
+      "key_verse_reference": "JOB 29:14",
+      "official_direction": null,
+      "prayer_focus": "Sistema de justiça; autoridades; defesa dos vulneráveis; equidade; integridade.",
+      "prayer_points": [
+        "Sistema de justiça",
+        "autoridades",
+        "defesa dos vulneráveis",
+        "equidade",
+        "integridade"
+      ],
+      "altar": {
+        "ministry": "Lago Music",
+        "leaders_label": "Jacson e Paloma"
+      },
+      "milestone": null,
+      "next_day_teaser": null,
+      "publish_status": "published",
+      "readings": [
+        {
+          "sort_order": 1,
+          "canonical_reference": "JOB 21-32"
+        }
+      ]
+    },
+    {
+      "campaign_id": "lagoinha-100-dias-2026",
+      "day_number": 40,
+      "title": "Restauração depois das perdas",
+      "theme": null,
+      "theme_highlight": null,
+      "sphere": "economia",
+      "key_verse_reference": "JOB 42:10",
+      "official_direction": null,
+      "prayer_focus": "Recuperação financeira; desempregados; negócios atingidos; generosidade; novos começos.",
+      "prayer_points": [
+        "Recuperação financeira",
+        "desempregados",
+        "negócios atingidos",
+        "generosidade",
+        "novos começos"
+      ],
+      "altar": {
+        "ministry": "Intercessão/Bálsamo",
+        "leaders_label": "Prs. Leandra e Daniel"
+      },
+      "milestone": null,
+      "next_day_teaser": null,
+      "publish_status": "published",
+      "readings": [
+        {
+          "sort_order": 1,
+          "canonical_reference": "JOB 33-42"
+        },
+        {
+          "sort_order": 2,
+          "canonical_reference": "PSA 1-2"
+        }
+      ]
+    },
+    {
+      "campaign_id": "lagoinha-100-dias-2026",
+      "day_number": 41,
+      "title": "Palavras puras em meio ao ruído",
+      "theme": null,
+      "theme_highlight": null,
+      "sphere": "midia_comunicacao",
+      "key_verse_reference": "PSA 12:6",
+      "official_direction": null,
+      "prayer_focus": "Verdade; combate às fake news; comunicação ética; redes sociais; discernimento.",
+      "prayer_points": [
+        "Verdade",
+        "combate às fake news",
+        "comunicação ética",
+        "redes sociais",
+        "discernimento"
+      ],
+      "altar": {
+        "ministry": "Pérolas (Shine)",
+        "leaders_label": "Pra. Katiana"
+      },
+      "milestone": null,
+      "next_day_teaser": null,
+      "publish_status": "published",
+      "readings": [
+        {
+          "sort_order": 1,
+          "canonical_reference": "PSA 3-14"
+        }
+      ]
+    },
+    {
+      "campaign_id": "lagoinha-100-dias-2026",
+      "day_number": 42,
+      "title": "A criação proclamando a glória de Deus",
+      "theme": null,
+      "theme_highlight": null,
+      "sphere": "artes_entretenimento",
+      "key_verse_reference": "PSA 19:1",
+      "official_direction": null,
+      "prayer_focus": "Beleza; criatividade; fotografia; cinema; música; arte que revele o Criador.",
+      "prayer_points": [
+        "Beleza",
+        "criatividade",
+        "fotografia",
+        "cinema",
+        "música",
+        "arte que revele o Criador"
+      ],
+      "altar": {
+        "ministry": "Plug",
+        "leaders_label": "Prs. Gabriel e Paula"
+      },
+      "milestone": null,
+      "next_day_teaser": null,
+      "publish_status": "published",
+      "readings": [
+        {
+          "sort_order": 1,
+          "canonical_reference": "PSA 15-26"
+        }
+      ]
+    },
+    {
+      "campaign_id": "lagoinha-100-dias-2026",
+      "day_number": 43,
+      "title": "Uma Igreja apaixonada pela presença",
+      "theme": null,
+      "theme_highlight": null,
+      "sphere": "igreja",
+      "key_verse_reference": "PSA 27:4",
+      "official_direction": null,
+      "prayer_focus": "Adoração; intimidade; casas de oração; ministros; fome pela presença.",
+      "prayer_points": [
+        "Adoração",
+        "intimidade",
+        "casas de oração",
+        "ministros",
+        "fome pela presença"
+      ],
+      "altar": {
+        "ministry": "Rocket",
+        "leaders_label": "Prs. Vladi e Júlia"
+      },
+      "milestone": null,
+      "next_day_teaser": null,
+      "publish_status": "published",
+      "readings": [
+        {
+          "sort_order": 1,
+          "canonical_reference": "PSA 27-38"
+        }
+      ]
+    },
+    {
+      "campaign_id": "lagoinha-100-dias-2026",
+      "day_number": 44,
+      "title": "Deus como refúgio das famílias",
+      "theme": null,
+      "theme_highlight": null,
+      "sphere": "familia",
+      "key_verse_reference": "PSA 46:1",
+      "official_direction": null,
+      "prayer_focus": "Lares em crise; violência doméstica; proteção; segurança emocional; restauração.",
+      "prayer_points": [
+        "Lares em crise",
+        "violência doméstica",
+        "proteção",
+        "segurança emocional",
+        "restauração"
+      ],
+      "altar": {
+        "ministry": "Intercessão/Bálsamo",
+        "leaders_label": "Prs. Leandra e Daniel"
+      },
+      "milestone": null,
+      "next_day_teaser": null,
+      "publish_status": "published",
+      "readings": [
+        {
+          "sort_order": 1,
+          "canonical_reference": "PSA 39-50"
+        }
+      ]
+    },
+    {
+      "campaign_id": "lagoinha-100-dias-2026",
+      "day_number": 45,
+      "title": "Verdade no íntimo",
+      "theme": null,
+      "theme_highlight": null,
+      "sphere": "educacao",
+      "key_verse_reference": "PSA 51:6",
+      "official_direction": null,
+      "prayer_focus": "Formação de caráter; integridade acadêmica; professores; alunos; transformação interior.",
+      "prayer_points": [
+        "Formação de caráter",
+        "integridade acadêmica",
+        "professores",
+        "alunos",
+        "transformação interior"
+      ],
+      "altar": {
+        "ministry": "Shine",
+        "leaders_label": "Pra. Gabriela"
+      },
+      "milestone": null,
+      "next_day_teaser": null,
+      "publish_status": "published",
+      "readings": [
+        {
+          "sort_order": 1,
+          "canonical_reference": "PSA 51-62"
+        }
+      ]
+    },
+    {
+      "campaign_id": "lagoinha-100-dias-2026",
+      "day_number": 46,
+      "title": "Justiça para governar",
+      "theme": null,
+      "theme_highlight": null,
+      "sphere": "governo",
+      "key_verse_reference": "PSA 72:1-2",
+      "official_direction": null,
+      "prayer_focus": "Governantes; decisões justas; pobres e vulneráveis; tribunais; políticas públicas.",
+      "prayer_points": [
+        "Governantes",
+        "decisões justas",
+        "pobres e vulneráveis",
+        "tribunais",
+        "políticas públicas"
+      ],
+      "altar": {
+        "ministry": "Shine+",
+        "leaders_label": "Pra. Elizabeth"
+      },
+      "milestone": null,
+      "next_day_teaser": null,
+      "publish_status": "published",
+      "readings": [
+        {
+          "sort_order": 1,
+          "canonical_reference": "PSA 63-74"
+        }
+      ]
+    },
+    {
+      "campaign_id": "lagoinha-100-dias-2026",
+      "day_number": 47,
+      "title": "Provisão sem comprometer a integridade",
+      "theme": null,
+      "theme_highlight": null,
+      "sphere": "economia",
+      "key_verse_reference": "PSA 84:11",
+      "official_direction": null,
+      "prayer_focus": "Trabalho digno; oportunidades; honestidade; provisão; confiança em Deus.",
+      "prayer_points": [
+        "Trabalho digno",
+        "oportunidades",
+        "honestidade",
+        "provisão",
+        "confiança em Deus"
+      ],
+      "altar": {
+        "ministry": "Start",
+        "leaders_label": "Prs. Roberto e Sany"
+      },
+      "milestone": null,
+      "next_day_teaser": null,
+      "publish_status": "published",
+      "readings": [
+        {
+          "sort_order": 1,
+          "canonical_reference": "PSA 75-86"
+        }
+      ]
+    },
+    {
+      "campaign_id": "lagoinha-100-dias-2026",
+      "day_number": 48,
+      "title": "Anunciar Sua glória entre as nações",
+      "theme": null,
+      "theme_highlight": null,
+      "sphere": "midia_comunicacao",
+      "key_verse_reference": "PSA 96:3",
+      "official_direction": null,
+      "prayer_focus": "Evangelização digital; mídia cristã; alcance internacional; testemunhos; proclamação.",
+      "prayer_points": [
+        "Evangelização digital",
+        "mídia cristã",
+        "alcance internacional",
+        "testemunhos",
+        "proclamação"
+      ],
+      "altar": {
+        "ministry": "Intercessão/Bálsamo",
+        "leaders_label": "Prs. Leandra e Daniel"
+      },
+      "milestone": null,
+      "next_day_teaser": null,
+      "publish_status": "published",
+      "readings": [
+        {
+          "sort_order": 1,
+          "canonical_reference": "PSA 87-98"
+        }
+      ]
+    },
+    {
+      "campaign_id": "lagoinha-100-dias-2026",
+      "day_number": 49,
+      "title": "Pureza diante dos olhos",
+      "theme": null,
+      "theme_highlight": null,
+      "sphere": "artes_entretenimento",
+      "key_verse_reference": "PSA 101:3",
+      "official_direction": null,
+      "prayer_focus": "Conteúdo audiovisual; pornografia; entretenimento infantil; escolhas; produtores e plataformas.",
+      "prayer_points": [
+        "Conteúdo audiovisual",
+        "pornografia",
+        "entretenimento infantil",
+        "escolhas",
+        "produtores e plataformas"
+      ],
+      "altar": {
+        "ministry": "Teatro (Lag) Art Factory",
+        "leaders_label": "Samuel Rofergo"
+      },
+      "milestone": null,
+      "next_day_teaser": null,
+      "publish_status": "published",
+      "readings": [
+        {
+          "sort_order": 1,
+          "canonical_reference": "PSA 99-110"
+        }
+      ]
+    },
+    {
+      "campaign_id": "lagoinha-100-dias-2026",
+      "day_number": 50,
+      "title": "Uma Igreja que ora pela paz",
+      "theme": null,
+      "theme_highlight": null,
+      "sphere": "igreja",
+      "key_verse_reference": "PSA 122:6",
+      "official_direction": null,
+      "prayer_focus": "Unidade; reconciliação; Israel e Jerusalém; paz; Igreja como agente de reconciliação.",
+      "prayer_points": [
+        "Unidade",
+        "reconciliação",
+        "Israel e Jerusalém",
+        "paz",
+        "Igreja como agente de reconciliação"
+      ],
+      "altar": {
+        "ministry": "We Care",
+        "leaders_label": "Pr. Paulo e Priscila"
+      },
+      "milestone": "Metade do caminho",
+      "next_day_teaser": null,
+      "publish_status": "published",
+      "readings": [
+        {
+          "sort_order": 1,
+          "canonical_reference": "PSA 111-122"
+        }
+      ]
+    },
+    {
+      "campaign_id": "lagoinha-100-dias-2026",
+      "day_number": 51,
+      "title": "Filhos como herança",
+      "theme": null,
+      "theme_highlight": null,
+      "sphere": "familia",
+      "key_verse_reference": "PSA 127:3",
+      "official_direction": null,
+      "prayer_focus": "Crianças; gestantes; pais; proteção da infância; futuras gerações.",
+      "prayer_points": [
+        "Crianças",
+        "gestantes",
+        "pais",
+        "proteção da infância",
+        "futuras gerações"
+      ],
+      "altar": {
+        "ministry": "À Mesa",
+        "leaders_label": "Edson e Rejane"
+      },
+      "milestone": null,
+      "next_day_teaser": null,
+      "publish_status": "published",
+      "readings": [
+        {
+          "sort_order": 1,
+          "canonical_reference": "PSA 123-134"
+        }
+      ]
+    },
+    {
+      "campaign_id": "lagoinha-100-dias-2026",
+      "day_number": 52,
+      "title": "Ensina-me a fazer a tua vontade",
+      "theme": null,
+      "theme_highlight": null,
+      "sphere": "educacao",
+      "key_verse_reference": "PSA 143:10",
+      "official_direction": null,
+      "prayer_focus": "Educadores; currículos; escolhas profissionais; alunos; direção de Deus.",
+      "prayer_points": [
+        "Educadores",
+        "currículos",
+        "escolhas profissionais",
+        "alunos",
+        "direção de Deus"
+      ],
+      "altar": {
+        "ministry": "Acolher",
+        "leaders_label": "Prs. Paula e Gabriel"
+      },
+      "milestone": null,
+      "next_day_teaser": null,
+      "publish_status": "published",
+      "readings": [
+        {
+          "sort_order": 1,
+          "canonical_reference": "PSA 135-146"
+        }
+      ]
+    },
+    {
+      "campaign_id": "lagoinha-100-dias-2026",
+      "day_number": 53,
+      "title": "Governar por meio da sabedoria",
+      "theme": null,
+      "theme_highlight": null,
+      "sphere": "governo",
+      "key_verse_reference": "PRO 8:15-16",
+      "official_direction": null,
+      "prayer_focus": "Executivo; Legislativo; Judiciário; lideranças locais; decisões sábias.",
+      "prayer_points": [
+        "Executivo",
+        "Legislativo",
+        "Judiciário",
+        "lideranças locais",
+        "decisões sábias"
+      ],
+      "altar": {
+        "ministry": "Intercessão/Bálsamo",
+        "leaders_label": "Prs. Leandra e Daniel"
+      },
+      "milestone": null,
+      "next_day_teaser": null,
+      "publish_status": "published",
+      "readings": [
+        {
+          "sort_order": 1,
+          "canonical_reference": "PSA 147-150"
+        },
+        {
+          "sort_order": 2,
+          "canonical_reference": "PRO 1-8"
+        }
+      ]
+    },
+    {
+      "campaign_id": "lagoinha-100-dias-2026",
+      "day_number": 54,
+      "title": "Integridade nas relações econômicas",
+      "theme": null,
+      "theme_highlight": null,
+      "sphere": "economia",
+      "key_verse_reference": "PRO 11:1",
+      "official_direction": null,
+      "prayer_focus": "Comércio justo; impostos; empresas; combate à corrupção; honestidade.",
+      "prayer_points": [
+        "Comércio justo",
+        "impostos",
+        "empresas",
+        "combate à corrupção",
+        "honestidade"
+      ],
+      "altar": {
+        "ministry": "Capelania",
+        "leaders_label": "Prs. Francisco e Milena"
+      },
+      "milestone": null,
+      "next_day_teaser": null,
+      "publish_status": "published",
+      "readings": [
+        {
+          "sort_order": 1,
+          "canonical_reference": "PRO 9-20"
+        }
+      ]
+    },
+    {
+      "campaign_id": "lagoinha-100-dias-2026",
+      "day_number": 55,
+      "title": "A palavra certa no tempo certo",
+      "theme": null,
+      "theme_highlight": null,
+      "sphere": "midia_comunicacao",
+      "key_verse_reference": "PRO 25:11",
+      "official_direction": null,
+      "prayer_focus": "Comunicadores; prudência; discursos públicos; redes; palavras que edificam.",
+      "prayer_points": [
+        "Comunicadores",
+        "prudência",
+        "discursos públicos",
+        "redes",
+        "palavras que edificam"
+      ],
+      "altar": {
+        "ministry": "Carisma",
+        "leaders_label": "Prs. Fernando e Nahália"
+      },
+      "milestone": null,
+      "next_day_teaser": null,
+      "publish_status": "published",
+      "readings": [
+        {
+          "sort_order": 1,
+          "canonical_reference": "PRO 21-31"
+        },
+        {
+          "sort_order": 2,
+          "canonical_reference": "ECC 1"
+        }
+      ]
+    },
+    {
+      "campaign_id": "lagoinha-100-dias-2026",
+      "day_number": 56,
+      "title": "Beleza no tempo de Deus",
+      "theme": null,
+      "theme_highlight": null,
+      "sphere": "artes_entretenimento",
+      "key_verse_reference": "ECC 3:11",
+      "official_direction": null,
+      "prayer_focus": "Artistas; criatividade; beleza; saúde emocional; propósito acima da fama.",
+      "prayer_points": [
+        "Artistas",
+        "criatividade",
+        "beleza",
+        "saúde emocional",
+        "propósito acima da fama"
+      ],
+      "altar": {
+        "ministry": "Central de Voluntários",
+        "leaders_label": "Prs. Leo e Marcia"
+      },
+      "milestone": null,
+      "next_day_teaser": null,
+      "publish_status": "published",
+      "readings": [
+        {
+          "sort_order": 1,
+          "canonical_reference": "ECC 2-12"
+        },
+        {
+          "sort_order": 2,
+          "canonical_reference": "SNG 1"
+        }
+      ]
+    },
+    {
+      "campaign_id": "lagoinha-100-dias-2026",
+      "day_number": 57,
+      "title": "Igreja que ensina os caminhos do Senhor",
+      "theme": null,
+      "theme_highlight": null,
+      "sphere": "igreja",
+      "key_verse_reference": "ISA 2:3",
+      "official_direction": null,
+      "prayer_focus": "Discipulado; púlpitos; ensino bíblico; liderança; nações alcançadas.",
+      "prayer_points": [
+        "Discipulado",
+        "púlpitos",
+        "ensino bíblico",
+        "liderança",
+        "nações alcançadas"
+      ],
+      "altar": {
+        "ministry": "Intercessão/Bálsamo",
+        "leaders_label": "Prs. Leandra e Daniel"
+      },
+      "milestone": null,
+      "next_day_teaser": null,
+      "publish_status": "published",
+      "readings": [
+        {
+          "sort_order": 1,
+          "canonical_reference": "SNG 2-8"
+        },
+        {
+          "sort_order": 2,
+          "canonical_reference": "ISA 1-5"
+        }
+      ]
+    },
+    {
+      "campaign_id": "lagoinha-100-dias-2026",
+      "day_number": 58,
+      "title": "Famílias como sinais de Deus",
+      "theme": null,
+      "theme_highlight": null,
+      "sphere": "familia",
+      "key_verse_reference": "ISA 8:18",
+      "official_direction": null,
+      "prayer_focus": "Pais e filhos; testemunho familiar; filhos pródigos; proteção; legado.",
+      "prayer_points": [
+        "Pais e filhos",
+        "testemunho familiar",
+        "filhos pródigos",
+        "proteção",
+        "legado"
+      ],
+      "altar": {
+        "ministry": "Centuriões",
+        "leaders_label": "Filipe e Tatá"
+      },
+      "milestone": null,
+      "next_day_teaser": null,
+      "publish_status": "published",
+      "readings": [
+        {
+          "sort_order": 1,
+          "canonical_reference": "ISA 6-17"
+        }
+      ]
+    },
+    {
+      "campaign_id": "lagoinha-100-dias-2026",
+      "day_number": 59,
+      "title": "Deus ensina o caminho certo",
+      "theme": null,
+      "theme_highlight": null,
+      "sphere": "educacao",
+      "key_verse_reference": "ISA 28:26",
+      "official_direction": null,
+      "prayer_focus": "Professores; métodos de ensino; sabedoria; formação profissional; inovação.",
+      "prayer_points": [
+        "Professores",
+        "métodos de ensino",
+        "sabedoria",
+        "formação profissional",
+        "inovação"
+      ],
+      "altar": {
+        "ministry": "Champions",
+        "leaders_label": "Alessandro e Jennifer"
+      },
+      "milestone": null,
+      "next_day_teaser": null,
+      "publish_status": "published",
+      "readings": [
+        {
+          "sort_order": 1,
+          "canonical_reference": "ISA 18-29"
+        }
+      ]
+    },
+    {
+      "campaign_id": "lagoinha-100-dias-2026",
+      "day_number": 60,
+      "title": "O Senhor é nosso Juiz, Legislador e Rei",
+      "theme": null,
+      "theme_highlight": null,
+      "sphere": "governo",
+      "key_verse_reference": "ISA 33:22",
+      "official_direction": null,
+      "prayer_focus": "Justiça; leis; autoridades; soberania de Deus; proteção da nação.",
+      "prayer_points": [
+        "Justiça",
+        "leis",
+        "autoridades",
+        "soberania de Deus",
+        "proteção da nação"
+      ],
+      "altar": {
+        "ministry": "Consolidação",
+        "leaders_label": "Watson e Loiane"
+      },
+      "milestone": null,
+      "next_day_teaser": null,
+      "publish_status": "published",
+      "readings": [
+        {
+          "sort_order": 1,
+          "canonical_reference": "ISA 30-41"
+        }
+      ]
+    },
+    {
+      "campaign_id": "lagoinha-100-dias-2026",
+      "day_number": 61,
+      "title": "Recursos revelados para propósitos de Deus",
+      "theme": null,
+      "theme_highlight": null,
+      "sphere": "economia",
+      "key_verse_reference": "ISA 45:3",
+      "official_direction": null,
+      "prayer_focus": "Provisão; investimentos; empreendedorismo; recursos para o Reino; oportunidades.",
+      "prayer_points": [
+        "Provisão",
+        "investimentos",
+        "empreendedorismo",
+        "recursos para o Reino",
+        "oportunidades"
+      ],
+      "altar": {
+        "ministry": "Intercessão/Bálsamo",
+        "leaders_label": "Prs. Leandra e Daniel"
+      },
+      "milestone": null,
+      "next_day_teaser": null,
+      "publish_status": "published",
+      "readings": [
+        {
+          "sort_order": 1,
+          "canonical_reference": "ISA 42-53"
+        }
+      ]
+    },
+    {
+      "campaign_id": "lagoinha-100-dias-2026",
+      "day_number": 62,
+      "title": "Levanta-te e resplandece",
+      "theme": null,
+      "theme_highlight": null,
+      "sphere": "midia_comunicacao",
+      "key_verse_reference": "ISA 60:1",
+      "official_direction": null,
+      "prayer_focus": "Voz cristã; influência; comunicação de esperança; testemunho público; alcance.",
+      "prayer_points": [
+        "Voz cristã",
+        "influência",
+        "comunicação de esperança",
+        "testemunho público",
+        "alcance"
+      ],
+      "altar": {
+        "ministry": "Dança - DNA",
+        "leaders_label": "Pra. Rebeca"
+      },
+      "milestone": null,
+      "next_day_teaser": null,
+      "publish_status": "published",
+      "readings": [
+        {
+          "sort_order": 1,
+          "canonical_reference": "ISA 54-65"
+        }
+      ]
+    },
+    {
+      "campaign_id": "lagoinha-100-dias-2026",
+      "day_number": 63,
+      "title": "Palavras colocadas por Deus na boca",
+      "theme": null,
+      "theme_highlight": null,
+      "sphere": "artes_entretenimento",
+      "key_verse_reference": "JER 1:9",
+      "official_direction": null,
+      "prayer_focus": "Escritores; roteiristas; compositores; atores; criadores de conteúdo.",
+      "prayer_points": [
+        "Escritores",
+        "roteiristas",
+        "compositores",
+        "atores",
+        "criadores de conteúdo"
+      ],
+      "altar": {
+        "ministry": "Diaconia",
+        "leaders_label": "Prs. Higor e Fernanda"
+      },
+      "milestone": null,
+      "next_day_teaser": null,
+      "publish_status": "published",
+      "readings": [
+        {
+          "sort_order": 1,
+          "canonical_reference": "ISA 66"
+        },
+        {
+          "sort_order": 2,
+          "canonical_reference": "JER 1-11"
+        }
+      ]
+    },
+    {
+      "campaign_id": "lagoinha-100-dias-2026",
+      "day_number": 64,
+      "title": "Pastores segundo o cuidado de Deus",
+      "theme": null,
+      "theme_highlight": null,
+      "sphere": "igreja",
+      "key_verse_reference": "JER 23:4",
+      "official_direction": null,
+      "prayer_focus": "Pastores; líderes; proteção do rebanho; integridade ministerial; novos líderes.",
+      "prayer_points": [
+        "Pastores",
+        "líderes",
+        "proteção do rebanho",
+        "integridade ministerial",
+        "novos líderes"
+      ],
+      "altar": {
+        "ministry": "EBD",
+        "leaders_label": "Marcio e Débora"
+      },
+      "milestone": null,
+      "next_day_teaser": null,
+      "publish_status": "published",
+      "readings": [
+        {
+          "sort_order": 1,
+          "canonical_reference": "JER 12-23"
+        }
+      ]
+    },
+    {
+      "campaign_id": "lagoinha-100-dias-2026",
+      "day_number": 65,
+      "title": "Um só coração e um só caminho",
+      "theme": null,
+      "theme_highlight": null,
+      "sphere": "familia",
+      "key_verse_reference": "JER 32:39",
+      "official_direction": null,
+      "prayer_focus": "Unidade familiar; reconciliação; temor do Senhor; filhos; alianças restauradas.",
+      "prayer_points": [
+        "Unidade familiar",
+        "reconciliação",
+        "temor do Senhor",
+        "filhos",
+        "alianças restauradas"
+      ],
+      "altar": {
+        "ministry": "Ephatá",
+        "leaders_label": "Jô Carvalho"
+      },
+      "milestone": null,
+      "next_day_teaser": null,
+      "publish_status": "published",
+      "readings": [
+        {
+          "sort_order": 1,
+          "canonical_reference": "JER 24-35"
+        }
+      ]
+    },
+    {
+      "campaign_id": "lagoinha-100-dias-2026",
+      "day_number": 66,
+      "title": "Ouvir para mudar de caminho",
+      "theme": null,
+      "theme_highlight": null,
+      "sphere": "educacao",
+      "key_verse_reference": "JER 36:3",
+      "official_direction": null,
+      "prayer_focus": "Escolas; correção; abertura à verdade; arrependimento; formação responsável.",
+      "prayer_points": [
+        "Escolas",
+        "correção",
+        "abertura à verdade",
+        "arrependimento",
+        "formação responsável"
+      ],
+      "altar": {
+        "ministry": "Intercessão/Bálsamo",
+        "leaders_label": "Prs. Leandra e Daniel"
+      },
+      "milestone": null,
+      "next_day_teaser": null,
+      "publish_status": "published",
+      "readings": [
+        {
+          "sort_order": 1,
+          "canonical_reference": "JER 36-47"
+        }
+      ]
+    },
+    {
+      "campaign_id": "lagoinha-100-dias-2026",
+      "day_number": 67,
+      "title": "Examinar os caminhos da nação",
+      "theme": null,
+      "theme_highlight": null,
+      "sphere": "governo",
+      "key_verse_reference": "LAM 3:40",
+      "official_direction": null,
+      "prayer_focus": "Arrependimento nacional; revisão de políticas injustas; autoridades; responsabilidade; restauração.",
+      "prayer_points": [
+        "Arrependimento nacional",
+        "revisão de políticas injustas",
+        "autoridades",
+        "responsabilidade",
+        "restauração"
+      ],
+      "altar": {
+        "ministry": "Evangelismo",
+        "leaders_label": "Matheus e Eduarda"
+      },
+      "milestone": null,
+      "next_day_teaser": null,
+      "publish_status": "published",
+      "readings": [
+        {
+          "sort_order": 1,
+          "canonical_reference": "JER 48-52"
+        },
+        {
+          "sort_order": 2,
+          "canonical_reference": "LAM 1-5"
+        },
+        {
+          "sort_order": 3,
+          "canonical_reference": "EZK 1-2"
+        }
+      ]
+    },
+    {
+      "campaign_id": "lagoinha-100-dias-2026",
+      "day_number": 68,
+      "title": "Recursos não podem ocupar o lugar de Deus",
+      "theme": null,
+      "theme_highlight": null,
+      "sphere": "economia",
+      "key_verse_reference": "EZK 7:19",
+      "official_direction": null,
+      "prayer_focus": "Combate à idolatria do dinheiro; ganância; consumismo; generosidade; dependência de Deus.",
+      "prayer_points": [
+        "Combate à idolatria do dinheiro",
+        "ganância",
+        "consumismo",
+        "generosidade",
+        "dependência de Deus"
+      ],
+      "altar": {
+        "ministry": "Feira Missionária",
+        "leaders_label": "Pra. Marta"
+      },
+      "milestone": null,
+      "next_day_teaser": null,
+      "publish_status": "published",
+      "readings": [
+        {
+          "sort_order": 1,
+          "canonical_reference": "EZK 3-14"
+        }
+      ]
+    },
+    {
+      "campaign_id": "lagoinha-100-dias-2026",
+      "day_number": 69,
+      "title": "Uma voz que se coloca na brecha",
+      "theme": null,
+      "theme_highlight": null,
+      "sphere": "midia_comunicacao",
+      "key_verse_reference": "EZK 22:30",
+      "official_direction": null,
+      "prayer_focus": "Intercessores; comunicadores cristãos; denúncia responsável; verdade; defesa da sociedade.",
+      "prayer_points": [
+        "Intercessores",
+        "comunicadores cristãos",
+        "denúncia responsável",
+        "verdade",
+        "defesa da sociedade"
+      ],
+      "altar": {
+        "ministry": "Follow",
+        "leaders_label": "Pr. Leo Félix"
+      },
+      "milestone": null,
+      "next_day_teaser": null,
+      "publish_status": "published",
+      "readings": [
+        {
+          "sort_order": 1,
+          "canonical_reference": "EZK 15-26"
+        }
+      ]
+    },
+    {
+      "campaign_id": "lagoinha-100-dias-2026",
+      "day_number": 70,
+      "title": "Cultura com um novo coração",
+      "theme": null,
+      "theme_highlight": null,
+      "sphere": "artes_entretenimento",
+      "key_verse_reference": "EZK 36:26",
+      "official_direction": null,
+      "prayer_focus": "Transformação cultural; artistas convertidos; criatividade redimida; novos valores; influência.",
+      "prayer_points": [
+        "Transformação cultural",
+        "artistas convertidos",
+        "criatividade redimida",
+        "novos valores",
+        "influência"
+      ],
+      "altar": {
+        "ministry": "Intercessão/Bálsamo",
+        "leaders_label": "Prs. Leandra e Daniel"
+      },
+      "milestone": null,
+      "next_day_teaser": null,
+      "publish_status": "published",
+      "readings": [
+        {
+          "sort_order": 1,
+          "canonical_reference": "EZK 27-38"
+        }
+      ]
+    },
+    {
+      "campaign_id": "lagoinha-100-dias-2026",
+      "day_number": 71,
+      "title": "Uma Igreja que leva vida por onde passa",
+      "theme": null,
+      "theme_highlight": null,
+      "sphere": "igreja",
+      "key_verse_reference": "EZK 47:9",
+      "official_direction": null,
+      "prayer_focus": "Avivamento; cura; evangelismo; cidades; transformação territorial.",
+      "prayer_points": [
+        "Avivamento",
+        "cura",
+        "evangelismo",
+        "cidades",
+        "transformação territorial"
+      ],
+      "altar": {
+        "ministry": "Future",
+        "leaders_label": "Guilherme"
+      },
+      "milestone": null,
+      "next_day_teaser": null,
+      "publish_status": "published",
+      "readings": [
+        {
+          "sort_order": 1,
+          "canonical_reference": "EZK 39-48"
+        },
+        {
+          "sort_order": 2,
+          "canonical_reference": "DAN 1-2"
+        }
+      ]
+    },
+    {
+      "campaign_id": "lagoinha-100-dias-2026",
+      "day_number": 72,
+      "title": "Alianças restauradas",
+      "theme": null,
+      "theme_highlight": null,
+      "sphere": "familia",
+      "key_verse_reference": "HOS 2:19-20",
+      "official_direction": null,
+      "prayer_focus": "Casamentos; fidelidade; reconciliação; cura de traições; alianças duradouras.",
+      "prayer_points": [
+        "Casamentos",
+        "fidelidade",
+        "reconciliação",
+        "cura de traições",
+        "alianças duradouras"
+      ],
+      "altar": {
+        "ministry": "GC",
+        "leaders_label": "Prs. Cézar e Erica"
+      },
+      "milestone": null,
+      "next_day_teaser": null,
+      "publish_status": "published",
+      "readings": [
+        {
+          "sort_order": 1,
+          "canonical_reference": "DAN 3-12"
+        },
+        {
+          "sort_order": 2,
+          "canonical_reference": "HOS 1-2"
+        }
+      ]
+    },
+    {
+      "campaign_id": "lagoinha-100-dias-2026",
+      "day_number": 73,
+      "title": "Conhecimento que preserva uma geração",
+      "theme": null,
+      "theme_highlight": null,
+      "sphere": "educacao",
+      "key_verse_reference": "HOS 4:6",
+      "official_direction": null,
+      "prayer_focus": "Conhecimento bíblico; alfabetização; professores; combate à ignorância; formação espiritual.",
+      "prayer_points": [
+        "Conhecimento bíblico",
+        "alfabetização",
+        "professores",
+        "combate à ignorância",
+        "formação espiritual"
+      ],
+      "altar": {
+        "ministry": "Gerações",
+        "leaders_label": "Prs. Richarde e Priscila"
+      },
+      "milestone": null,
+      "next_day_teaser": null,
+      "publish_status": "published",
+      "readings": [
+        {
+          "sort_order": 1,
+          "canonical_reference": "HOS 3-14"
+        }
+      ]
+    },
+    {
+      "campaign_id": "lagoinha-100-dias-2026",
+      "day_number": 74,
+      "title": "Justiça correndo como um rio",
+      "theme": null,
+      "theme_highlight": null,
+      "sphere": "governo",
+      "key_verse_reference": "AMO 5:24",
+      "official_direction": null,
+      "prayer_focus": "Justiça social; combate à corrupção; proteção dos vulneráveis; autoridades; retidão institucional.",
+      "prayer_points": [
+        "Justiça social",
+        "combate à corrupção",
+        "proteção dos vulneráveis",
+        "autoridades",
+        "retidão institucional"
+      ],
+      "altar": {
+        "ministry": "Intercessão/Bálsamo",
+        "leaders_label": "Prs. Leandra e Daniel"
+      },
+      "milestone": null,
+      "next_day_teaser": null,
+      "publish_status": "published",
+      "readings": [
+        {
+          "sort_order": 1,
+          "canonical_reference": "JOL 1-3"
+        },
+        {
+          "sort_order": 2,
+          "canonical_reference": "AMO 1-9"
+        }
+      ]
+    },
+    {
+      "campaign_id": "lagoinha-100-dias-2026",
+      "day_number": 75,
+      "title": "Economia com justiça, misericórdia e humildade",
+      "theme": null,
+      "theme_highlight": null,
+      "sphere": "economia",
+      "key_verse_reference": "MIC 6:8",
+      "official_direction": null,
+      "prayer_focus": "Relações de trabalho; empresários; justiça salarial; ética; cuidado com vulneráveis.",
+      "prayer_points": [
+        "Relações de trabalho",
+        "empresários",
+        "justiça salarial",
+        "ética",
+        "cuidado com vulneráveis"
+      ],
+      "altar": {
+        "ministry": "Hero",
+        "leaders_label": "Pr. Leo Félix"
+      },
+      "milestone": "Reta final",
+      "next_day_teaser": null,
+      "publish_status": "published",
+      "readings": [
+        {
+          "sort_order": 1,
+          "canonical_reference": "OBA 1"
+        },
+        {
+          "sort_order": 2,
+          "canonical_reference": "JON 1-4"
+        },
+        {
+          "sort_order": 3,
+          "canonical_reference": "MIC 1-7"
+        }
+      ]
+    },
+    {
+      "campaign_id": "lagoinha-100-dias-2026",
+      "day_number": 76,
+      "title": "Encher a terra do conhecimento da glória",
+      "theme": null,
+      "theme_highlight": null,
+      "sphere": "midia_comunicacao",
+      "key_verse_reference": "HAB 2:14",
+      "official_direction": null,
+      "prayer_focus": "Evangelho nas plataformas; comunicação global; internet; testemunho; alcance das nações.",
+      "prayer_points": [
+        "Evangelho nas plataformas",
+        "comunicação global",
+        "internet",
+        "testemunho",
+        "alcance das nações"
+      ],
+      "altar": {
+        "ministry": "Hero+",
+        "leaders_label": "Pr. Tamiozzo"
+      },
+      "milestone": null,
+      "next_day_teaser": null,
+      "publish_status": "published",
+      "readings": [
+        {
+          "sort_order": 1,
+          "canonical_reference": "NAM 1-3"
+        },
+        {
+          "sort_order": 2,
+          "canonical_reference": "HAB 1-3"
+        },
+        {
+          "sort_order": 3,
+          "canonical_reference": "ZEP 1-3"
+        },
+        {
+          "sort_order": 4,
+          "canonical_reference": "HAG 1-2"
+        },
+        {
+          "sort_order": 5,
+          "canonical_reference": "ZEC 1"
+        }
+      ]
+    },
+    {
+      "campaign_id": "lagoinha-100-dias-2026",
+      "day_number": 77,
+      "title": "Cultura que desperta fome por Deus",
+      "theme": null,
+      "theme_highlight": null,
+      "sphere": "artes_entretenimento",
+      "key_verse_reference": "ZEC 8:23",
+      "official_direction": null,
+      "prayer_focus": "Influenciadores; artistas; testemunho; produções que despertem esperança; alcance cultural.",
+      "prayer_points": [
+        "Influenciadores",
+        "artistas",
+        "testemunho",
+        "produções que despertem esperança",
+        "alcance cultural"
+      ],
+      "altar": {
+        "ministry": "Host (Eventos)",
+        "leaders_label": "Alessandro e Jennifer"
+      },
+      "milestone": null,
+      "next_day_teaser": null,
+      "publish_status": "published",
+      "readings": [
+        {
+          "sort_order": 1,
+          "canonical_reference": "ZEC 2-13"
+        }
+      ]
+    },
+    {
+      "campaign_id": "lagoinha-100-dias-2026",
+      "day_number": 78,
+      "title": "Igreja: luz do mundo",
+      "theme": null,
+      "theme_highlight": null,
+      "sphere": "igreja",
+      "key_verse_reference": "MAT 5:14",
+      "official_direction": null,
+      "prayer_focus": "Relevância sem comprometimento; santidade; boas obras; testemunho; influência nas cidades.",
+      "prayer_points": [
+        "Relevância sem comprometimento",
+        "santidade",
+        "boas obras",
+        "testemunho",
+        "influência nas cidades"
+      ],
+      "altar": {
+        "ministry": "Intercessão/Bálsamo",
+        "leaders_label": "Prs. Leandra e Daniel"
+      },
+      "milestone": null,
+      "next_day_teaser": null,
+      "publish_status": "published",
+      "readings": [
+        {
+          "sort_order": 1,
+          "canonical_reference": "ZEC 14"
+        },
+        {
+          "sort_order": 2,
+          "canonical_reference": "MAL 1-4"
+        },
+        {
+          "sort_order": 3,
+          "canonical_reference": "MAT 1-7"
+        }
+      ]
+    },
+    {
+      "campaign_id": "lagoinha-100-dias-2026",
+      "day_number": 79,
+      "title": "O que Deus uniu",
+      "theme": null,
+      "theme_highlight": null,
+      "sphere": "familia",
+      "key_verse_reference": "MAT 19:6",
+      "official_direction": null,
+      "prayer_focus": "Casamentos; reconciliação; fidelidade; prevenção do divórcio; cura conjugal.",
+      "prayer_points": [
+        "Casamentos",
+        "reconciliação",
+        "fidelidade",
+        "prevenção do divórcio",
+        "cura conjugal"
+      ],
+      "altar": {
+        "ministry": "Integração",
+        "leaders_label": "Fabio e Emanuelly"
+      },
+      "milestone": null,
+      "next_day_teaser": null,
+      "publish_status": "published",
+      "readings": [
+        {
+          "sort_order": 1,
+          "canonical_reference": "MAT 8-19"
+        }
+      ]
+    },
+    {
+      "campaign_id": "lagoinha-100-dias-2026",
+      "day_number": 80,
+      "title": "Ensinar uma geração a obedecer",
+      "theme": null,
+      "theme_highlight": null,
+      "sphere": "educacao",
+      "key_verse_reference": "MAT 28:19-20",
+      "official_direction": null,
+      "prayer_focus": "Discipulado; professores; formação cristã; escolas; transmissão da verdade.",
+      "prayer_points": [
+        "Discipulado",
+        "professores",
+        "formação cristã",
+        "escolas",
+        "transmissão da verdade"
+      ],
+      "altar": {
+        "ministry": "Kids",
+        "leaders_label": "Marcela e Karlton"
+      },
+      "milestone": null,
+      "next_day_teaser": null,
+      "publish_status": "published",
+      "readings": [
+        {
+          "sort_order": 1,
+          "canonical_reference": "MAT 20-28"
+        },
+        {
+          "sort_order": 2,
+          "canonical_reference": "MRK 1-3"
+        }
+      ]
+    },
+    {
+      "campaign_id": "lagoinha-100-dias-2026",
+      "day_number": 81,
+      "title": "Autoridade para servir",
+      "theme": null,
+      "theme_highlight": null,
+      "sphere": "governo",
+      "key_verse_reference": "MRK 10:43-45",
+      "official_direction": null,
+      "prayer_focus": "Liderança servidora; humildade; combate ao abuso de poder; serviço público; integridade.",
+      "prayer_points": [
+        "Liderança servidora",
+        "humildade",
+        "combate ao abuso de poder",
+        "serviço público",
+        "integridade"
+      ],
+      "altar": {
+        "ministry": "Legacy",
+        "leaders_label": "Prs. Júnior e Miriã"
+      },
+      "milestone": null,
+      "next_day_teaser": null,
+      "publish_status": "published",
+      "readings": [
+        {
+          "sort_order": 1,
+          "canonical_reference": "MRK 4-15"
+        }
+      ]
+    },
+    {
+      "campaign_id": "lagoinha-100-dias-2026",
+      "day_number": 82,
+      "title": "Generosidade que vence a avareza",
+      "theme": null,
+      "theme_highlight": null,
+      "sphere": "economia",
+      "key_verse_reference": "LUK 6:38",
+      "official_direction": null,
+      "prayer_focus": "Generosidade; provisão; ofertas; empresários; cuidado com necessitados.",
+      "prayer_points": [
+        "Generosidade",
+        "provisão",
+        "ofertas",
+        "empresários",
+        "cuidado com necessitados"
+      ],
+      "altar": {
+        "ministry": "Life Care",
+        "leaders_label": "Rones"
+      },
+      "milestone": null,
+      "next_day_teaser": null,
+      "publish_status": "published",
+      "readings": [
+        {
+          "sort_order": 1,
+          "canonical_reference": "MRK 16"
+        },
+        {
+          "sort_order": 2,
+          "canonical_reference": "LUK 1-11"
+        }
+      ]
+    },
+    {
+      "campaign_id": "lagoinha-100-dias-2026",
+      "day_number": 83,
+      "title": "A verdade será conhecida",
+      "theme": null,
+      "theme_highlight": null,
+      "sphere": "midia_comunicacao",
+      "key_verse_reference": "LUK 12:3",
+      "official_direction": null,
+      "prayer_focus": "Transparência; combate à corrupção informacional; verdade; responsabilidade; liberdade para anunciar o Evangelho.",
+      "prayer_points": [
+        "Transparência",
+        "combate à corrupção informacional",
+        "verdade",
+        "responsabilidade",
+        "liberdade para anunciar o Evangelho"
+      ],
+      "altar": {
+        "ministry": "Intercessão/Bálsamo",
+        "leaders_label": "Prs. Leandra e Daniel"
+      },
+      "milestone": null,
+      "next_day_teaser": null,
+      "publish_status": "published",
+      "readings": [
+        {
+          "sort_order": 1,
+          "canonical_reference": "LUK 12-23"
+        }
+      ]
+    },
+    {
+      "campaign_id": "lagoinha-100-dias-2026",
+      "day_number": 84,
+      "title": "Comunicar verdade e graça",
+      "theme": null,
+      "theme_highlight": null,
+      "sphere": "artes_entretenimento",
+      "key_verse_reference": "JHN 1:14",
+      "official_direction": null,
+      "prayer_focus": "Narrativas; cinema; teatro; música; beleza acompanhada de verdade e graça.",
+      "prayer_points": [
+        "Narrativas",
+        "cinema",
+        "teatro",
+        "música",
+        "beleza acompanhada de verdade e graça"
+      ],
+      "altar": {
+        "ministry": "Link",
+        "leaders_label": "Rafael e Lorena"
+      },
+      "milestone": null,
+      "next_day_teaser": null,
+      "publish_status": "published",
+      "readings": [
+        {
+          "sort_order": 1,
+          "canonical_reference": "LUK 24"
+        },
+        {
+          "sort_order": 2,
+          "canonical_reference": "JHN 1-11"
+        }
+      ]
+    },
+    {
+      "campaign_id": "lagoinha-100-dias-2026",
+      "day_number": 85,
+      "title": "Igreja cheia do Espírito e enviada",
+      "theme": null,
+      "theme_highlight": null,
+      "sphere": "igreja",
+      "key_verse_reference": "ACT 1:8",
+      "official_direction": null,
+      "prayer_focus": "Batismo no Espírito; evangelismo; missões; testemunho; expansão da Igreja.",
+      "prayer_points": [
+        "Batismo no Espírito",
+        "evangelismo",
+        "missões",
+        "testemunho",
+        "expansão da Igreja"
+      ],
+      "altar": {
+        "ministry": "Meeting Grace",
+        "leaders_label": "Priscila e Yasmin"
+      },
+      "milestone": null,
+      "next_day_teaser": null,
+      "publish_status": "published",
+      "readings": [
+        {
+          "sort_order": 1,
+          "canonical_reference": "JHN 12-21"
+        },
+        {
+          "sort_order": 2,
+          "canonical_reference": "ACT 1-2"
+        }
+      ]
+    },
+    {
+      "campaign_id": "lagoinha-100-dias-2026",
+      "day_number": 86,
+      "title": "Casas que buscam a Deus",
+      "theme": null,
+      "theme_highlight": null,
+      "sphere": "familia",
+      "key_verse_reference": "ACT 10:2",
+      "official_direction": null,
+      "prayer_focus": "Oração familiar; generosidade; salvação de famílias inteiras; pais; ambiente espiritual dos lares.",
+      "prayer_points": [
+        "Oração familiar",
+        "generosidade",
+        "salvação de famílias inteiras",
+        "pais",
+        "ambiente espiritual dos lares"
+      ],
+      "altar": {
+        "ministry": "Min. de Pais",
+        "leaders_label": "Givanildo e Rivany"
+      },
+      "milestone": null,
+      "next_day_teaser": null,
+      "publish_status": "published",
+      "readings": [
+        {
+          "sort_order": 1,
+          "canonical_reference": "ACT 3-14"
+        }
+      ]
+    },
+    {
+      "campaign_id": "lagoinha-100-dias-2026",
+      "day_number": 87,
+      "title": "Ensino preciso da verdade",
+      "theme": null,
+      "theme_highlight": null,
+      "sphere": "educacao",
+      "key_verse_reference": "ACT 18:24-26",
+      "official_direction": null,
+      "prayer_focus": "Mestres; mentores; discipuladores; formação teológica; humildade para aprender.",
+      "prayer_points": [
+        "Mestres",
+        "mentores",
+        "discipuladores",
+        "formação teológica",
+        "humildade para aprender"
+      ],
+      "altar": {
+        "ministry": "Intercessão/Bálsamo",
+        "leaders_label": "Prs. Leandra e Daniel"
+      },
+      "milestone": null,
+      "next_day_teaser": null,
+      "publish_status": "published",
+      "readings": [
+        {
+          "sort_order": 1,
+          "canonical_reference": "ACT 15-26"
+        }
+      ]
+    },
+    {
+      "campaign_id": "lagoinha-100-dias-2026",
+      "day_number": 88,
+      "title": "Liderança que coopera com redenção e esperança",
+      "theme": null,
+      "theme_highlight": null,
+      "sphere": "governo",
+      "key_verse_reference": "ROM 8:19",
+      "official_direction": null,
+      "prayer_focus": "Autoridades; instituições; responsabilidade; proteção da criação; esperança para a sociedade.",
+      "prayer_points": [
+        "Autoridades",
+        "instituições",
+        "responsabilidade",
+        "proteção da criação",
+        "esperança para a sociedade"
+      ],
+      "altar": {
+        "ministry": "Missão Estrutural",
+        "leaders_label": "Luciano e Bruna"
+      },
+      "milestone": null,
+      "next_day_teaser": null,
+      "publish_status": "published",
+      "readings": [
+        {
+          "sort_order": 1,
+          "canonical_reference": "ACT 27-28"
+        },
+        {
+          "sort_order": 2,
+          "canonical_reference": "ROM 1-10"
+        }
+      ]
+    },
+    {
+      "campaign_id": "lagoinha-100-dias-2026",
+      "day_number": 89,
+      "title": "Trabalho com diligência",
+      "theme": null,
+      "theme_highlight": null,
+      "sphere": "economia",
+      "key_verse_reference": "ROM 12:11",
+      "official_direction": null,
+      "prayer_focus": "Profissionais; empresários; excelência; produtividade; serviço ao Senhor através do trabalho.",
+      "prayer_points": [
+        "Profissionais",
+        "empresários",
+        "excelência",
+        "produtividade",
+        "serviço ao Senhor através do trabalho"
+      ],
+      "altar": {
+        "ministry": "Lago Music",
+        "leaders_label": "Jacson e Paloma"
+      },
+      "milestone": null,
+      "next_day_teaser": null,
+      "publish_status": "published",
+      "readings": [
+        {
+          "sort_order": 1,
+          "canonical_reference": "ROM 11-16"
+        },
+        {
+          "sort_order": 2,
+          "canonical_reference": "1CO 1-6"
+        }
+      ]
+    },
+    {
+      "campaign_id": "lagoinha-100-dias-2026",
+      "day_number": 90,
+      "title": "Uma voz clara e compreensível",
+      "theme": null,
+      "theme_highlight": null,
+      "sphere": "midia_comunicacao",
+      "key_verse_reference": "1CO 14:8",
+      "official_direction": null,
+      "prayer_focus": "Clareza na mensagem; púlpitos; comunicação cristã; mídia; ausência de confusão.",
+      "prayer_points": [
+        "Clareza na mensagem",
+        "púlpitos",
+        "comunicação cristã",
+        "mídia",
+        "ausência de confusão"
+      ],
+      "altar": {
+        "ministry": "Pérolas (Shine)",
+        "leaders_label": "Pra. Katiana"
+      },
+      "milestone": null,
+      "next_day_teaser": null,
+      "publish_status": "published",
+      "readings": [
+        {
+          "sort_order": 1,
+          "canonical_reference": "1CO 7-16"
+        },
+        {
+          "sort_order": 2,
+          "canonical_reference": "2CO 1"
+        }
+      ]
+    },
+    {
+      "campaign_id": "lagoinha-100-dias-2026",
+      "day_number": 91,
+      "title": "O tesouro acima do instrumento",
+      "theme": null,
+      "theme_highlight": null,
+      "sphere": "artes_entretenimento",
+      "key_verse_reference": "2CO 4:7",
+      "official_direction": null,
+      "prayer_focus": "Humildade dos talentos; celebridades; identidade; saúde emocional; glória pertencendo a Deus.",
+      "prayer_points": [
+        "Humildade dos talentos",
+        "celebridades",
+        "identidade",
+        "saúde emocional",
+        "glória pertencendo a Deus"
+      ],
+      "altar": {
+        "ministry": "Intercessão/Bálsamo",
+        "leaders_label": "Prs. Leandra e Daniel"
+      },
+      "milestone": null,
+      "next_day_teaser": null,
+      "publish_status": "published",
+      "readings": [
+        {
+          "sort_order": 1,
+          "canonical_reference": "2CO 2-12"
+        }
+      ]
+    },
+    {
+      "campaign_id": "lagoinha-100-dias-2026",
+      "day_number": 92,
+      "title": "Preservar a unidade do Espírito",
+      "theme": null,
+      "theme_highlight": null,
+      "sphere": "igreja",
+      "key_verse_reference": "EPH 4:3",
+      "official_direction": null,
+      "prayer_focus": "Unidade entre igrejas; reconciliação; líderes; maturidade; cooperação no Corpo de Cristo.",
+      "prayer_points": [
+        "Unidade entre igrejas",
+        "reconciliação",
+        "líderes",
+        "maturidade",
+        "cooperação no Corpo de Cristo"
+      ],
+      "altar": {
+        "ministry": "Plug",
+        "leaders_label": "Prs. Gabriel e Paula"
+      },
+      "milestone": null,
+      "next_day_teaser": null,
+      "publish_status": "published",
+      "readings": [
+        {
+          "sort_order": 1,
+          "canonical_reference": "2CO 13"
+        },
+        {
+          "sort_order": 2,
+          "canonical_reference": "GAL 1-6"
+        },
+        {
+          "sort_order": 3,
+          "canonical_reference": "EPH 1-4"
+        }
+      ]
+    },
+    {
+      "campaign_id": "lagoinha-100-dias-2026",
+      "day_number": 93,
+      "title": "Gerações reconciliadas",
+      "theme": null,
+      "theme_highlight": null,
+      "sphere": "familia",
+      "key_verse_reference": "EPH 6:1-4",
+      "official_direction": null,
+      "prayer_focus": "Pais e filhos; honra; disciplina saudável; cura de feridas; discipulado no lar.",
+      "prayer_points": [
+        "Pais e filhos",
+        "honra",
+        "disciplina saudável",
+        "cura de feridas",
+        "discipulado no lar"
+      ],
+      "altar": {
+        "ministry": "Rocket",
+        "leaders_label": "Prs. Vladi e Júlia"
+      },
+      "milestone": null,
+      "next_day_teaser": null,
+      "publish_status": "published",
+      "readings": [
+        {
+          "sort_order": 1,
+          "canonical_reference": "EPH 5-6"
+        },
+        {
+          "sort_order": 2,
+          "canonical_reference": "PHP 1-4"
+        },
+        {
+          "sort_order": 3,
+          "canonical_reference": "COL 1-4"
+        },
+        {
+          "sort_order": 4,
+          "canonical_reference": "1TH 1"
+        }
+      ]
+    },
+    {
+      "campaign_id": "lagoinha-100-dias-2026",
+      "day_number": 94,
+      "title": "Uma geração que se torna exemplo",
+      "theme": null,
+      "theme_highlight": null,
+      "sphere": "educacao",
+      "key_verse_reference": "1TI 4:12",
+      "official_direction": null,
+      "prayer_focus": "Jovens; estudantes; pureza; caráter; liderança da nova geração.",
+      "prayer_points": [
+        "Jovens",
+        "estudantes",
+        "pureza",
+        "caráter",
+        "liderança da nova geração"
+      ],
+      "altar": {
+        "ministry": "Shine",
+        "leaders_label": "Pra. Gabriela"
+      },
+      "milestone": null,
+      "next_day_teaser": null,
+      "publish_status": "published",
+      "readings": [
+        {
+          "sort_order": 1,
+          "canonical_reference": "1TH 2-5"
+        },
+        {
+          "sort_order": 2,
+          "canonical_reference": "2TH 1-3"
+        },
+        {
+          "sort_order": 3,
+          "canonical_reference": "1TI 1-4"
+        }
+      ]
+    },
+    {
+      "campaign_id": "lagoinha-100-dias-2026",
+      "day_number": 95,
+      "title": "Prontos para toda boa obra",
+      "theme": null,
+      "theme_highlight": null,
+      "sphere": "governo",
+      "key_verse_reference": "TIT 3:1",
+      "official_direction": null,
+      "prayer_focus": "Autoridades; cidadania responsável; servidores públicos; submissão legítima; serviço ao bem comum.",
+      "prayer_points": [
+        "Autoridades",
+        "cidadania responsável",
+        "servidores públicos",
+        "submissão legítima",
+        "serviço ao bem comum"
+      ],
+      "altar": {
+        "ministry": "Shine+",
+        "leaders_label": "Pra. Elizabeth"
+      },
+      "milestone": null,
+      "next_day_teaser": null,
+      "publish_status": "published",
+      "readings": [
+        {
+          "sort_order": 1,
+          "canonical_reference": "1TI 5-6"
+        },
+        {
+          "sort_order": 2,
+          "canonical_reference": "2TI 1-4"
+        },
+        {
+          "sort_order": 3,
+          "canonical_reference": "TIT 1-3"
+        },
+        {
+          "sort_order": 4,
+          "canonical_reference": "PHM 1"
+        },
+        {
+          "sort_order": 5,
+          "canonical_reference": "HEB 1"
+        }
+      ]
+    },
+    {
+      "campaign_id": "lagoinha-100-dias-2026",
+      "day_number": 96,
+      "title": "Deus não se esquece do trabalho",
+      "theme": null,
+      "theme_highlight": null,
+      "sphere": "economia",
+      "key_verse_reference": "HEB 6:10",
+      "official_direction": null,
+      "prayer_focus": "Trabalhadores; voluntários; perseverança; reconhecimento; trabalho feito com amor.",
+      "prayer_points": [
+        "Trabalhadores",
+        "voluntários",
+        "perseverança",
+        "reconhecimento",
+        "trabalho feito com amor"
+      ],
+      "altar": {
+        "ministry": "Intercessão/Bálsamo",
+        "leaders_label": "Prs. Leandra e Daniel"
+      },
+      "milestone": null,
+      "next_day_teaser": null,
+      "publish_status": "published",
+      "readings": [
+        {
+          "sort_order": 1,
+          "canonical_reference": "HEB 2-12"
+        }
+      ]
+    },
+    {
+      "campaign_id": "lagoinha-100-dias-2026",
+      "day_number": 97,
+      "title": "Prontos para ouvir, tardios para falar",
+      "theme": null,
+      "theme_highlight": null,
+      "sphere": "midia_comunicacao",
+      "key_verse_reference": "JAS 1:19",
+      "official_direction": null,
+      "prayer_focus": "Redes sociais; debates; jornalistas; líderes; comunicação sábia e responsável.",
+      "prayer_points": [
+        "Redes sociais",
+        "debates",
+        "jornalistas",
+        "líderes",
+        "comunicação sábia e responsável"
+      ],
+      "altar": {
+        "ministry": "Start",
+        "leaders_label": "Prs. Roberto e Sany"
+      },
+      "milestone": null,
+      "next_day_teaser": null,
+      "publish_status": "published",
+      "readings": [
+        {
+          "sort_order": 1,
+          "canonical_reference": "HEB 13"
+        },
+        {
+          "sort_order": 2,
+          "canonical_reference": "JAS 1-5"
+        },
+        {
+          "sort_order": 3,
+          "canonical_reference": "1PE 1-5"
+        }
+      ]
+    },
+    {
+      "campaign_id": "lagoinha-100-dias-2026",
+      "day_number": 98,
+      "title": "Produções que caminhem na luz",
+      "theme": null,
+      "theme_highlight": null,
+      "sphere": "artes_entretenimento",
+      "key_verse_reference": "1JN 1:5",
+      "official_direction": null,
+      "prayer_focus": "Pureza; verdade; artistas; indústria cultural; ruptura com obras das trevas.",
+      "prayer_points": [
+        "Pureza",
+        "verdade",
+        "artistas",
+        "indústria cultural",
+        "ruptura com obras das trevas"
+      ],
+      "altar": {
+        "ministry": "Teatro (Lag) Art Factory",
+        "leaders_label": "Samuel Rofergo"
+      },
+      "milestone": null,
+      "next_day_teaser": null,
+      "publish_status": "published",
+      "readings": [
+        {
+          "sort_order": 1,
+          "canonical_reference": "2PE 1-3"
+        },
+        {
+          "sort_order": 2,
+          "canonical_reference": "1JN 1-5"
+        },
+        {
+          "sort_order": 3,
+          "canonical_reference": "2JN 1"
+        },
+        {
+          "sort_order": 4,
+          "canonical_reference": "3JN 1"
+        },
+        {
+          "sort_order": 5,
+          "canonical_reference": "JUD 1"
+        }
+      ]
+    },
+    {
+      "campaign_id": "lagoinha-100-dias-2026",
+      "day_number": 99,
+      "title": "Uma Igreja diante de uma porta aberta",
+      "theme": null,
+      "theme_highlight": null,
+      "sphere": "igreja",
+      "key_verse_reference": "REV 3:8",
+      "official_direction": null,
+      "prayer_focus": "Missões; perseverança; fidelidade; avivamento; portas para o Evangelho.",
+      "prayer_points": [
+        "Missões",
+        "perseverança",
+        "fidelidade",
+        "avivamento",
+        "portas para o Evangelho"
+      ],
+      "altar": {
+        "ministry": "We Care",
+        "leaders_label": "Pr. Paulo e Priscila"
+      },
+      "milestone": null,
+      "next_day_teaser": null,
+      "publish_status": "published",
+      "readings": [
+        {
+          "sort_order": 1,
+          "canonical_reference": "REV 1-11"
+        }
+      ]
+    },
+    {
+      "campaign_id": "lagoinha-100-dias-2026",
+      "day_number": 100,
+      "title": "Eis que faço novas todas as coisas",
+      "theme": null,
+      "theme_highlight": null,
+      "sphere": "familia",
+      "key_verse_reference": "REV 21:5",
+      "official_direction": null,
+      "prayer_focus": "Consagração das famílias; cura do que ficou para trás; restauração; novas gerações; entrada no novo ano debaixo do governo de Deus.",
+      "prayer_points": [
+        "Consagração das famílias",
+        "cura do que ficou para trás",
+        "restauração",
+        "novas gerações",
+        "entrada no novo ano debaixo do governo de Deus"
+      ],
+      "altar": {
+        "ministry": "Intercessão/Bálsamo",
+        "leaders_label": "Prs. Leandra e Daniel"
+      },
+      "milestone": "Jornada completa",
+      "next_day_teaser": null,
+      "publish_status": "published",
+      "readings": [
+        {
+          "sort_order": 1,
+          "canonical_reference": "REV 12-22"
+        }
+      ]
+    }
+  ],
+  "provenance": {
+    "source_type": "original_church_content",
+    "source_name": "100 Dias — Guia Diário de Intercessão (2026-09-23 a 2026-12-31)",
+    "source_external_id": null,
+    "source_provider": "Lagoinha — material recebido de Davi em 2026-09-19 (autoria no arquivo: Leandra Pedroso, 28/08/2026)",
+    "rights_status": "pending_authorization",
+    "rights_reference": null,
+    "content_version": "1.0.0",
+    "leader_names_authorized": false,
+    "source_files": [
+      {
+        "file": "2026-08-28_guia-diario-de-intercessao.docx",
+        "sha256": "3e1dca0a0fff0e435def732f20127afe58acb4b1f6630fb2135f8a209845b199"
+      },
+      {
+        "file": "2026-08-28_escala-100-dias.docx",
+        "sha256": "8a6ce977a8c1e90d9b1344ea665249ce3ecc28e50c481855e1e25251625db6b6"
+      },
+      {
+        "file": "2026-08-28_orientacao-aos-lideres.docx",
+        "sha256": "2fd53fc72f661e8b9ba90817af20e9e26115a1ccec6b94bcfa730edaaceac15a"
+      }
+    ],
+    "generated_by": "scripts/convert-100-dias.mjs"
+  },
+  "DEV_ONLY": false,
+  "NOT_PRODUCTION_CONTENT": false
+}

@@ -8,7 +8,7 @@ import { OnboardingStep } from '@/ui/OnboardingStep';
 const OPTIONS: { mode: ReadingMode; title: string; subtitle: string }[] = [
   { mode: 'in_app', title: 'Ler aqui no app', subtitle: 'O texto aparece direto na tela de hoje' },
   { mode: 'own_bible', title: 'Usar minha Bíblia', subtitle: 'Você lê onde preferir e marca o dia como concluído' },
-  { mode: 'both', title: 'Eu vou alternar', subtitle: 'Depende do dia' },
+  { mode: 'both', title: 'Vou alternar', subtitle: 'Depende do dia' },
 ];
 
 export default function ReadingModeScreen() {
@@ -17,13 +17,12 @@ export default function ReadingModeScreen() {
 
   return (
     <OnboardingStep
-      step={2}
+      step={1}
       title="Como você pretende ler na maioria dos dias?"
       subtitle="Isso muda só o destaque dos botões. As duas formas continuam disponíveis, sempre."
       footer={
         <Button
           title="Continuar"
-          size="lg"
           disabled={!selected}
           onPress={() => {
             if (selected) track({ name: 'reading_mode_selected', mode: selected });
@@ -35,14 +34,14 @@ export default function ReadingModeScreen() {
       {OPTIONS.map((option) => (
         <ChoiceRow
           key={option.mode}
-          title={option.title}
-          subtitle={option.subtitle}
+          label={option.title}
+          description={option.subtitle}
           selected={selected === option.mode}
           onPress={() => updateSettings((s) => ({ ...s, readingMode: option.mode, lastUsedReadingMode: option.mode }))}
           testID={`onboarding-mode-${option.mode}`}
         />
       ))}
-      <AppText variant="muted">
+      <AppText variant="caption">
         Ler na Bíblia impressa ou em outro aplicativo não é uma experiência inferior. Aqui organizamos a jornada.
       </AppText>
     </OnboardingStep>

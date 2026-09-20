@@ -11,7 +11,7 @@ import {
 } from '@/progress/completionsStore';
 import { useSettings } from '@/settings/settingsStore';
 
-import { getCampaign, getDataset, getDay, isRunningOnFixtures } from './datasetSource';
+import { contentState, getCampaign, getDataset, getDay, type ContentState } from './datasetSource';
 import { officialDayInfo, type CampaignPhase } from './officialDay';
 import { nextMilestoneAfter, reachedMilestones, type Milestone } from './milestones';
 import type { Campaign, JourneyDay } from './types';
@@ -22,7 +22,10 @@ export type JourneySnapshot = {
   campaign: Campaign;
   officialDay: number;
   phase: CampaignPhase;
+  /** Verdadeiro sempre que o conteúdo ativo NÃO estiver autorizado (fixture ou pendente): a UI avisa. */
   isDevContent: boolean;
+  /** Fixture fictícia, conteúdo real pendente ou conteúdo real autorizado. */
+  contentState: ContentState;
   completions: Completions | null;
   completedCount: number;
   pendingDays: number[];
@@ -60,6 +63,7 @@ export function useJourney(): JourneySnapshot {
   /** Simular um dia no painel DEV coloca a campanha em curso, senão nada abriria. */
   const phase: CampaignPhase = override !== null ? 'running' : info.phase;
   const done = completedCount(completions);
+  const state = contentState();
 
   /**
    * Antes da campanha começar, NENHUM dia abre — inclusive o Dia 1. O clamp do dia
@@ -79,7 +83,8 @@ export function useJourney(): JourneySnapshot {
     campaign,
     officialDay,
     phase,
-    isDevContent: isRunningOnFixtures(),
+    isDevContent: state !== 'authorized',
+    contentState: state,
     completions,
     completedCount: done,
     pendingDays: phase === 'before_start' ? [] : pendingDaysUpTo(completions, officialDay).filter((d) => phase === 'finished' || d !== officialDay),

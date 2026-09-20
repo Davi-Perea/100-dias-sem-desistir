@@ -1,49 +1,44 @@
 import { router } from 'expo-router';
-import { useEffect } from 'react';
 import { View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { track } from '@/analytics/analytics';
-import { useJourney } from '@/journey/useJourney';
-import { AppText, Button, DevContentBanner, Screen } from '@/ui/components';
-import { spacing, useTheme } from '@/ui/theme';
+import { Dove } from '@/ui/brand';
+import { AppText, Button, Highlight, Screen } from '@/ui/components';
+import { fonts, spacing, useGutter, useTheme } from '@/ui/theme';
 
+/** 01a Boas-vindas. */
 export default function WelcomeScreen() {
-  const insets = useSafeAreaInsets();
   const { colors } = useTheme();
-  const journey = useJourney();
-
-  useEffect(() => {
-    track({ name: 'onboarding_started' });
-  }, []);
+  const insets = useSafeAreaInsets();
+  const inset = useGutter();
 
   return (
     <Screen>
-      <View
-        style={{
-          flex: 1,
-          paddingTop: insets.top + spacing.xxl,
-          paddingBottom: insets.bottom + spacing.xl,
-          paddingHorizontal: spacing.xl,
-          justifyContent: 'space-between',
-          gap: spacing.xl,
-        }}>
-        <View style={{ gap: spacing.lg, flex: 1, justifyContent: 'center' }}>
-          {journey.isDevContent ? <DevContentBanner compact /> : null}
-          <AppText variant="eyebrow">Jornada da igreja</AppText>
-          <AppText variant="display" style={{ fontSize: 40, lineHeight: 46 }}>
-            100 dias.{'\n'}Uma igreja.{'\n'}Uma jornada.
+      <View style={{ flex: 1, paddingHorizontal: inset, paddingTop: spacing.xl }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
+          <Dove width={34} role="signature" />
+          <AppText style={{ fontFamily: fonts.label, fontSize: 15, color: colors.text }}>Lagoinha</AppText>
+        </View>
+
+        <View style={{ flex: 1, justifyContent: 'center', gap: spacing.xl }}>
+          <AppText variant="display" accessibilityRole="header">
+            <Highlight>100 dias.</Highlight>
+            {'\n'}Uma igreja.{'\n'}Uma jornada.
           </AppText>
-          <AppText variant="secondary" style={{ fontSize: 17, lineHeight: 25 }}>
-            Leia, acompanhe seu progresso e caminhe junto com sua comunidade.
-          </AppText>
-          <View style={{ height: 1, backgroundColor: colors.border }} />
-          <AppText variant="muted">
-            Leia aqui ou na Bíblia que você já ama. Nós organizamos a jornada.
+          <AppText variant="body">
+            A igreja inteira lê a mesma coisa, no mesmo dia. Você acompanha o seu ritmo sem competir com
+            ninguém, e o que você escreve é só seu.
           </AppText>
         </View>
 
-        <Button title="Começar" size="lg" onPress={() => router.push('/onboarding/leitura')} testID="onboarding-start" />
+        <View style={{ gap: spacing.sm, paddingBottom: insets.bottom + 44 }}>
+          <Button
+            title="Começar"
+            onPress={() => router.push('/onboarding/leitura')}
+            testID="onboarding-start"
+          />
+          <Button title="Já tenho conta" variant="underline" onPress={() => router.push('/conta')} />
+        </View>
       </View>
     </Screen>
   );

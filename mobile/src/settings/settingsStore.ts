@@ -15,6 +15,18 @@ export type Settings = {
   reminder: { slot: ReminderSlot; hour: number; minute: number };
   readerFontSize: number;
   analyticsEnabled: boolean;
+  /**
+   * Marcos já mostrados em tela cheia. O handoff pede que a tela de marco
+   * apareça UMA vez; guardar isso evita que ela reapareça a cada retorno.
+   */
+  milestonesSeen: number[];
+  /**
+   * Ministério da pessoa, escolhido localmente entre os da escala. Serve para
+   * destacar os dias do ministério e avisar na véspera. Não vai para servidor.
+   */
+  ministry: string | null;
+  /** Aviso local diário às 12h com quem conduz o altar de hoje. Opt-in. */
+  altarReminder: boolean;
   /** Ferramentas de desenvolvimento; nunca visíveis em produção. */
   dev: { slowLoad: boolean; failLoad: boolean; dayOverride: number | null };
 };
@@ -29,6 +41,9 @@ export const DEFAULT_SETTINGS: Settings = {
   reminder: { slot: 'none', hour: 7, minute: 0 },
   readerFontSize: 18,
   analyticsEnabled: false,
+  milestonesSeen: [],
+  ministry: null,
+  altarReminder: false,
   dev: { slowLoad: false, failLoad: false, dayOverride: null },
 };
 
@@ -42,6 +57,7 @@ function merge(raw: unknown): Settings {
     ...DEFAULT_SETTINGS,
     ...r,
     reminder: { ...DEFAULT_SETTINGS.reminder, ...(r.reminder ?? {}) },
+    milestonesSeen: Array.isArray(r.milestonesSeen) ? r.milestonesSeen.filter((d) => typeof d === 'number') : [],
     dev: { ...DEFAULT_SETTINGS.dev, ...(r.dev ?? {}) },
   };
 }

@@ -1,4 +1,3 @@
-import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -6,25 +5,47 @@ import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-n
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { track } from '@/analytics/analytics';
-import { expandChapters, formatReference, parseReference } from '@/bible/references';
+import { expandChapters, parseReference } from '@/bible/references';
 import { getDay } from '@/journey/datasetSource';
 import { useJourney } from '@/journey/useJourney';
 import { isDayCompleted, setDayCompleted } from '@/progress/completionsStore';
 import { getBibleProvider, type Passage } from '@/reader/provider';
 import { saveReaderPosition } from '@/reader/readerPosition';
 import { updateSettings, useSettings } from '@/settings/settingsStore';
-import { AppText, Button, Screen, StateView } from '@/ui/components';
-import { fonts, iconSize, MAX_CONTENT_WIDTH, MIN_TOUCH, radius, spacing, useTheme } from '@/ui/theme';
+import {
+  AppText,
+  Button,
+  Cap,
+  Screen,
+  Sheet,
+  StateView,
+} from '@/ui/components';
+import { Icon } from '@/ui/icons';
+import {
+  BRAND_YELLOW,
+  MAX_CONTENT_WIDTH,
+  MIN_TOUCH,
+  fonts,
+  glass,
+  radius,
+  spacing,
+  useTheme,
+} from '@/ui/theme';
 
 const MIN_FONT = 14;
 const MAX_FONT = 30;
 
-/** Reader é rota contextual (spec §7/§16): aberto a partir de Hoje ou Jornada, nunca uma aba. */
+/**
+ * Leitor bíblico (tela 04). Rota contextual, nunca uma aba.
+ *
+ * O texto fica sempre em superfície OPACA: vidro só na barra de topo. Ler sobre
+ * material translúcido é exatamente o que o handoff proíbe.
+ */
 export default function ReaderScreen() {
   const { day } = useLocalSearchParams<{ day: string }>();
   const dayNumber = Number(day);
   const insets = useSafeAreaInsets();
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   const settings = useSettings();
   const journey = useJourney();
   const scrollRef = useRef<ScrollView>(null);
@@ -33,18 +54,20 @@ export default function ReaderScreen() {
   /** Resultado chaveado pelo capítulo: evita setState síncrono dentro do efeito. */
   const [result, setResult] = useState<{ key: string; passage?: Passage; error?: Error } | null>(null);
   const [busy, setBusy] = useState(false);
-  const [chromeVisible, setChromeVisible] = useState(true);
+  const [sizeSheet, setSizeSheet] = useState(false);
   const [reloadTick, setReloadTick] = useState(0);
 
   const dayData = getDay(dayNumber);
   const provider = getBibleProvider();
   const metadata = provider.getMetadata();
 
-  /** Todos os capítulos do dia, achatados: o leitor pagina capítulo a capítulo. */
   const chapters = useMemo(() => {
     if (!dayData) return [];
     return dayData.readings.flatMap((reading) =>
-      expandChapters(reading.canonical_reference).map((chapter) => ({ ...chapter, source: reading.canonical_reference })),
+      expandChapters(reading.canonical_reference).map((chapter) => ({
+        ...chapter,
+        source: reading.canonical_reference,
+      })),
     );
   }, [dayData]);
 
@@ -87,7 +110,12 @@ export default function ReaderScreen() {
   if (!Number.isInteger(dayNumber) || !dayData || chapters.length === 0) {
     return (
       <Screen tone="reader">
-        <StateView kind="empty" title="Leitura não encontrada" message="Este dia não tem leituras definidas." />
+        <StateView
+          kind="empty"
+          title="Leitura não encontrada"
+          message="Este dia não tem leituras definidas."
+          action={<Button title="Voltar" variant="outline" onPress={() => router.back()} />}
+        />
       </Screen>
     );
   }
@@ -95,6 +123,7 @@ export default function ReaderScreen() {
   const done = isDayCompleted(journey.completions, dayNumber);
   const fontSize = settings?.readerFontSize ?? 18;
   const isLastChapter = chapterIndex >= chapters.length - 1;
+  const chapterProgress = (chapterIndex + 1) / chapters.length;
 
   const completeDay = async () => {
     setBusy(true);
@@ -108,95 +137,142 @@ export default function ReaderScreen() {
     }
   };
 
+  const readOwnBible = async () => {
+    await updateSettings((s) => ({ ...s, lastUsedReadingMode: 'own_bible' }));
+    await setDayCompleted(journey.campaign.id, dayNumber, true);
+    track({ name: 'reading_completed', dayNumber, mode: 'own_bible' });
+    router.back();
+  };
+
   return (
-    <Screen tone="reader">
-      {/* Cabeçalho próprio: o leitor precisa de cromo mínimo e removível. */}
-      {chromeVisible ? (
-        <View
-          style={[
-            styles.header,
-            { paddingTop: insets.top + spacing.sm, borderBottomColor: colors.border, backgroundColor: colors.readerBackground },
-          ]}>
+    <Screen tone="reader" edges={['left', 'right']}>
+      {/* ------------------------------------------------- barra de topo (vidro) */}
+      <View
+        style={{
+          paddingTop: insets.top,
+          backgroundColor: isDark ? glass.darkLight : glass.reader,
+        }}
+      >
+        <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.md }}>
           <Pressable
             onPress={() => router.back()}
             accessibilityRole="button"
             accessibilityLabel="Fechar leitura"
-            hitSlop={10}
-            style={{ minWidth: MIN_TOUCH, minHeight: MIN_TOUCH, justifyContent: 'center' }}>
-            <Ionicons name="chevron-back" size={iconSize.lg} color={colors.text} />
+            testID="reader-back"
+            style={({ pressed }) => [
+              { width: MIN_TOUCH, height: MIN_TOUCH, alignItems: 'center', justifyContent: 'center' },
+              pressed && { opacity: 0.72 },
+            ]}
+          >
+            <Icon name="chevron-left" size={24} color={colors.text} />
           </Pressable>
+
           <View style={{ flex: 1, alignItems: 'center' }}>
-            <AppText variant="muted">Dia {dayNumber}</AppText>
-            <AppText style={{ fontWeight: '600' }} numberOfLines={1}>
-              {current ? `${current.bookName} ${current.chapter}` : ''}
+            <AppText style={{ fontFamily: fonts.label, fontSize: 15, color: colors.text }} numberOfLines={1}>
+              {current.bookName} {current.chapter}
+            </AppText>
+            <AppText variant="tick">
+              Dia {dayNumber} · capítulo {chapterIndex + 1} de {chapters.length}
             </AppText>
           </View>
-          <View style={{ flexDirection: 'row', gap: spacing.xs }}>
-            <Pressable
-              onPress={() => changeFont(-2)}
-              accessibilityRole="button"
-              accessibilityLabel="Diminuir tamanho da fonte"
-              hitSlop={8}
-              style={{ minWidth: MIN_TOUCH, minHeight: MIN_TOUCH, alignItems: 'center', justifyContent: 'center' }}>
-              <AppText style={{ fontSize: 15, fontWeight: '700' }}>A−</AppText>
-            </Pressable>
-            <Pressable
-              onPress={() => changeFont(2)}
-              accessibilityRole="button"
-              accessibilityLabel="Aumentar tamanho da fonte"
-              hitSlop={8}
-              style={{ minWidth: MIN_TOUCH, minHeight: MIN_TOUCH, alignItems: 'center', justifyContent: 'center' }}>
-              <AppText style={{ fontSize: 17, fontWeight: '700' }}>A+</AppText>
-            </Pressable>
-          </View>
+
+          <Pressable
+            onPress={() => setSizeSheet(true)}
+            accessibilityRole="button"
+            accessibilityLabel="Tamanho do texto"
+            testID="reader-text-size"
+            style={({ pressed }) => [
+              { width: MIN_TOUCH, height: MIN_TOUCH, alignItems: 'center', justifyContent: 'center' },
+              pressed && { opacity: 0.72 },
+            ]}
+          >
+            <Icon name="text-size" size={22} color={colors.text} />
+          </Pressable>
         </View>
-      ) : null}
+
+        {/* Filete de 3px: o preenchimento amarelo é o avanço dentro do dia. */}
+        <View
+          style={{ height: 3, backgroundColor: colors.surfaceSunken }}
+          accessible
+          accessibilityRole="progressbar"
+          accessibilityLabel={`Capítulo ${chapterIndex + 1} de ${chapters.length}`}
+          accessibilityValue={{ min: 0, max: chapters.length, now: chapterIndex + 1 }}
+        >
+          <View style={{ width: `${chapterProgress * 100}%`, height: 3, backgroundColor: BRAND_YELLOW }} />
+        </View>
+      </View>
 
       <ScrollView
         ref={scrollRef}
         contentInsetAdjustmentBehavior="never"
         contentContainerStyle={{
-          padding: spacing.xl,
-          paddingTop: chromeVisible ? spacing.xl : insets.top + spacing.xl,
-          paddingBottom: insets.bottom + 140,
+          paddingHorizontal: spacing.xl + 2,
+          paddingTop: spacing.xl,
+          paddingBottom: insets.bottom + 180,
           gap: spacing.lg,
-          // Medida de leitura: em tablet/paisagem o texto não vai de ponta a ponta.
           width: '100%',
           maxWidth: MAX_CONTENT_WIDTH,
           alignSelf: 'center',
-        }}>
-        <Pressable onPress={() => setChromeVisible((v) => !v)} accessibilityRole="button" accessibilityLabel="Alternar controles de leitura">
-          <View style={{ gap: spacing.sm }}>
-            <AppText variant="eyebrow">{formatReference(current.source)}</AppText>
-            <AppText variant="title" style={{ fontFamily: fonts.serif, fontSize: fontSize + 8 }}>
-              {current.bookName} {current.chapter}
-            </AppText>
-          </View>
-        </Pressable>
+        }}
+      >
+        {/* ------------------------------------------------ cabeça do capítulo */}
+        <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md }}>
+          <Cap style={{ flex: 1 }}>{current.bookName}</Cap>
+          <AppText variant="tick" style={{ flex: 1, textAlign: 'right' }}>
+            {metadata.abbreviation} · texto segue o tamanho do sistema
+          </AppText>
+        </View>
+        <Text
+          style={{ fontFamily: fonts.readStrong, fontSize: 44, lineHeight: 48, color: colors.text }}
+          accessibilityRole="header"
+        >
+          {current.chapter}
+        </Text>
 
         {metadata.isDevPlaceholder ? (
-          <View style={[styles.notice, { backgroundColor: colors.devBannerSurface, borderColor: colors.devBanner }]}>
-            <AppText style={{ color: colors.devBanner, fontWeight: '700', fontSize: 11, letterSpacing: 0.8 }}>
+          <View
+            style={{
+              borderWidth: 1,
+              borderColor: colors.devBanner,
+              borderRadius: radius.sm,
+              padding: spacing.md,
+              gap: 2,
+              backgroundColor: colors.devBannerSurface,
+            }}
+          >
+            <Text style={{ fontFamily: fonts.label, fontSize: 11, letterSpacing: 0.8, color: colors.devBanner }}>
               DEV FIXTURE — NOT PRODUCTION CONTENT
-            </AppText>
-            <AppText variant="muted" style={{ color: colors.devBanner }}>
+            </Text>
+            <AppText variant="tick" style={{ color: colors.devBanner }}>
               Texto de exemplo. Nenhuma tradução bíblica é exibida enquanto a licença não estiver resolvida.
             </AppText>
           </View>
         ) : null}
 
         {error ? (
-          <StateView kind="error" message={error.message} onRetry={() => setReloadTick((t) => t + 1)} />
+          <StateView
+            kind="error"
+            title="Não foi possível carregar"
+            message={error.message}
+            action={<Button title="Tentar de novo" variant="outline" onPress={() => setReloadTick((t) => t + 1)} />}
+          />
         ) : !passage ? (
-          <StateView kind="loading" message="Carregando o capítulo." />
+          <StateView kind="loading" />
         ) : (
           passage.verses.map((verse) => (
             <Text
               key={verse.verse}
               accessibilityLabel={`Versículo ${verse.verse}. ${verse.text}`}
               maxFontSizeMultiplier={1.8}
-              style={{ fontFamily: fonts.serif, fontSize, lineHeight: fontSize * 1.62, color: colors.text }}>
-              <Text style={{ fontSize: Math.max(11, fontSize * 0.62), color: colors.accent, fontWeight: '700' }}>
+              style={{ fontFamily: fonts.read, fontSize, lineHeight: fontSize * 1.7, color: colors.text }}
+            >
+              <Text
+                style={{
+                  fontFamily: fonts.item,
+                  fontSize: Math.max(11, fontSize * 0.61),
+                  color: colors.textMuted,
+                }}
+              >
                 {verse.verse}{' '}
               </Text>
               {verse.text}
@@ -204,76 +280,90 @@ export default function ReaderScreen() {
           ))
         )}
 
-        <AppText variant="muted" style={{ fontSize: 12, marginTop: spacing.lg }}>
+        <AppText variant="tick" style={{ marginTop: spacing.lg }}>
           {metadata.copyrightNotice}
         </AppText>
       </ScrollView>
 
+      {/* ------------------------------------------------------------- rodapé */}
       <View
-        style={[
-          styles.toolbar,
-          { paddingBottom: insets.bottom + spacing.sm, backgroundColor: colors.surface, borderTopColor: colors.border },
-        ]}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+        style={{
+          position: 'absolute',
+          left: 0,
+          right: 0,
+          bottom: 0,
+          paddingHorizontal: spacing.xl,
+          paddingTop: spacing.md,
+          paddingBottom: insets.bottom + spacing.md,
+          gap: spacing.sm,
+          backgroundColor: colors.readerBackground,
+          borderTopWidth: StyleSheet.hairlineWidth,
+          borderTopColor: colors.border,
+        }}
+      >
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
           <Pressable
             onPress={() => setChapterIndex((i) => Math.max(0, i - 1))}
             disabled={chapterIndex === 0}
             accessibilityRole="button"
             accessibilityLabel="Capítulo anterior"
             accessibilityState={{ disabled: chapterIndex === 0 }}
-            style={{ minWidth: MIN_TOUCH, minHeight: MIN_TOUCH, alignItems: 'center', justifyContent: 'center', opacity: chapterIndex === 0 ? 0.35 : 1 }}>
-            <Ionicons name="chevron-back" size={iconSize.md} color={colors.text} />
+            testID="reader-previous"
+            style={({ pressed }) => [
+              {
+                width: 56,
+                height: 56,
+                borderRadius: radius.button,
+                borderWidth: 2,
+                borderColor: colors.text,
+                alignItems: 'center',
+                justifyContent: 'center',
+                opacity: chapterIndex === 0 ? 0.35 : 1,
+              },
+              pressed && chapterIndex > 0 && { opacity: 0.72 },
+            ]}
+          >
+            <Icon name="chevron-left" size={22} color={colors.text} />
           </Pressable>
 
-          <View style={{ flex: 1, alignItems: 'center' }}>
-            <AppText variant="muted">
-              Capítulo {chapterIndex + 1} de {chapters.length}
-            </AppText>
+          <View style={{ flex: 1 }}>
+            {isLastChapter || done ? (
+              <Button
+                title={done ? 'Voltar' : 'Concluir leitura'}
+                icon={done ? undefined : 'check'}
+                onPress={done ? () => router.back() : completeDay}
+                loading={busy}
+                testID="reader-complete"
+              />
+            ) : (
+              <Button
+                title="Próximo capítulo"
+                icon="chevron-right"
+                onPress={() => setChapterIndex((i) => Math.min(chapters.length - 1, i + 1))}
+                testID="reader-next"
+              />
+            )}
           </View>
-
-          <Pressable
-            onPress={() => setChapterIndex((i) => Math.min(chapters.length - 1, i + 1))}
-            disabled={isLastChapter}
-            accessibilityRole="button"
-            accessibilityLabel="Próximo capítulo"
-            accessibilityState={{ disabled: isLastChapter }}
-            style={{ minWidth: MIN_TOUCH, minHeight: MIN_TOUCH, alignItems: 'center', justifyContent: 'center', opacity: isLastChapter ? 0.35 : 1 }}>
-            <Ionicons name="chevron-forward" size={iconSize.md} color={colors.text} />
-          </Pressable>
         </View>
 
-        {done ? (
-          <Button title="Dia concluído ✓" variant="secondary" onPress={() => router.back()} />
-        ) : (
-          <Button
-            title="Concluir leitura de hoje"
-            onPress={completeDay}
-            loading={busy}
-            testID="reader-complete"
-          />
-        )}
+        {!done ? (
+          <Button title="Prefiro ler na minha Bíblia" variant="underline" onPress={readOwnBible} />
+        ) : null}
       </View>
+
+      <Sheet visible={sizeSheet} onClose={() => setSizeSheet(false)} title="Tamanho do texto">
+        <AppText variant="secondary">
+          O texto também acompanha o tamanho de fonte do seu aparelho.
+        </AppText>
+        <View style={{ flexDirection: 'row', gap: spacing.md }}>
+          <Button title="Diminuir" variant="outline" onPress={() => changeFont(-2)} style={{ flex: 1 }} />
+          <Button title="Aumentar" variant="outline" onPress={() => changeFont(2)} style={{ flex: 1 }} />
+        </View>
+        <Text style={{ fontFamily: fonts.read, fontSize, lineHeight: fontSize * 1.7, color: colors.text }}>
+          Exemplo do tamanho atual do texto de leitura.
+        </Text>
+        <Button title="Pronto" variant="outline" onPress={() => setSizeSheet(false)} />
+      </Sheet>
     </Screen>
   );
 }
-
-const styles = StyleSheet.create({
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    paddingHorizontal: spacing.md,
-    paddingBottom: spacing.sm,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  toolbar: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    padding: spacing.md,
-    gap: spacing.sm,
-    borderTopWidth: StyleSheet.hairlineWidth,
-  },
-  notice: { borderWidth: 1, borderRadius: radius.sm, padding: spacing.md, gap: 2 },
-});

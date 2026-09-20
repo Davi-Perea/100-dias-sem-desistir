@@ -1,22 +1,40 @@
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 
+import { altarForDisplay, getDay } from '@/journey/datasetSource';
+import { dateOfDay, rawCampaignDay } from '@/journey/officialDay';
+import { SPHERE_LABEL } from '@/journey/spheres';
+import type { Campaign } from '@/journey/types';
 import type { ReminderSlot } from '@/settings/settingsStore';
 
 /**
- * Lembrete de leitura: notificação LOCAL, sem conta e sem servidor (spec §15).
+ * Lembretes: notificações LOCAIS, sem conta e sem servidor (spec §15).
  * Android: expo-notifications só usa alarme exato se o app tiver a permissão;
  * como não declaramos SCHEDULE_EXACT_ALARM, o agendamento é inexato — o que a
  * política do Google Play exige para lembretes que não são despertador/calendário.
+ *
+ * Três famílias, cada uma com o próprio prefixo de identificador:
+ *  - leitura diária (uma notificação repetida);
+ *  - véspera do dia do meu ministério (uma por dia do ministério, 2 ou 24);
+ *  - altar de hoje às 12h (janela rolante de 14 dias, refeita a cada abertura).
+ * O iOS aceita no máximo 64 agendamentos pendentes; a soma aqui fica abaixo disso.
  */
 export const DAILY_REMINDER_ID = 'daily-reading-reminder';
+export const MINISTRY_REMINDER_PREFIX = 'ministry-eve-';
+export const ALTAR_REMINDER_PREFIX = 'altar-today-';
 const ANDROID_CHANNEL_ID = 'reading-reminders';
+
+/** Véspera às 19h; altar às 12h (meia hora antes do encontro das 12h30). */
+export const MINISTRY_EVE_TIME = { hour: 19, minute: 0 } as const;
+export const ALTAR_TIME = { hour: 12, minute: 0 } as const;
+export const ALTAR_WINDOW_DAYS = 14;
 
 export type ReminderResult = { ok: true } | { ok: false; reason: string };
 
 export const SLOT_TIMES: Record<Exclude<ReminderSlot, 'custom' | 'none'>, { hour: number; minute: number }> = {
   morning: { hour: 7, minute: 0 },
-  afternoon: { hour: 14, minute: 0 },
+  // 13:00 é o horário concreto que o handoff mostra na tela 01d.
+  afternoon: { hour: 13, minute: 0 },
   evening: { hour: 20, minute: 0 },
 };
 
@@ -91,6 +109,145 @@ export async function scheduleDailyReminder(hour: number, minute: number): Promi
     },
   });
   return { ok: true };
+}
+
+/* ------------------------------------------------ planos (funções puras) */
+
+/**
+ * Data-hora LOCAL do aparelho para um dia da campanha. A campanha vive em
+ * São Paulo; para quem está lá, o relógio local e o da campanha coincidem.
+ */
+export function localDateTimeForDay(
+  dayNumber: number,
+  campaign: Campaign,
+  time: { hour: number; minute: number },
+  offsetDays = 0,
+): Date {
+  const [year, month, day] = dateOfDay(dayNumber, campaign).split('-').map(Number);
+  return new Date(year, month - 1, day + offsetDays, time.hour, time.minute, 0, 0);
+}
+
+export type PlannedReminder = { id: string; day: number; when: Date; title: string; body: string };
+
+/** Véspera de cada dia do ministério, só no futuro. */
+export function ministryReminderPlan(ministry: string | null, days: number[], campaign: Campaign, now: Date): PlannedReminder[] {
+  if (!ministry) return [];
+  return days
+    .map((day) => {
+      const sphere = getDay(day)?.sphere;
+      return {
+        id: `${MINISTRY_REMINDER_PREFIX}${day}`,
+        day,
+        when: localDateTimeForDay(day, campaign, MINISTRY_EVE_TIME, -1),
+        title: 'Amanhã é o dia do seu ministério',
+        body: `${ministry} conduz o altar das 12h30 no Dia ${day}${sphere ? ` · Monte: ${SPHERE_LABEL[sphere]}` : ''}.`,
+      };
+    })
+    .filter((item) => item.when.getTime() > now.getTime());
+}
+
+/** Altar de hoje, às 12h, para os próximos dias da janela; nunca no passado. */
+export function altarReminderPlan(campaign: Campaign, now: Date, windowDays = ALTAR_WINDOW_DAYS): PlannedReminder[] {
+  const first = Math.max(1, rawCampaignDay(now, campaign));
+  const last = Math.min(campaign.total_days, first + windowDays - 1);
+  const plan: PlannedReminder[] = [];
+  for (let day = first; day <= last; day += 1) {
+    const journeyDay = getDay(day);
+    const altar = altarForDisplay(journeyDay);
+    if (!altar) continue;
+    const when = localDateTimeForDay(day, campaign, ALTAR_TIME);
+    if (when.getTime() <= now.getTime()) continue;
+    const sphere = journeyDay?.sphere;
+    plan.push({
+      id: `${ALTAR_REMINDER_PREFIX}${day}`,
+      day,
+      when,
+      title: `Altar das 12h30 · Dia ${day}`,
+      body: `Hoje conduz: ${altar.ministry}${sphere ? ` · Monte: ${SPHERE_LABEL[sphere]}` : ''}.`,
+    });
+  }
+  return plan;
+}
+
+/* --------------------------------------------------------- agendamento */
+
+/**
+ * As sincronizações rodam uma de cada vez. A tela que liga o aviso chama
+ * `sync*` para mostrar o motivo de uma falha, e o hook do layout reage à mesma
+ * mudança de settings: sem fila, as duas cancelariam e agendariam ao mesmo tempo
+ * e poderiam pedir a permissão do sistema duas vezes.
+ */
+let queue: Promise<unknown> = Promise.resolve();
+function serialized<T>(task: () => Promise<T>): Promise<T> {
+  const run = queue.then(task, task);
+  queue = run.then(
+    () => undefined,
+    () => undefined,
+  );
+  return run;
+}
+
+async function cancelWithPrefix(prefix: string): Promise<void> {
+  const all = await Notifications.getAllScheduledNotificationsAsync();
+  await Promise.all(
+    all
+      .filter((n) => n.identifier.startsWith(prefix))
+      .map((n) => Notifications.cancelScheduledNotificationAsync(n.identifier).catch(() => {})),
+  );
+}
+
+async function schedulePlan(plan: PlannedReminder[]): Promise<void> {
+  for (const item of plan) {
+    await Notifications.scheduleNotificationAsync({
+      identifier: item.id,
+      content: { title: item.title, body: item.body },
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.DATE,
+        date: item.when,
+        channelId: ANDROID_CHANNEL_ID,
+      },
+    });
+  }
+}
+
+/**
+ * Reagenda as vésperas do ministério escolhido. Cancelar sempre e agendar de
+ * novo é o que mantém o estado do SO igual ao da escolha, sem contabilidade.
+ * A permissão só é pedida quando há algo a agendar.
+ */
+export function syncMinistryReminders(
+  ministry: string | null,
+  days: number[],
+  campaign: Campaign,
+  now: Date,
+): Promise<ReminderResult> {
+  if (!isReminderSupported()) return Promise.resolve({ ok: false, reason: 'Notificações locais não são suportadas na web.' });
+  return serialized(async () => {
+    await cancelWithPrefix(MINISTRY_REMINDER_PREFIX);
+    const plan = ministryReminderPlan(ministry, days, campaign, now);
+    if (plan.length === 0) return { ok: true };
+    const granted = await ensureNotificationPermission();
+    if (!granted) return { ok: false, reason: 'Permissão de notificações negada. Você pode ativar nos ajustes do sistema.' };
+    await ensureAndroidChannel();
+    await schedulePlan(plan);
+    return { ok: true };
+  });
+}
+
+/** Janela rolante do altar de hoje. Chamar a cada abertura do app. */
+export function syncAltarReminders(enabled: boolean, campaign: Campaign, now: Date): Promise<ReminderResult> {
+  if (!isReminderSupported()) return Promise.resolve({ ok: false, reason: 'Notificações locais não são suportadas na web.' });
+  return serialized(async () => {
+    await cancelWithPrefix(ALTAR_REMINDER_PREFIX);
+    if (!enabled) return { ok: true };
+    const plan = altarReminderPlan(campaign, now);
+    if (plan.length === 0) return { ok: true };
+    const granted = await ensureNotificationPermission();
+    if (!granted) return { ok: false, reason: 'Permissão de notificações negada. Você pode ativar nos ajustes do sistema.' };
+    await ensureAndroidChannel();
+    await schedulePlan(plan);
+    return { ok: true };
+  });
 }
 
 export async function scheduleTestNotification(seconds = 5): Promise<ReminderResult> {

@@ -1,3 +1,7 @@
+> **SUPERSEDIDO (2026-09-07).** A aparência do produto passou a ser a do handoff
+> "100 Dias — Lagoinha". Este arquivo fica como registro da exploração anterior.
+> O sistema em vigor está em `docs/technical/DESIGN_IMPLEMENTATION.md`.
+
 # Design System — Jornada 100 Dias (MASTER)
 
 - **Fonte de verdade global.** Regras de página em `pages/<pagina>.md` sobrescrevem este arquivo.

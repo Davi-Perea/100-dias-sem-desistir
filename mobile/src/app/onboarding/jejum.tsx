@@ -13,27 +13,27 @@ export default function FastingScreen() {
 
   return (
     <OnboardingStep
-      step={3}
+      step={2}
       title="Você vai participar do propósito de jejum?"
-      subtitle="Se sim, um cartão privado aparece no Hoje para você marcar. Ninguém mais vê."
+      subtitle="Não perguntamos do que você jejua. Isso é entre você e Deus. Se participar, aparece só uma marcação privada no seu Início."
       footer={
-        <Button title="Continuar" size="lg" onPress={() => router.push('/onboarding/lembrete')} testID="fasting-continue" />
+        <Button title="Continuar" onPress={() => router.push('/onboarding/lembrete')} testID="fasting-continue" />
       }>
       <ChoiceRow
-        title="Sim"
-        subtitle="Quero acompanhar meu propósito"
+        label="Sim, vou participar"
+        description="Quero acompanhar meu propósito"
         selected={settings?.fastingEnabled === true}
         onPress={() => updateSettings((s) => ({ ...s, fastingEnabled: true }))}
         testID="fasting-yes"
       />
       <ChoiceRow
-        title="Ainda não"
-        subtitle="Você pode ativar depois em Você"
+        label="Ainda não"
+        description="Você pode ativar depois em Você"
         selected={settings?.fastingEnabled === false}
         onPress={() => updateSettings((s) => ({ ...s, fastingEnabled: false }))}
         testID="fasting-no"
       />
-      <AppText variant="muted">
+      <AppText variant="caption">
         O registro de jejum fica apenas neste aparelho. Não vai para grupo, líder, relatório ou servidor.
       </AppText>
     </OnboardingStep>

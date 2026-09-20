@@ -63,12 +63,12 @@ describe('portão de produção', () => {
     authorized.DEV_ONLY = false;
     authorized.NOT_PRODUCTION_CONTENT = false;
     authorized.provenance = {
-      source_type: 'external_plan',
-      source_name: '100 Dias na Palavra e Oração',
-      source_external_id: '42360',
-      source_provider: 'Alcance Curitiba',
+      source_type: 'original_church_content',
+      source_name: '100 Dias — Guia Diário de Intercessão',
+      source_external_id: null,
+      source_provider: 'Lagoinha',
       rights_status: 'authorized',
-      rights_reference: 'contrato-2026-001',
+      rights_reference: 'autorizacao-2026-09-xx',
       content_version: '1.0.0',
     };
     const result = assertProductionReady(authorized);

@@ -9,7 +9,10 @@ Não importar memória, decisões, código, arquitetura ou documentação de out
   Antes: Sprint 0 (pesquisa/ADRs) e Sprint 0.5 (spike, `docs/technical/SPIKE_001_MOBILE_FOUNDATION.md`).
 - `mobile/` é o app V1: Fases 1–4 construídas e testadas com **fixtures DEV**; Fases 5–8 existem como schema SQL não aplicado.
   Estado detalhado e o que falta: `docs/technical/V1_BUILD_STATUS.md`.
-- Repositório git inicializado em `main`, sem commits. **Nunca fazer commit sem autorização explícita.**
+- Repositório git em `main` com um commit (Execution 01). **Nunca fazer commit sem autorização explícita.**
+- 2026-09-19: chegou o **material real** dos 100 Dias (guia, escala, orientação aos líderes). Execution 03 converteu o
+  guia em dataset (`mobile/content/`). Plano da fase final: `docs/product/PLANO_FASE_FINAL_100_DIAS.md`.
+  A campanha começa em **23/09/2026** e o app entra em andamento (entrada tardia é comportamento de produto).
 - Decisões estruturais vivem em ADRs (`docs/technical/ADR-*.md`). Status possível: PROPOSTA → APROVADA → SUPERSEDIDA.
 
 ## Papéis
@@ -70,13 +73,17 @@ Se um problema técnico afetar produto/estratégia, **não mudar silenciosamente
 
 ## Regras invioláveis do conteúdo (MASTER PRODUCT SPEC v1.1 §17–18, §31)
 
-- A fonte editorial canônica desejada é o plano **"100 Dias na Palavra e Oração"** (YouVersion Plan ID **42360**, Alcance Curitiba).
-- **Proibido:** scraping do YouVersion, cópia manual em massa, API não autorizada, inferir ou fabricar dias faltantes,
-  paráfrase automática para contornar direitos, substituir por outro plano (SBB, Luciano Subirá, "parecido"),
-  ou inventar um cronograma próprio para produção.
-- Enquanto não houver autorização (**Launch Gate 2**), o app roda com fixtures marcadas `DEV_ONLY` / `NOT_PRODUCTION_CONTENT`.
-  Nenhuma fixture pode ser apresentada como conteúdo real: existe banner obrigatório na UI e bloqueio no validador.
-- Licença da tradução bíblica (**Gate 1**) e autorização do plano (**Gate 2**) são problemas jurídicos **independentes**.
+- A fonte editorial canônica é o material **próprio da igreja**: "100 Dias — Guia Diário de Intercessão" (23/09 a 31/12/2026),
+  recebido em 2026-09-19, versionado em `mobile/content/source/` e convertido por `mobile/scripts/convert-100-dias.mjs`
+  em `mobile/content/100-dias-2026/dataset.json`. O plano 42360 do YouVersion está **superado** e não é mais referência.
+- **Proibido:** scraping do YouVersion, cópia de planos de terceiros, inferir ou fabricar dias, corrigir ou reescrever o texto
+  da igreja por conta própria, editar o `dataset.json` à mão (só o conversor gera; `npm run content:check` confere) e
+  inventar cronograma próprio.
+- **Launch Gate 2 agora é interno:** autorização escrita da igreja para publicar o guia e a escala no app. Até ela existir,
+  `rights_status = pending_authorization`: builds de desenvolvimento mostram o aviso "aguardando autorização" e builds de
+  release falham na abertura pelo portão de produção. Nomes de líderes só aparecem com `leader_names_authorized`.
+- As fixtures `DEV_ONLY` continuam existindo só para testes e painel DEV, sempre com banner; nunca são apresentadas como reais.
+- Licença da tradução bíblica (**Gate 1**) continua um problema **independente**: o material só traz referências, nunca texto.
 - A pendência de autorização é uma Launch Gate, não um convite para mudar o produto. Se ela não vier, a decisão volta ao Product Brain.
 
 ## Decisões vigentes (todas em status PROPOSTA — nada aprovado ainda)

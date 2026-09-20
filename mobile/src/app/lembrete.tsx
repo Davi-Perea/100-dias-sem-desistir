@@ -82,7 +82,7 @@ export default function ReminderScreen() {
     <Screen>
       <ScreenScroll>
         <View style={{ gap: spacing.xs }}>
-          <AppText variant="title">Quando você quer ser lembrado?</AppText>
+          <AppText variant="blockTitle">Quando você quer ser lembrado?</AppText>
           <AppText variant="secondary">
             Notificação local, agendada no seu aparelho. Não depende de conta nem de conexão.
           </AppText>
@@ -105,15 +105,16 @@ export default function ReminderScreen() {
           {(['morning', 'afternoon', 'evening'] as const).map((slot) => (
             <ChoiceRow
               key={slot}
-              title={SLOT_LABELS[slot]}
-              subtitle={formatTime(SLOT_TIMES[slot].hour, SLOT_TIMES[slot].minute)}
+              label={SLOT_LABELS[slot]}
+              description={formatTime(SLOT_TIMES[slot].hour, SLOT_TIMES[slot].minute)}
+              compact
               selected={current.slot === slot}
               onPress={() => apply(slot, SLOT_TIMES[slot].hour, SLOT_TIMES[slot].minute)}
               testID={`reminder-${slot}`}
             />
           ))}
           <ChoiceRow
-            title={SLOT_LABELS.none}
+            label={SLOT_LABELS.none}
             selected={current.slot === 'none'}
             onPress={() => apply('none', current.hour, current.minute)}
             testID="reminder-none"
@@ -121,7 +122,7 @@ export default function ReminderScreen() {
         </View>
 
         <View style={{ gap: spacing.sm }}>
-          <AppText variant="eyebrow">Escolher horário</AppText>
+          <AppText variant="cap">Escolher horário</AppText>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
             {CUSTOM_TIMES.map((t) => {
               const selected = current.slot === 'custom' && current.hour === t.hour && current.minute === t.minute;
@@ -129,7 +130,7 @@ export default function ReminderScreen() {
                 <Button
                   key={`${t.hour}-${t.minute}`}
                   title={formatTime(t.hour, t.minute)}
-                  variant={selected ? 'primary' : 'secondary'}
+                  variant={selected ? 'primary' : 'outline'}
                   disabled={busy}
                   onPress={() => apply('custom', t.hour, t.minute)}
                   style={{ paddingHorizontal: spacing.lg }}
@@ -150,7 +151,7 @@ export default function ReminderScreen() {
             <AppText variant="muted">{scheduled} agendamento(s) ativo(s) no sistema.</AppText>
             <Button
               title="Testar agora (5 s)"
-              variant="ghost"
+              variant="underline"
               disabled={!supported || busy}
               onPress={async () => {
                 const result = await scheduleTestNotification(5);

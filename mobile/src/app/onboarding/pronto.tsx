@@ -4,12 +4,24 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { track } from '@/analytics/analytics';
 import { useJourney } from '@/journey/useJourney';
+import { formatTime, SLOT_LABELS } from '@/reminders/reminders';
 import { updateSettings, useSettings } from '@/settings/settingsStore';
-import { AppText, Button, Screen } from '@/ui/components';
-import { spacing } from '@/ui/theme';
+import { Dove } from '@/ui/brand';
+import { AppText, Button, Highlight, Screen } from '@/ui/components';
+import { Icon } from '@/ui/icons';
+import { spacing, useGutter, useTheme } from '@/ui/theme';
 
+const READING_LABEL: Record<string, string> = {
+  in_app: 'Você vai ler aqui no app',
+  own_bible: 'Você vai ler na sua Bíblia',
+  both: 'Você vai alternar entre as duas',
+};
+
+/** 01e Tudo pronto. */
 export default function ReadyScreen() {
   const insets = useSafeAreaInsets();
+  const inset = useGutter();
+  const { colors } = useTheme();
   const journey = useJourney();
   const settings = useSettings();
 
@@ -26,30 +38,61 @@ export default function ReadyScreen() {
     router.replace('/');
   };
 
+  const reminder = settings?.reminder;
+  const confirmations = [
+    settings?.readingMode ? READING_LABEL[settings.readingMode] : 'Você escolhe como ler a cada dia',
+    settings?.fastingEnabled ? 'Seu jejum fica privado neste aparelho' : 'Sem propósito de jejum por enquanto',
+    reminder && reminder.slot !== 'none'
+      ? `Lembrete às ${formatTime(reminder.hour, reminder.minute)}`
+      : SLOT_LABELS.none,
+  ];
+
+  const started = journey.phase !== 'before_start';
+
   return (
     <Screen>
       <View
         style={{
           flex: 1,
-          paddingTop: insets.top + spacing.xxl,
+          paddingTop: spacing.xxl,
           paddingBottom: insets.bottom + spacing.xl,
-          paddingHorizontal: spacing.xl,
-          justifyContent: 'space-between',
+          paddingHorizontal: inset,
           gap: spacing.xl,
-        }}>
-        <View style={{ flex: 1, justifyContent: 'center', gap: spacing.md }}>
-          <AppText variant="eyebrow">Tudo pronto</AppText>
-          <AppText variant="display" style={{ fontSize: 38, lineHeight: 44 }}>
-            Hoje é o Dia {journey.officialDay} de {journey.campaign.total_days}.
+        }}
+      >
+        <Dove width={96} role="signature" />
+
+        <View style={{ flex: 1, gap: spacing.lg }}>
+          <AppText variant="display" accessibilityRole="header">
+            Tudo pronto.
           </AppText>
-          <AppText variant="secondary" style={{ fontSize: 17 }}>
-            {journey.officialDay > 1
-              ? 'A igreja já começou, e você entra exatamente onde ela está. Os dias anteriores continuam disponíveis, sem pressa.'
-              : 'Sua jornada começa agora. Um dia de cada vez.'}
-          </AppText>
+          {started ? (
+            <AppText variant="blockTitle" style={{ fontSize: 24, lineHeight: 30 }}>
+              Hoje é o <Highlight>Dia {journey.officialDay}</Highlight> de {journey.campaign.total_days}
+            </AppText>
+          ) : (
+            <AppText variant="blockTitle" style={{ fontSize: 24, lineHeight: 30 }}>
+              A jornada da igreja começa em breve
+            </AppText>
+          )}
+
+          <View style={{ gap: spacing.md, marginTop: spacing.sm }}>
+            {confirmations.map((line) => (
+              <View key={line} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
+                <Icon name="check" size={18} color={colors.text} strokeWidth={2.4} />
+                <AppText variant="item" style={{ flex: 1 }}>
+                  {line}
+                </AppText>
+              </View>
+            ))}
+          </View>
         </View>
 
-        <Button title="Começar o dia" size="lg" onPress={start} testID="onboarding-finish" />
+        <Button
+          title={started ? `Começar o Dia ${journey.officialDay}` : 'Ir para o Início'}
+          onPress={start}
+          testID="onboarding-finish"
+        />
       </View>
     </Screen>
   );

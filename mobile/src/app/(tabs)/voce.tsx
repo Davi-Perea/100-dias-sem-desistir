@@ -1,37 +1,69 @@
-import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
+import { useState } from 'react';
 import { View } from 'react-native';
 
+import { useCloudSession } from '@/cloud/useSession';
 import { fastingKeptCount, useFasting } from '@/fasting/fastingStore';
+import { altarOfDay } from '@/journey/ministries';
 import { useJourney } from '@/journey/useJourney';
 import { reflectionCount, useReflections } from '@/reflections/reflectionsStore';
-import { formatTime, SLOT_LABELS } from '@/reminders/reminders';
+import { syncAltarReminders } from '@/reminders/reminders';
 import { updateSettings, useSettings } from '@/settings/settingsStore';
+import { FlyingDove } from '@/ui/FlyingDove';
 import {
   AppText,
+  Avatar,
+  Block,
   Button,
-  Card,
-  ChoiceRow,
-  Divider,
+  Cap,
+  Checkbox,
+  Highlight,
+  Rule,
   Screen,
   ScreenScroll,
   SettingRow,
   StateView,
 } from '@/ui/components';
-import { iconSize, spacing, useTheme } from '@/ui/theme';
+import { fonts, spacing, useTheme } from '@/ui/theme';
 
-const READING_MODE_LABELS = {
-  in_app: 'Ler aqui no app',
-  own_bible: 'Usar minha Bíblia',
+const READING_MODE_LABEL: Record<string, string> = {
+  in_app: 'Aqui no app',
+  own_bible: 'Minha Bíblia',
   both: 'Vou alternar',
-} as const;
+};
 
+const SLOT_LABEL: Record<string, string> = {
+  morning: 'Manhã',
+  afternoon: 'Tarde',
+  evening: 'Noite',
+  custom: 'Horário escolhido',
+  none: 'Sem lembrete',
+};
+
+function Group({ title, children, accent = false }: { title: string; children: React.ReactNode; accent?: boolean }) {
+  return (
+    <View style={{ gap: spacing.sm }}>
+      {accent ? (
+        <Cap>
+          <Highlight>{title}</Highlight>
+        </Cap>
+      ) : (
+        <Cap>{title}</Cap>
+      )}
+      <View>{children}</View>
+    </View>
+  );
+}
+
+/** Você (tela 08): progresso pessoal e as preferências, agrupadas por caps. */
 export default function YouScreen() {
   const { colors } = useTheme();
-  const settings = useSettings();
   const journey = useJourney();
-  const fasting = useFasting(journey.campaign.id);
+  const settings = useSettings();
+  const session = useCloudSession();
   const reflections = useReflections(journey.campaign.id);
+  const fasting = useFasting(journey.campaign.id);
+  const [altarNotice, setAltarNotice] = useState<string | null>(null);
 
   if (!settings || !journey.ready) {
     return (
@@ -41,98 +73,199 @@ export default function YouScreen() {
     );
   }
 
+  const email = session.session?.user?.email ?? null;
+  const name = email ? email.split('@')[0] : null;
+  const total = journey.campaign.total_days;
+  const isLeader = session.role === 'leader' || session.role === 'admin';
+  const reminder = settings.reminder;
   const reminderLabel =
-    settings.reminder.slot === 'none'
-      ? 'Sem lembrete'
-      : `${SLOT_LABELS[settings.reminder.slot]} · ${formatTime(settings.reminder.hour, settings.reminder.minute)}`;
+    reminder.slot === 'none'
+      ? SLOT_LABEL.none
+      : `${String(reminder.hour).padStart(2, '0')}:${String(reminder.minute).padStart(2, '0')}`;
+
+  // Fora do período da campanha não existe "hoje" no altar: o dia oficial é
+  // clampado para exibição, e mostrar o Dia 1 (ou o Dia 100) como hoje enganaria.
+  const altarToday = journey.phase === 'running' ? (altarOfDay(journey.officialDay)?.ministry ?? null) : null;
+
+  const toggleAltarReminder = async () => {
+    if (settings.altarReminder) {
+      setAltarNotice(null);
+      await updateSettings((s) => ({ ...s, altarReminder: false }));
+      return;
+    }
+    await updateSettings((s) => ({ ...s, altarReminder: true }));
+    const result = await syncAltarReminders(true, journey.campaign, new Date());
+    if (result.ok) {
+      setAltarNotice(null);
+      return;
+    }
+    // Web (sem notificações locais) e permissão negada chegam pelo mesmo caminho:
+    // o motivo aparece como aviso, e a preferência volta a "desligado" porque
+    // nada foi agendado. Deixar a caixa marcada seria prometer um aviso que não vem.
+    setAltarNotice(result.reason);
+    await updateSettings((s) => ({ ...s, altarReminder: false }));
+  };
 
   return (
     <Screen>
-      <ScreenScroll>
-        <View style={{ gap: spacing.xs }}>
-          <AppText variant="eyebrow">Sua jornada</AppText>
-          <AppText variant="title">
-            {journey.completedCount} de {journey.campaign.total_days} dias concluídos
-          </AppText>
-          {journey.reached.length > 0 ? (
-            <AppText variant="secondary">
-              Marcos alcançados: {journey.reached.map((m) => m.label).join(', ')}.
-            </AppText>
+      <ScreenScroll gap={spacing.xl}>
+        {/* ------------------------------------------------------- identidade */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.lg }}>
+          {name ? (
+            <Avatar name={name} size={52} />
           ) : (
-            <AppText variant="secondary">Seu primeiro marco é o dia 7.</AppText>
+            <View
+              style={{
+                width: 52,
+                height: 52,
+                borderRadius: 26,
+                backgroundColor: colors.surfaceMuted,
+              }}
+            />
           )}
+          <View style={{ flex: 1, gap: 2 }}>
+            <AppText style={{ fontFamily: fonts.title, fontSize: 24, letterSpacing: -0.5, color: colors.text }}>
+              {name ?? 'Sua jornada'}
+            </AppText>
+            <AppText variant="caption">
+              {session.membership?.group.name
+                ? `${session.membership.group.name}${isLeader ? ' · líder' : ''}`
+                : 'Sem conta conectada'}
+            </AppText>
+          </View>
         </View>
 
-        <Card>
+        {/* ---------------------------------------------------- meu progresso */}
+        <Block>
           <View style={{ gap: spacing.md }}>
-            <AppText variant="eyebrow">Jornada e propósito</AppText>
-            <SettingRow
-              title="Participar do propósito de jejum"
-              subtitle="Registro privado, só neste aparelho"
-              value={settings.fastingEnabled}
-              onValueChange={(v) => updateSettings((s) => ({ ...s, fastingEnabled: v }))}
-              testID="fasting-setting"
-            />
-            {settings.fastingEnabled ? (
-              <AppText variant="muted">
-                {fastingKeptCount(fasting)} {fastingKeptCount(fasting) === 1 ? 'dia registrado' : 'dias registrados'}.
+            <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: spacing.sm }}>
+              <AppText style={{ flex: 1, fontFamily: fonts.title, fontSize: 18, color: colors.text }}>
+                Meu progresso
+              </AppText>
+              <AppText variant="caption">
+                {journey.completedCount} de {total} dias
+              </AppText>
+            </View>
+            <FlyingDove completed={journey.completedCount} totalDays={total} />
+          </View>
+        </Block>
+
+        <Group title="Minha jornada">
+          <SettingRow
+            label="Minhas reflexões"
+            value={String(reflectionCount(reflections))}
+            onPress={() => router.push('/reflexoes')}
+            first
+            testID="row-reflections"
+          />
+          <SettingRow
+            label="Meu jejum"
+            value={
+              settings.fastingEnabled
+                ? `${fastingKeptCount(fasting)} ${fastingKeptCount(fasting) === 1 ? 'dia' : 'dias'}`
+                : 'Desligado'
+            }
+            onPress={() => router.push('/jejum')}
+            testID="row-fasting"
+          />
+        </Group>
+
+        <Group title="Comunidade">
+          <SettingRow
+            label="Meu ministério"
+            value={settings.ministry ?? 'Escolher'}
+            onPress={() => router.push('/ministerio')}
+            first
+            testID="row-ministry"
+          />
+          <SettingRow
+            label="Altar de hoje"
+            value={altarToday ?? '—'}
+            onPress={() => router.push('/(tabs)/juntos')}
+            testID="row-altar-today"
+          />
+        </Group>
+
+        <Group title="Preferências">
+          <SettingRow
+            label="Lembretes"
+            value={reminderLabel}
+            onPress={() => router.push('/lembrete')}
+            first
+            testID="row-reminder"
+          />
+          {/* Mesmo desenho da linha de jejum do Início: texto à esquerda, caixa à direita. */}
+          <View>
+            <Rule />
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.sm }}>
+              <View style={{ flex: 1, gap: 2 }}>
+                <AppText variant="item">Aviso do altar das 12h30</AppText>
+                <AppText variant="caption">Um aviso local por dia com quem conduz o altar. Só neste aparelho.</AppText>
+              </View>
+              <Checkbox
+                checked={settings.altarReminder}
+                onToggle={toggleAltarReminder}
+                label="Aviso do altar das 12h30"
+                testID="altar-reminder-toggle"
+              />
+            </View>
+            {altarNotice ? (
+              <AppText
+                variant="caption"
+                accessibilityLiveRegion="polite"
+                style={{ paddingBottom: spacing.sm }}
+                testID="altar-reminder-notice"
+              >
+                {altarNotice}
               </AppText>
             ) : null}
-            <Divider />
-            <AppText variant="muted">
-              {reflectionCount(reflections) === 1
-                ? '1 reflexão privada guardada neste aparelho.'
-                : `${reflectionCount(reflections)} reflexões privadas guardadas neste aparelho.`}
-            </AppText>
           </View>
-        </Card>
+          <SettingRow
+            label="Leitura"
+            value={settings.readingMode ? READING_MODE_LABEL[settings.readingMode] : 'Não definido'}
+            onPress={() => router.push('/aparencia')}
+            testID="row-reading-mode"
+          />
+          <SettingRow
+            label="Aparência e acessibilidade"
+            onPress={() => router.push('/aparencia')}
+            testID="row-appearance"
+          />
+        </Group>
 
-        <Card>
-          <View style={{ gap: spacing.md }}>
-            <AppText variant="eyebrow">Como você lê</AppText>
-            {(Object.keys(READING_MODE_LABELS) as (keyof typeof READING_MODE_LABELS)[]).map((mode) => (
-              <ChoiceRow
-                key={mode}
-                title={READING_MODE_LABELS[mode]}
-                selected={settings.readingMode === mode}
-                onPress={() => updateSettings((s) => ({ ...s, readingMode: mode }))}
-                testID={`reading-mode-${mode}`}
-              />
-            ))}
-            <AppText variant="muted">
-              Isso muda apenas o destaque dos botões no Hoje. As duas formas continuam disponíveis.
-            </AppText>
-          </View>
-        </Card>
-
-        <Card onPress={() => router.push('/lembrete')} accessibilityLabel={`Lembrete de leitura: ${reminderLabel}`}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
-            <Ionicons name="notifications-outline" size={iconSize.md} color={colors.textSecondary} />
-            <View style={{ flex: 1, gap: 2 }}>
-              <AppText style={{ fontWeight: '600' }}>Lembrete de leitura</AppText>
-              <AppText variant="muted">{reminderLabel}</AppText>
-            </View>
-            <Ionicons name="chevron-forward" size={iconSize.sm} color={colors.textMuted} />
-          </View>
-        </Card>
-
-        <Card>
-          <View style={{ gap: spacing.md }}>
-            <AppText variant="eyebrow">Privacidade</AppText>
+        {isLeader ? (
+          <Group title="Liderança" accent>
             <SettingRow
-              title="Enviar dados de uso anônimos"
-              subtitle="Desligado por padrão. Nunca inclui reflexões, jejum ou textos."
-              value={settings.analyticsEnabled}
-              onValueChange={(v) => updateSettings((s) => ({ ...s, analyticsEnabled: v }))}
-              testID="analytics-setting"
+              label="Ferramentas de líder"
+              value={session.membership?.group.name ?? undefined}
+              onPress={() =>
+                session.membership?.group.id
+                  ? router.push({ pathname: '/grupo/[id]', params: { id: session.membership.group.id } })
+                  : router.push('/(tabs)/juntos')
+              }
+              first
+              testID="row-leader-tools"
             />
-            <AppText variant="muted">
-              Reflexões, jejum e progresso ficam neste aparelho. Nada é enviado para servidores nesta versão.
-            </AppText>
-          </View>
-        </Card>
+            {session.role === 'admin' ? (
+              <SettingRow label="Administração" onPress={() => router.push('/admin')} testID="row-admin" />
+            ) : null}
+          </Group>
+        ) : null}
 
-        <Button title="Painel de desenvolvimento" variant="quiet" onPress={() => router.push('/dev')} />
+        <Group title="Conta">
+          <SettingRow
+            label="Conta e privacidade"
+            value={email ?? 'Sem conta'}
+            onPress={() => router.push('/conta')}
+            first
+            testID="row-account"
+          />
+          <SettingRow label="Ajuda" onPress={() => router.push('/ajuda')} testID="row-help" />
+        </Group>
+
+        {__DEV__ ? (
+          <Button title="Painel de desenvolvimento" variant="underline" onPress={() => router.push('/dev')} />
+        ) : null}
       </ScreenScroll>
     </Screen>
   );

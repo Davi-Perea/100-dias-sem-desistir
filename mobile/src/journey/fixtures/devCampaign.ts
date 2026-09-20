@@ -2,17 +2,19 @@
  * ┌───────────────────────────────────────────────────────────────────────────┐
  * │  DEV FIXTURE — NOT PRODUCTION CONTENT                                     │
  * │                                                                           │
- * │  Conteúdo 100% fictício, criado apenas para exercitar a arquitetura.      │
- * │  NÃO é um cronograma de leitura, NÃO é um plano alternativo e NÃO deve    │
- * │  ser apresentado como conteúdo editorial real (spec §17, §29, §31).       │
+ * │  Conteúdo 100% fictício, criado apenas para exercitar a arquitetura e os  │
+ * │  testes. NÃO é um cronograma de leitura, NÃO é um plano alternativo e     │
+ * │  NÃO deve ser apresentado como conteúdo editorial real.                   │
  * │                                                                           │
- * │  A fonte editorial canônica DESEJADA para produção é o plano              │
- * │  "100 Dias na Palavra e Oração" (YouVersion Plan ID 42360, Alcance        │
- * │  Curitiba), que só pode ser ingerido após o Launch Gate 2 (autorização).  │
- * │  Estas fixtures existem para que a troca seja apenas de DADOS.            │
+ * │  O conteúdo REAL vive em content/100-dias-2026/dataset.json, gerado a     │
+ * │  partir do material próprio da igreja (content/source/) por               │
+ * │  scripts/convert-100-dias.mjs. Estas fixtures continuam existindo porque  │
+ * │  os testes precisam de um "hoje" controlável (dia 17) e de conteúdo que   │
+ * │  nunca possa ser confundido com o da igreja.                              │
  * └───────────────────────────────────────────────────────────────────────────┘
  */
 import { milestoneForDay } from '../milestones';
+import { SPHERE_ORDER } from '../spheres';
 import { TOTAL_DAYS, type Campaign, type JourneyDataset, type JourneyDay } from '../types';
 
 export const DEV_FIXTURE_BANNER = 'DEV FIXTURE — NOT PRODUCTION CONTENT';
@@ -36,16 +38,25 @@ const FIXTURE_KEY_VERSES = ['PSA 1:1', 'PRO 3:5', 'JHN 1:1', 'PSA 23:1', 'JHN 3:
 function fixtureDay(dayNumber: number): JourneyDay {
   const cycle = FIXTURE_REFERENCE_CYCLE[(dayNumber - 1) % FIXTURE_REFERENCE_CYCLE.length];
   const milestone = milestoneForDay(dayNumber);
+  const points = [`Motivo de exemplo A do dia ${dayNumber}`, `Motivo de exemplo B do dia ${dayNumber}`];
   return {
     campaign_id: CAMPAIGN_ID,
     day_number: dayNumber,
     title: `Dia ${dayNumber} — título de exemplo`,
     theme: `Tema de exemplo ${((dayNumber - 1) % 5) + 1}`,
+    // O realce cai justamente sobre "exemplo": no conteúdo fictício a ênfase
+    // visual reforça que este não é o tema real da igreja.
+    theme_highlight: 'exemplo',
+    // A rotação dos sete montes é estrutura (esquema não protegido), não conteúdo;
+    // as fixtures a seguem para a interface poder ser exercitada.
+    sphere: SPHERE_ORDER[(dayNumber - 1) % SPHERE_ORDER.length],
     key_verse_reference: FIXTURE_KEY_VERSES[(dayNumber - 1) % FIXTURE_KEY_VERSES.length],
     official_direction:
       `Direção pastoral de exemplo para o dia ${dayNumber}. Este texto é uma fixture de desenvolvimento ` +
       'e será substituído pelo conteúdo editorial autorizado.',
-    prayer_focus: `Motivo de oração de exemplo para o dia ${dayNumber}.`,
+    prayer_focus: `${points.join('; ')}.`,
+    prayer_points: points,
+    altar: { ministry: `Ministério de exemplo ${((dayNumber - 1) % 3) + 1}`, leaders_label: null },
     milestone: milestone ? milestone.label : null,
     next_day_teaser: dayNumber < TOTAL_DAYS ? `Amanhã continuamos no dia ${dayNumber + 1}.` : null,
     publish_status: 'published',
@@ -66,6 +77,7 @@ export function devCampaign(reference: Date = new Date()): Campaign {
   return {
     id: CAMPAIGN_ID,
     title: 'Jornada de 100 Dias (fixture)',
+    subtitle: null,
     start_date: devStartDate(reference),
     timezone: 'America/Sao_Paulo',
     utc_offset_minutes: -180,
@@ -85,24 +97,10 @@ export function devDataset(reference: Date = new Date()): JourneyDataset {
       source_provider: null,
       rights_status: 'dev_fixture',
       rights_reference: null,
-      content_version: 'dev-0.1.0',
+      content_version: 'dev-0.2.0',
+      leader_names_authorized: false,
     },
     DEV_ONLY: true,
     NOT_PRODUCTION_CONTENT: true,
   };
 }
-
-/**
- * Metadados da fonte editorial desejada, registrados desde já para rastreabilidade
- * (spec §17). Nenhum conteúdo do plano é reproduzido aqui — apenas a identificação
- * da fonte e o estado dos direitos.
- */
-export const CANONICAL_SOURCE_TARGET = {
-  source_type: 'external_plan' as const,
-  source_name: '100 Dias na Palavra e Oração',
-  source_external_id: '42360',
-  source_provider: 'Alcance Curitiba',
-  rights_status: 'pending_authorization' as const,
-  rights_reference: null,
-  note: 'Aguardando Launch Gate 2. Ingestão só por canal autorizado; scraping proibido (spec §18.6).',
-};

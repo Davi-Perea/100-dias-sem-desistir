@@ -3,7 +3,8 @@
 - **Data:** 2026-09-07 · **Spec:** MASTER PRODUCT SPEC v1.1 (aprovado para build)
 - **Código:** `mobile/` (React Native + Expo SDK 57, TypeScript). Substitui o spike do Sprint 0.5.
 - **Nada commitado.** `git status` continua com tudo não rastreado.
-- **Conteúdo:** roda 100% com fixtures DEV. Nenhum conteúdo do plano 42360 foi ingerido, copiado, inferido ou reconstruído.
+- **Conteúdo (atualizado 2026-09-19):** o app embarca o **material real da igreja** (`mobile/content/100-dias-2026/dataset.json`),
+  com `rights_status = pending_authorization`. As fixtures DEV ficaram só para testes e painel DEV. O plano 42360 está superado.
 
 ---
 
@@ -109,6 +110,13 @@ Auditoria formal contra os requisitos A–H do closeout. Três falhas encontrada
    campo `groupId` e os eventos de grupo/social do contrato de analytics). A aba Juntos continua existindo
    (spec §16) como um lugar honesto que diz que a comunidade vem depois.
 
+### EXECUTION 03 — conteúdo real (2026-09-19)
+
+O material da igreja (guia diário + escala + orientação aos líderes) virou dataset por conversor determinístico
+(`mobile/scripts/convert-100-dias.mjs`), com proveniência, hashes das fontes e 17 testes que fixam as medições
+(1.189 capítulos exatamente uma vez, 11–12 por dia, sete montes em rotação, versículo dentro da leitura, 39 ministérios).
+Detalhes e regras de direitos: `EXECUTION_03_CONTEUDO_REAL.md`. **239 testes, 13 suítes.**
+
 ## 4. Bug encontrado e corrigido durante a validação
 
 **A negativa de permissão de notificação prendia o usuário no onboarding.** Na tela de lembrete, uma falha ao agendar
@@ -132,12 +140,12 @@ npx expo start
 7. Lembrete: agendar, testar em 5 s, verificar entrega.
 8. Android 16: barras (edge-to-edge) e gesto de voltar.
 
-## 6. Como trocar as fixtures pelo dataset autorizado (Fase 11, após Gate 2)
+## 6. Como o conteúdo real entra e sai do app (desde a Execution 03)
 
-1. Receber o dataset por canal autorizado (nunca scraping).
-2. Normalizar para o shape de `JourneyDataset`, preenchendo `provenance` com `source_external_id = "42360"`,
-   `source_provider = "Alcance Curitiba"`, `rights_status = "authorized"` e `rights_reference` apontando para a autorização.
-3. `loadDataset(dataset, 'production')` — recusa qualquer coisa não autorizada.
-4. Rodar o validador e a suíte de testes.
-5. Revisão humana do conteúdo (fidelidade editorial: não reescrever, não resumir, não reordenar).
-6. Nenhuma tela precisa mudar. Se precisar, a abstração falhou e isso é um defeito a corrigir antes de publicar.
+1. As fontes da igreja ficam em `mobile/content/source/` (nunca editar; revisão nova = arquivo novo).
+2. `npm run content:convert` regenera `mobile/content/100-dias-2026/dataset.json`; `npm run content:check` confere.
+3. Quando a autorização escrita chegar, ela é registrada em `mobile/content/100-dias-2026/rights.json`
+   (`rights_status`, `rights_reference`, `leader_names_authorized`) e o conversor é rodado de novo. O
+   `dataset.json` nunca é editado à mão.
+4. Build de release sem autorização falha na abertura (portão de produção em `datasetSource.ts`), e
+   `node scripts/convert-100-dias.mjs --check --require-authorized` falha antes do build. É proposital.

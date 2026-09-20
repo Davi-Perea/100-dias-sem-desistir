@@ -47,13 +47,12 @@ export default function ReminderOnboardingScreen() {
 
   return (
     <OnboardingStep
-      step={4}
+      step={3}
       title="Quando você quer ser lembrado da sua leitura?"
       subtitle="Um lembrete local, agendado no seu aparelho."
       footer={
         <Button
           title={blocked ? 'Continuar sem lembrete' : 'Continuar'}
-          size="lg"
           onPress={finish}
           loading={busy}
           testID="reminder-continue"
@@ -62,28 +61,31 @@ export default function ReminderOnboardingScreen() {
       {(['morning', 'afternoon', 'evening'] as const).map((option) => (
         <ChoiceRow
           key={option}
-          title={SLOT_LABELS[option]}
-          subtitle={formatTime(SLOT_TIMES[option].hour, SLOT_TIMES[option].minute)}
+          label={SLOT_LABELS[option]}
+          description={formatTime(SLOT_TIMES[option].hour, SLOT_TIMES[option].minute)}
+          compact
           selected={slot === option}
           onPress={() => choose(option, SLOT_TIMES[option].hour, SLOT_TIMES[option].minute)}
           testID={`onboarding-reminder-${option}`}
         />
       ))}
       <ChoiceRow
-        title={SLOT_LABELS.custom}
-        subtitle={formatTime(CUSTOM.hour, CUSTOM.minute)}
+        label={SLOT_LABELS.custom}
+        description={formatTime(CUSTOM.hour, CUSTOM.minute)}
+        compact
         selected={slot === 'custom'}
         onPress={() => choose('custom', CUSTOM.hour, CUSTOM.minute)}
         testID="onboarding-reminder-custom"
       />
       <ChoiceRow
-        title={SLOT_LABELS.none}
+        label={SLOT_LABELS.none}
+        compact
         selected={slot === 'none'}
         onPress={() => choose('none', 7, 0)}
         testID="onboarding-reminder-none"
       />
-      {notice ? <AppText variant="muted">{notice}</AppText> : null}
-      <AppText variant="muted">Você pode mudar ou desligar o lembrete depois, em Você.</AppText>
+      {notice ? <AppText variant="caption">{notice}</AppText> : null}
+      <AppText variant="caption">Você pode mudar ou desligar o lembrete depois, em Você.</AppText>
     </OnboardingStep>
   );
 }

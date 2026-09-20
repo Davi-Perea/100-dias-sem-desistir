@@ -1,31 +1,41 @@
-import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
-import { useState } from 'react';
-import { Platform, Pressable, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useEffect, useState } from 'react';
+import { Platform, View } from 'react-native';
 
 import { track } from '@/analytics/analytics';
 import { formatReference } from '@/bible/references';
-import { milestoneForDay } from '@/journey/milestones';
-import { formatDayDate } from '@/journey/officialDay';
-import { useJourney } from '@/journey/useJourney';
-import { isDayCompleted, setDayCompleted } from '@/progress/completionsStore';
+import { useCloudSession } from '@/cloud/useSession';
+import { collectiveNotice, getChurchProgress } from '@/community/communityState';
 import { isFastingKept, setFastingKept, useFasting } from '@/fasting/fastingStore';
+import { milestoneForDay } from '@/journey/milestones';
+import { altarOfDay } from '@/journey/ministries';
+import { formatDayDate, rawCampaignDay } from '@/journey/officialDay';
+import { readingSummary, splitHighlight } from '@/journey/readingSummary';
+import { SPHERE_LABEL } from '@/journey/spheres';
+import { useJourney } from '@/journey/useJourney';
+import { completedDayNumbers, isDayCompleted, setDayCompleted } from '@/progress/completionsStore';
 import { getReflection, useReflections } from '@/reflections/reflectionsStore';
 import { updateSettings, useSettings } from '@/settings/settingsStore';
+import { HundredDayRuler } from '@/ui/HundredDayRuler';
+import { AccountButton, BrandHeader } from '@/ui/Lockup';
+import { SpherePill } from '@/ui/SpherePill';
 import {
   AppText,
   Button,
-  Card,
+  Cap,
+  Checkbox,
   DevContentBanner,
-  Divider,
+  Highlight,
+  OfflineBanner,
   ProgressBar,
+  Rule,
   Screen,
   ScreenScroll,
   StateView,
 } from '@/ui/components';
-import { iconSize, radius, spacing, useTheme } from '@/ui/theme';
+import { Icon } from '@/ui/icons';
+import { BRAND_YELLOW, fonts, spacing, useTheme } from '@/ui/theme';
 
 function haptic(style: 'light' | 'success' = 'light') {
   if (Platform.OS === 'web') return;
@@ -33,19 +43,54 @@ function haptic(style: 'light' | 'success' = 'light') {
   else Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
 }
 
-export default function TodayScreen() {
-  const insets = useSafeAreaInsets();
+/** "Dia 17" em 84px com "de 100" ao lado, alinhado pela base. */
+function DayHeadline({ day, total, size = 84 }: { day: number; total: number; size?: number }) {
+  const { colors } = useTheme();
+  return (
+    <View
+      style={{ flexDirection: 'row', alignItems: 'baseline', gap: spacing.sm }}
+      accessible
+      accessibilityRole="header"
+      accessibilityLabel={`Dia ${day} de ${total}`}
+    >
+      <AppText
+        variant="displayXl"
+        style={{ fontSize: size, lineHeight: size * 0.95, letterSpacing: size * -0.045 }}
+      >
+        Dia {day}
+      </AppText>
+      <AppText style={{ fontFamily: fonts.item, fontSize: size * 0.24, color: colors.textMuted }}>
+        de {total}
+      </AppText>
+    </View>
+  );
+}
+
+export default function StartScreen() {
   const { colors } = useTheme();
   const journey = useJourney();
   const settings = useSettings();
+  const session = useCloudSession();
   const fasting = useFasting(journey.campaign.id);
   const reflections = useReflections(journey.campaign.id);
   const [busy, setBusy] = useState(false);
 
+  const accountName = (session.session?.user?.email ?? null)?.split('@')[0] ?? null;
+  const church = getChurchProgress();
+
+  // Marco em tela cheia: uma vez por marco alcançado (handoff, telas 10 e 11).
+  const reachedNow = journey.ready ? milestoneForDay(journey.completedCount) : null;
+  const unseenMilestone =
+    reachedNow && settings && !settings.milestonesSeen.includes(reachedNow.day) ? reachedNow.day : null;
+  useEffect(() => {
+    if (unseenMilestone === null) return;
+    router.push({ pathname: '/marco/[day]', params: { day: String(unseenMilestone) } });
+  }, [unseenMilestone]);
+
   if (!journey.ready || !settings) {
     return (
       <Screen>
-        <StateView kind="loading" message="Preparando sua jornada." />
+        <StateView kind="loading" />
       </Screen>
     );
   }
@@ -53,45 +98,75 @@ export default function TodayScreen() {
   const { officialDay, campaign, todayDay, completions, phase } = journey;
   const total = campaign.total_days;
 
-  // ---------------------------------------------------------------------------
-  // Estado ANTES da campanha: nenhum conteúdo é revelado, nem o do Dia 1.
-  // ---------------------------------------------------------------------------
+  // ---------------------------------------------------------------- e1
+  // Antes da campanha nenhum conteúdo é revelado, nem o do Dia 1.
+  // ---------------------------------------------------------------- e1
   if (phase === 'before_start') {
+    // Contado no fuso da campanha: às 23h em São Paulo ainda é "hoje" para a igreja,
+    // mesmo que o UTC já tenha virado o dia.
+    const daysToStart = Math.max(0, 1 - rawCampaignDay(new Date(), campaign));
     return (
       <Screen>
-        <ScreenScroll contentStyle={{ paddingTop: insets.top + spacing.lg }}>
-          {journey.isDevContent ? <DevContentBanner /> : null}
-          <View style={{ gap: spacing.md }}>
-            <AppText variant="eyebrow">A jornada ainda não começou</AppText>
-            <AppText variant="display">100 dias, juntos</AppText>
-            <AppText variant="secondary">
-              A igreja começa em {formatDayDate(1, campaign)}. A leitura do primeiro dia abre nesse dia.
+        <ScreenScroll>
+          <BrandHeader right={<AccountButton name={accountName} />} />
+          <DevContentBanner state={journey.contentState} />
+
+          <View style={{ gap: spacing.sm }} testID="before-start-card">
+            <AppText variant="display" style={{ fontSize: 52, lineHeight: 52 }}>
+              Faltam <Highlight>{daysToStart === 1 ? '1 dia' : `${daysToStart} dias`}</Highlight>
+            </AppText>
+            <AppText variant="secondary">A igreja começa em {formatDayDate(1, campaign)}.</AppText>
+          </View>
+
+          <HundredDayRuler
+            totalDays={total}
+            officialDay={0}
+            completed={[]}
+            variant="inactive"
+            accessibilityLabel={`A jornada de ${total} dias ainda não começou.`}
+          />
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+            <AppText variant="tick">Dia 1 · {formatDayDate(1, campaign)}</AppText>
+            <AppText variant="tick">
+              Dia {total} · {formatDayDate(total, campaign)}
             </AppText>
           </View>
-          <Card tone="muted" testID="before-start-card">
-            <View style={{ gap: spacing.xs }}>
-              <AppText variant="eyebrow">Enquanto isso</AppText>
-              <AppText variant="secondary">
-                Você já pode escolher como prefere ler e definir seu lembrete diário em Você.
-              </AppText>
-            </View>
-          </Card>
+
+          <View style={{ flexDirection: 'row', gap: spacing.md }}>
+            <Button title="Ajustar lembrete" variant="outline" onPress={() => router.push('/lembrete')} style={{ flex: 1 }} />
+            <Button title="Entrar no grupo" variant="outline" onPress={() => router.push('/(tabs)/juntos')} style={{ flex: 1 }} />
+          </View>
         </ScreenScroll>
       </Screen>
     );
   }
 
   const done = isDayCompleted(completions, officialDay);
-  const campaignProgress = officialDay / total;
-  const personalProgress = journey.completedCount / total;
-  const milestone = done ? milestoneForDay(journey.completedCount) : null;
+  const summary = readingSummary(todayDay);
   const reflection = getReflection(reflections, officialDay);
   const preferOwnBible = (settings.lastUsedReadingMode ?? settings.readingMode) === 'own_bible';
   const isFinished = phase === 'finished';
-
-  // Retomada tratada como sucesso, nunca como falha (spec §4.5).
   const gap = journey.gapDays;
-  const returningAfterGap = !done && gap !== null && gap > 1;
+  const returningAfterGap = !done && gap !== null && gap >= 3;
+  const openCount = journey.pendingDays.length;
+  const theme = todayDay?.theme
+    ? splitHighlight(todayDay.theme, todayDay.theme_highlight)
+    : null;
+  const keyVerse = todayDay?.key_verse_reference ? formatReference(todayDay.key_verse_reference) : null;
+  const prayerPoints = todayDay?.prayer_points ?? [];
+  const sphereLabel = todayDay?.sphere ? SPHERE_LABEL[todayDay.sphere] : null;
+  // Nomes de pessoas já vêm filtrados pela autorização da igreja. Depois da
+  // campanha `officialDay` fica travado no último dia, então a linha mostra o
+  // altar do Dia 100.
+  const altar = altarOfDay(officialDay);
+  const altarLine = altar
+    ? `${isFinished ? `Conduziu no Dia ${total}` : 'Hoje conduz'}: ${altar.ministry}${
+        altar.leaders_label ? ` · ${altar.leaders_label}` : ''
+      }`
+    : null;
+
+  const openIntercession = () =>
+    router.push({ pathname: '/intercessao/[day]', params: { day: String(officialDay) } });
 
   const complete = async (mode: 'in_app' | 'own_bible' | 'unknown') => {
     setBusy(true);
@@ -123,231 +198,243 @@ export default function TodayScreen() {
     router.push({ pathname: '/reader/[day]', params: { day: String(officialDay) } });
   };
 
+  /**
+   * Handoff: escolher a própria Bíblia NÃO conclui o dia. Ela troca a ação
+   * principal do Início para "Concluir leitura", que a pessoa toca quando
+   * terminar de ler. Marcar por ela seria decidir no lugar dela.
+   */
   const readOwnBible = async () => {
     await updateSettings((s) => ({ ...s, lastUsedReadingMode: 'own_bible' }));
     track({ name: 'reading_started', dayNumber: officialDay, mode: 'own_bible' });
-    await complete('own_bible');
   };
 
-  const primaryReadCta = preferOwnBible ? (
-    <Button
-      title="Vou ler na minha Bíblia"
-      subtitle="Marcar como concluído"
-      size="lg"
-      onPress={readOwnBible}
-      disabled={busy}
-    />
-  ) : (
-    <Button title="Ler aqui" size="lg" onPress={openReader} disabled={busy} />
-  );
-  const secondaryReadCta = preferOwnBible ? (
-    <Button title="Ler aqui" variant="ghost" onPress={openReader} disabled={busy} />
-  ) : (
-    <Button title="Vou ler na minha Bíblia" variant="ghost" onPress={readOwnBible} disabled={busy} />
-  );
+  const statusLine = [
+    `${journey.completedCount} ${journey.completedCount === 1 ? 'concluído' : 'concluídos'}`,
+    openCount > 0 ? `${openCount} em aberto` : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
 
   return (
     <Screen>
-      <ScreenScroll contentStyle={{ paddingTop: insets.top + spacing.lg }}>
-        {journey.isDevContent ? <DevContentBanner /> : null}
+      <ScreenScroll gap={spacing.xl}>
+        <BrandHeader right={<AccountButton name={accountName} />} />
+        <DevContentBanner state={journey.contentState} />
+        {session.degraded ? <OfflineBanner /> : null}
 
-        {/* 6.1 cabeçalho */}
-        <View style={{ gap: spacing.md }}>
-          <AppText variant="eyebrow">
-            {isFinished ? `Jornada encerrada · ${total} dias` : `Dia ${officialDay} de ${total}`}
-          </AppText>
-          <AppText variant="display">{todayDay?.title ?? `Dia ${officialDay}`}</AppText>
-          <View style={{ gap: spacing.sm }}>
-            <ProgressBar
-              value={campaignProgress}
-              label={`A igreja está no dia ${officialDay} de ${total}`}
-              tone="muted"
-            />
-            <ProgressBar value={personalProgress} label={`Você concluiu ${journey.completedCount} de ${total} dias`} />
-            <AppText variant="muted">
-              Você concluiu {journey.completedCount} de {total} dias.
+        {/* ------------------------------------------------------------- e2 */}
+        {returningAfterGap ? (
+          <View style={{ gap: spacing.xs }} testID="return-module">
+            <AppText variant="blockTitleLg">
+              <Highlight>Que bom ter você</Highlight> de volta.
+            </AppText>
+            <AppText variant="secondary">
+              {openCount === 1
+                ? 'Um dia ficou para trás e continua aberto.'
+                : `${openCount} dias ficaram para trás e continuam abertos.`}{' '}
+              Você pode retomar por onde quiser.
+            </AppText>
+          </View>
+        ) : null}
+
+        {/* --------------------------------------------- cabeça: dia + régua */}
+        <View style={{ gap: spacing.lg }}>
+          <DayHeadline day={officialDay} total={total} />
+          <HundredDayRuler totalDays={total} officialDay={officialDay} completed={completedDayNumbers(completions)} />
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+            <AppText variant="tick">{statusLine}</AppText>
+            <AppText variant="tick" testID={isFinished ? 'after-campaign-card' : 'church-day'}>
+              {isFinished ? `Jornada encerrada · ${total} dias` : `Igreja no Dia ${officialDay}`}
             </AppText>
           </View>
         </View>
 
-        {/* Estado DEPOIS da campanha */}
-        {isFinished ? (
-          <Card tone="accent" testID="after-campaign-card">
+        <Rule />
+
+        {/* ------------------------------------------------- tema e leitura */}
+        <View style={{ gap: spacing.md }}>
+          <Cap>{isFinished ? `Tema do dia ${total}` : 'Tema de hoje'}</Cap>
+          {todayDay?.sphere ? <SpherePill sphere={todayDay.sphere} testID="sphere-pill" /> : null}
+          {theme ? (
+            <AppText variant="blockTitle">
+              {theme.before}
+              {theme.match ? <Highlight>{theme.match}</Highlight> : null}
+              {theme.after}
+            </AppText>
+          ) : (
+            <AppText variant="blockTitle">{todayDay?.title ?? `Dia ${officialDay}`}</AppText>
+          )}
+
+          {summary ? (
+            <View style={{ gap: 2 }}>
+              <AppText style={{ fontFamily: fonts.title, fontSize: 22, lineHeight: 27, color: colors.text }}>
+                {summary.label}
+              </AppText>
+              <AppText variant="caption">{summary.detail}</AppText>
+            </View>
+          ) : (
+            <AppText variant="caption">Nenhuma leitura definida para este dia.</AppText>
+          )}
+
+          {keyVerse ? (
             <View style={{ gap: spacing.xs }}>
-              <AppText variant="heading">A jornada da igreja terminou</AppText>
-              <AppText variant="secondary">
-                {journey.completedCount === total
-                  ? 'Você atravessou os 100 dias inteiros.'
-                  : 'Os dias que ficaram continuam abertos. Você pode concluir no seu ritmo.'}
+              <Cap>Versículo-base</Cap>
+              <AppText variant="action" testID="key-verse">
+                {keyVerse}
               </AppText>
             </View>
-          </Card>
-        ) : null}
+          ) : null}
 
-        {returningAfterGap ? (
-          <Card tone="accent">
-            <View style={{ gap: spacing.xs }}>
-              <AppText variant="heading" style={{ color: colors.accent }}>
-                Você voltou.
-              </AppText>
-              <AppText variant="secondary">Continue de onde quiser. A jornada segue com você.</AppText>
+          {/* Lista simples, não cartão: os motivos são texto da igreja, um por linha. */}
+          {prayerPoints.length > 0 ? (
+            <View style={{ gap: spacing.xs }} accessibilityRole="list" testID="prayer-points">
+              <Cap>Motivos de oração</Cap>
+              {prayerPoints.map((point, index) => (
+                <View
+                  key={`${index}-${point}`}
+                  style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm }}
+                >
+                  <View
+                    aria-hidden
+                    style={{ width: 6, height: 6, borderRadius: 3, marginTop: 7, backgroundColor: colors.text }}
+                  />
+                  <AppText variant="item" style={{ flex: 1 }}>
+                    {point}
+                  </AppText>
+                </View>
+              ))}
             </View>
-          </Card>
-        ) : null}
+          ) : null}
+        </View>
 
-        {/* 6.2 tema + 6.3 leitura + 6.4 versículo-chave */}
-        <Card>
-          <View style={{ gap: spacing.lg }}>
-            {todayDay?.theme ? (
-              <View style={{ gap: spacing.xs }}>
-                <AppText variant="eyebrow">Tema</AppText>
-                <AppText variant="heading">{todayDay.theme}</AppText>
+        {/* ------------------------------------------------- 02 contra 03 */}
+        {done ? (
+          <View style={{ gap: spacing.lg }} testID="day-completed">
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
+              <View
+                style={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: 20,
+                  backgroundColor: colors.text,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <Icon name="check" size={20} color={BRAND_YELLOW} strokeWidth={2.6} />
               </View>
-            ) : null}
+              <AppText variant="blockTitle" style={{ flex: 1, fontSize: 24, lineHeight: 28 }}>
+                <Highlight>Leitura de hoje</Highlight> concluída
+              </AppText>
+            </View>
+
+            <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: spacing.xs }}>
+              <AppText variant="caption">
+                {summary ? `${summary.label} · ` : ''}
+                {preferOwnBible ? 'lido na sua Bíblia' : 'lido aqui no app'} ·{' '}
+              </AppText>
+              <Button title="Desfazer" variant="underline" onPress={undo} testID="undo-complete" style={{ height: 24 }} />
+            </View>
 
             <View style={{ gap: spacing.sm }}>
-              <AppText variant="eyebrow">{isFinished ? 'Leitura do dia 100' : 'Leitura de hoje'}</AppText>
-              {todayDay && todayDay.readings.length > 0 ? (
-                todayDay.readings.map((reading) => (
-                  <AppText key={reading.sort_order} variant="title" style={{ fontSize: 22 }}>
-                    {formatReference(reading.canonical_reference)}
-                  </AppText>
-                ))
-              ) : (
-                <AppText variant="muted">Nenhuma leitura definida para este dia.</AppText>
-              )}
+              <Cap>Minha reflexão · só você vê</Cap>
+              <Button
+                title={reflection ? 'Editar minha reflexão' : 'Escrever minha reflexão'}
+                variant="outline"
+                onPress={() => router.push({ pathname: '/reflexao/[day]', params: { day: String(officialDay) } })}
+                testID="reflection-card"
+              />
             </View>
 
-            {todayDay?.key_verse_reference ? (
-              <>
-                <Divider />
-                <View style={{ gap: spacing.xs }}>
-                  <AppText variant="eyebrow">Versículo-chave</AppText>
-                  <AppText variant="body" style={{ fontWeight: '600' }}>
-                    {formatReference(todayDay.key_verse_reference)}
-                  </AppText>
-                </View>
-              </>
-            ) : null}
-
-            {todayDay?.official_direction ? (
-              <>
-                <Divider />
-                <AppText variant="secondary">{todayDay.official_direction}</AppText>
-              </>
-            ) : null}
-
-            {todayDay?.prayer_focus ? (
-              <View style={{ gap: spacing.xs }}>
-                <AppText variant="eyebrow">Oração</AppText>
-                <AppText variant="secondary">{todayDay.prayer_focus}</AppText>
-              </View>
-            ) : null}
-          </View>
-        </Card>
-
-        {/* 6.5 e 6.6 leitura e conclusão */}
-        {done ? (
-          <Card tone="accent">
-            <View style={{ gap: spacing.md }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
-                <Ionicons name="checkmark-circle" size={iconSize.lg} color={colors.success} />
-                <AppText variant="heading">Dia {officialDay} concluído</AppText>
-              </View>
-              {milestone ? <AppText variant="secondary">{milestone.celebration}</AppText> : null}
-              <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-                <View style={{ flex: 1 }}>
-                  <Button title="Reler" variant="secondary" onPress={openReader} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Button title="Desfazer" variant="quiet" onPress={undo} loading={busy} testID="undo-complete" />
-                </View>
-              </View>
-            </View>
-          </Card>
-        ) : (
-          <View style={{ gap: spacing.sm }}>
-            {primaryReadCta}
-            {secondaryReadCta}
             <Button
-              title="Concluir leitura de hoje"
-              variant="secondary"
-              onPress={() => complete('unknown')}
+              title="Intercessão do dia"
+              variant="outline"
+              onPress={openIntercession}
+              testID="open-intercession"
+            />
+          </View>
+        ) : (
+          <View style={{ gap: spacing.sm }} testID="day-open">
+            <Button
+              title={preferOwnBible ? 'Concluir leitura' : 'Ler agora'}
+              onPress={preferOwnBible ? () => complete('own_bible') : openReader}
               loading={busy}
               testID="complete-day"
+            />
+            <Button
+              title={preferOwnBible ? 'Ler aqui no app' : 'Vou ler na minha Bíblia'}
+              variant="underline"
+              onPress={preferOwnBible ? openReader : readOwnBible}
+              disabled={busy}
+            />
+            <Button
+              title="Intercessão do dia"
+              variant="outline"
+              onPress={openIntercession}
+              testID="open-intercession"
             />
           </View>
         )}
 
-        {/* 6.7 jejum */}
+        {/* ----------------------------------------------------- meu jejum */}
         {settings.fastingEnabled ? (
-          <Card testID="fasting-card">
-            <View style={{ gap: spacing.md }}>
-              <AppText variant="eyebrow">Meu jejum</AppText>
-              <Pressable
-                accessibilityRole="checkbox"
-                accessibilityState={{ checked: isFastingKept(fasting, officialDay) }}
-                accessibilityLabel="Cumpri meu propósito hoje"
-                accessibilityHint="Registro privado, guardado só neste aparelho"
-                testID="fasting-toggle"
-                onPress={() => {
+          <View testID="fasting-card">
+            <Rule />
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingTop: spacing.md }}>
+              <View style={{ flex: 1, gap: 2 }}>
+                <AppText variant="item">Meu jejum</AppText>
+                <AppText variant="caption">Registro privado. Fica só neste aparelho.</AppText>
+              </View>
+              <Checkbox
+                checked={isFastingKept(fasting, officialDay)}
+                onToggle={() => {
                   setFastingKept(campaign.id, officialDay, !isFastingKept(fasting, officialDay));
                   haptic('light');
                 }}
-                style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 48 }}>
-                <Ionicons
-                  name={isFastingKept(fasting, officialDay) ? 'checkbox' : 'square-outline'}
-                  size={iconSize.lg}
-                  color={isFastingKept(fasting, officialDay) ? colors.success : colors.controlBorder}
-                />
-                <AppText style={{ flex: 1 }}>
-                  {isFastingKept(fasting, officialDay) ? 'Cumprido hoje' : 'Cumpri meu propósito hoje'}
-                </AppText>
-              </Pressable>
-              <AppText variant="muted">Registro privado. Fica só neste aparelho.</AppText>
+                label="Cumpri meu propósito hoje"
+                testID="fasting-toggle"
+              />
             </View>
-          </Card>
-        ) : null}
-
-        {/* 6.8 reflexão, apenas após concluir */}
-        {done ? (
-          <Card
-            onPress={() => router.push({ pathname: '/reflexao/[day]', params: { day: String(officialDay) } })}
-            accessibilityLabel="O que ficou com você hoje? Escrever reflexão privada"
-            testID="reflection-card">
-            <View style={{ gap: spacing.xs }}>
-              <AppText variant="eyebrow">Minha reflexão</AppText>
-              <AppText variant="heading">O que ficou com você hoje?</AppText>
-              <AppText variant="muted" numberOfLines={2}>
-                {reflection ? reflection : 'Opcional e privada. Só você vê.'}
-              </AppText>
-            </View>
-          </Card>
-        ) : null}
-
-        {/* 6.11 próximo passo */}
-        {done && !isFinished && officialDay < total ? (
-          <View
-            style={{
-              padding: spacing.lg,
-              borderRadius: radius.lg,
-              borderWidth: 1,
-              borderStyle: 'dashed',
-              borderColor: colors.borderStrong,
-              gap: spacing.xs,
-            }}>
-            <AppText variant="eyebrow">Dia {officialDay + 1}</AppText>
-            <AppText variant="secondary">{todayDay?.next_day_teaser ?? 'Amanhã continuamos nossa jornada.'}</AppText>
           </View>
         ) : null}
 
-        {journey.pendingDays.length > 0 ? (
-          <Button
-            title={`Ver ${journey.pendingDays.length} ${journey.pendingDays.length === 1 ? 'dia pendente' : 'dias pendentes'}`}
-            variant="quiet"
-            onPress={() => router.push('/jornada')}
-          />
+        {/* ------------------------------------------------ altar das 12h30 */}
+        {altar && altarLine ? (
+          <View>
+            <Rule />
+            <View style={{ paddingTop: spacing.md, gap: spacing.xs }} testID="altar-today">
+              <Cap>Altar das 12h30</Cap>
+              <AppText variant="item">{altarLine}</AppText>
+              {sphereLabel ? <AppText variant="caption">Monte do dia · {sphereLabel}</AppText> : null}
+            </View>
+          </View>
         ) : null}
+
+        {/* -------------------------------------------------- linha coletiva */}
+        <View>
+          <Rule />
+          <View style={{ paddingTop: spacing.md, gap: spacing.sm }} testID="church-progress">
+            {church.status === 'available' ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
+                <AppText variant="item" style={{ flex: 1 }}>
+                  {church.data.readersToday.toLocaleString('pt-BR')} pessoas já leram hoje
+                </AppText>
+                <View style={{ width: 56 }}>
+                  <ProgressBar
+                    value={church.data.ratio}
+                    height={8}
+                    label={`${Math.round(church.data.ratio * 100)}% da igreja já leu hoje`}
+                  />
+                </View>
+              </View>
+            ) : (
+              <>
+                <AppText variant="item">Progresso da igreja</AppText>
+                <AppText variant="caption">{collectiveNotice(church)}</AppText>
+              </>
+            )}
+          </View>
+        </View>
       </ScreenScroll>
     </Screen>
   );

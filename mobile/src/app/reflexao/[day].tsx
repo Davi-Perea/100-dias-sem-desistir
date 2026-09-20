@@ -1,32 +1,57 @@
-import { router, Stack, useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, TextInput, View } from 'react-native';
+import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { getDay } from '@/journey/datasetSource';
+import { readingSummary } from '@/journey/readingSummary';
 import { useJourney } from '@/journey/useJourney';
 import { deleteReflection, getReflection, saveReflection, useReflections } from '@/reflections/reflectionsStore';
-import { AppText, Button, Card, Screen, StateView } from '@/ui/components';
-import { radius, spacing, useTheme } from '@/ui/theme';
+import { AppText, Button, Cap, Rule, Screen, StateView } from '@/ui/components';
+import { Icon } from '@/ui/icons';
+import { MAX_CONTENT_WIDTH, MIN_TOUCH, fonts, spacing, useGutter, useTheme } from '@/ui/theme';
 
 /**
- * Reflexão PRIVADA (spec §11): local, opcional, editável, excluível.
- * Não existe caminho daqui para grupo, backend ou analytics — compartilhar um
- * insight é outra ação, com outro campo, que começa vazio.
+ * Minha reflexão (tela 09). Privada por padrão e guardada só neste aparelho.
+ *
+ * Regra de produto do handoff, aplicada literalmente: a reflexão privada NUNCA
+ * pré-preenche o insight público. São dois textos diferentes, escritos em
+ * momentos diferentes, com públicos diferentes.
  */
 export default function ReflectionScreen() {
-  const { day } = useLocalSearchParams<{ day: string }>();
-  const dayNumber = Number(day);
-  const insets = useSafeAreaInsets();
+  const params = useLocalSearchParams<{ day: string }>();
   const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
+  const inset = useGutter();
   const journey = useJourney();
   const reflections = useReflections(journey.campaign.id);
 
-  // O rascunho começa nulo e só existe quando o usuário digita; até lá o campo
-  // mostra o que está gravado. Assim não é preciso sincronizar estado num efeito.
-  const [draft, setDraft] = useState<string | null>(null);
-  const [saved, setSaved] = useState(false);
+  const day = Number.parseInt(params.day ?? '', 10);
+  const stored = getReflection(reflections, day);
+  const [draftKey, setDraftKey] = useState<string | null>(null);
+  const [draft, setDraft] = useState('');
+  const [busy, setBusy] = useState(false);
 
-  if (!Number.isInteger(dayNumber) || !reflections) {
+  // Deriva o rascunho a partir do valor guardado sem setState dentro de efeito.
+  const key = `${journey.campaign.id}:${day}:${reflections ? 'ready' : 'loading'}`;
+  if (reflections && draftKey !== key) {
+    setDraftKey(key);
+    setDraft(stored);
+  }
+
+  if (!Number.isInteger(day) || day < 1 || day > journey.campaign.total_days) {
+    return (
+      <Screen>
+        <StateView
+          kind="empty"
+          title="Dia não encontrado"
+          action={<Button title="Voltar" variant="outline" onPress={() => router.back()} />}
+        />
+      </Screen>
+    );
+  }
+
+  if (!reflections) {
     return (
       <Screen>
         <StateView kind="loading" />
@@ -34,93 +59,154 @@ export default function ReflectionScreen() {
     );
   }
 
-  const existing = getReflection(reflections, dayNumber);
-  const text = draft ?? existing;
-  const setText = (value: string) => setDraft(value);
+  const summary = readingSummary(getDay(day));
+
+  const save = async () => {
+    setBusy(true);
+    try {
+      await saveReflection(journey.campaign.id, day, draft.trim());
+      router.back();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const remove = () => {
+    Alert.alert('Excluir reflexão', 'Esta reflexão será apagada deste aparelho.', [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Excluir',
+        style: 'destructive',
+        onPress: async () => {
+          await deleteReflection(journey.campaign.id, day);
+          router.back();
+        },
+      },
+    ]);
+  };
 
   return (
-    <Screen>
-      <Stack.Screen options={{ title: `Reflexão · Dia ${dayNumber}` }} />
+    <Screen edges={['top', 'left', 'right']}>
       <KeyboardAvoidingView
+        style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
-        style={{ flex: 1 }}>
-        <ScrollView
-          contentInsetAdjustmentBehavior="automatic"
-          keyboardShouldPersistTaps="handled"
-          contentContainerStyle={{ padding: spacing.lg, paddingBottom: insets.bottom + spacing.xxl, gap: spacing.lg }}>
-          <View style={{ gap: spacing.xs }}>
-            <AppText variant="eyebrow">Minha reflexão</AppText>
-            <AppText variant="title">O que ficou com você hoje?</AppText>
-            <AppText variant="secondary">
-              Opcional e privada. Fica guardada só neste aparelho e não é enviada para ninguém.
+        keyboardVerticalOffset={insets.top}
+      >
+        {/* ------------------------------------------------------------ barra */}
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            paddingHorizontal: inset - spacing.sm,
+            minHeight: MIN_TOUCH,
+          }}
+        >
+          <Pressable
+            onPress={() => router.back()}
+            accessibilityRole="button"
+            testID="reflection-cancel"
+            style={({ pressed }) => [{ minHeight: MIN_TOUCH, justifyContent: 'center', paddingHorizontal: spacing.sm }, pressed && { opacity: 0.72 }]}
+          >
+            <AppText variant="item">Cancelar</AppText>
+          </Pressable>
+          <View style={{ flex: 1, alignItems: 'center' }}>
+            <AppText style={{ fontFamily: fonts.label, fontSize: 15, color: colors.text }}>Dia {day}</AppText>
+          </View>
+          <Pressable
+            onPress={remove}
+            disabled={stored.length === 0}
+            accessibilityRole="button"
+            accessibilityState={{ disabled: stored.length === 0 }}
+            testID="reflection-delete"
+            style={({ pressed }) => [
+              { minHeight: MIN_TOUCH, justifyContent: 'center', paddingHorizontal: spacing.sm },
+              stored.length === 0 && { opacity: 0.4 },
+              pressed && stored.length > 0 && { opacity: 0.72 },
+            ]}
+          >
+            <AppText variant="item" style={{ color: colors.danger }}>
+              Excluir
             </AppText>
+          </Pressable>
+        </View>
+
+        <ScrollView
+          contentContainerStyle={{
+            paddingHorizontal: inset,
+            paddingTop: spacing.lg,
+            paddingBottom: spacing.xxl,
+            gap: spacing.lg,
+            width: '100%',
+            maxWidth: MAX_CONTENT_WIDTH + inset * 2,
+            alignSelf: 'center',
+          }}
+          keyboardShouldPersistTaps="handled"
+        >
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+            <Icon name="lock" size={16} color={colors.textMuted} />
+            <Cap>Minha reflexão · só você vê</Cap>
           </View>
 
+          <AppText variant="blockTitleLg">O que ficou com você hoje?</AppText>
+
           <TextInput
-            value={text}
-            onChangeText={(value) => {
-              setText(value);
-              setSaved(false);
-            }}
+            value={draft}
+            onChangeText={setDraft}
             multiline
+            autoFocus={stored.length === 0}
             textAlignVertical="top"
-            placeholder="Escreva o que quiser guardar deste dia…"
+            placeholder="Escreva à vontade."
             placeholderTextColor={colors.textMuted}
             accessibilityLabel="Texto da sua reflexão privada"
-            maxFontSizeMultiplier={1.8}
+            testID="reflection-input"
+            selectionColor={colors.text}
             style={{
-              minHeight: 200,
-              borderWidth: 1,
-              borderColor: colors.border,
-              backgroundColor: colors.surface,
-              borderRadius: radius.md,
-              padding: spacing.lg,
-              fontSize: 16,
-              lineHeight: 24,
+              minHeight: 220,
+              fontFamily: fonts.read,
+              fontSize: 19,
+              lineHeight: 30.4,
               color: colors.text,
             }}
           />
-
-          <Button
-            title="Salvar para mim"
-            onPress={async () => {
-              await saveReflection(journey.campaign.id, dayNumber, text);
-              setSaved(true);
-            }}
-            testID="save-reflection"
-          />
-
-          {saved ? (
-            <AppText variant="muted" accessibilityLiveRegion="polite" style={{ color: colors.success }}>
-              Guardado neste aparelho.
-            </AppText>
-          ) : null}
-
-          {existing ? (
-            <Button
-              title="Excluir reflexão"
-              variant="quiet"
-              onPress={async () => {
-                await deleteReflection(journey.campaign.id, dayNumber);
-                setText('');
-                setSaved(false);
-              }}
-            />
-          ) : null}
-
-          <Card tone="muted">
-            <View style={{ gap: spacing.xs }}>
-              <AppText variant="eyebrow">Compartilhar um insight</AppText>
-              <AppText variant="muted">
-                Compartilhar com o grupo é uma ação separada, com um campo próprio que começa vazio. Nada do que você
-                escreve aqui vira público automaticamente. Disponível quando o backend estiver conectado.
-              </AppText>
-            </View>
-          </Card>
-
-          <Button title="Fechar" variant="quiet" onPress={() => router.back()} />
         </ScrollView>
+
+        {/* ----------------------------------------------------------- rodapé */}
+        <View
+          style={{
+            paddingHorizontal: inset,
+            paddingTop: spacing.md,
+            paddingBottom: insets.bottom + spacing.md,
+            gap: spacing.md,
+            borderTopWidth: 1,
+            borderTopColor: colors.border,
+            backgroundColor: colors.surface,
+          }}
+        >
+          <Cap>
+            {summary ? `${summary.label} · ` : ''}salva neste aparelho
+          </Cap>
+          <Button title="Salvar para mim" onPress={save} loading={busy} testID="reflection-save" />
+
+          <Rule />
+
+          {/*
+            Caminho social. O composer de insight começa SEMPRE em branco: a
+            reflexão privada não é semente do texto público. Enquanto a área da
+            comunidade não estiver conectada, dizemos isso em vez de abrir um
+            caminho que não existe.
+          */}
+          <AppText variant="caption">
+            Um insight começa em branco e sua reflexão continua privada. Compartilhar abre quando a área da
+            comunidade estiver conectada.
+          </AppText>
+          <Button
+            title="Compartilhar um insight"
+            variant="outline"
+            disabled
+            onPress={() => {}}
+            testID="share-insight"
+          />
+        </View>
       </KeyboardAvoidingView>
     </Screen>
   );
