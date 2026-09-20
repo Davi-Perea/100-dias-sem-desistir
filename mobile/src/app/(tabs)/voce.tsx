@@ -94,7 +94,9 @@ export default function YouScreen() {
       return;
     }
     await updateSettings((s) => ({ ...s, altarReminder: true }));
-    const result = await syncAltarReminders(true, journey.campaign, new Date());
+    // Aqui existe o gesto: a pessoa acabou de marcar a caixa. É o único lugar
+    // que pode abrir o diálogo de permissão do sistema.
+    const result = await syncAltarReminders(true, journey.campaign, new Date(), { requestPermission: true });
     if (result.ok) {
       setAltarNotice(null);
       return;

@@ -69,7 +69,7 @@ export default function MinistryScreen() {
     await updateSettings((s) => ({ ...s, ministry: name }));
     // Sem ministério não há véspera a agendar; o hook do layout cancela as antigas.
     if (!name) return;
-    const result = await syncMinistryReminders(name, daysForMinistry(name), campaign, new Date());
+    const result = await syncMinistryReminders(name, daysForMinistry(name), campaign, new Date(), { requestPermission: true });
     // Web (sem notificações locais) e permissão negada chegam pelo mesmo caminho.
     // A escolha fica: destacar os dias não depende de aviso.
     if (!result.ok) setNotice(result.reason);

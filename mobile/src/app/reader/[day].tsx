@@ -7,16 +7,19 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { track } from '@/analytics/analytics';
 import { expandChapters, parseReference } from '@/bible/references';
 import { getDay } from '@/journey/datasetSource';
+import { formatDayDate } from '@/journey/officialDay';
 import { useJourney } from '@/journey/useJourney';
 import { isDayCompleted, setDayCompleted } from '@/progress/completionsStore';
 import { getBibleProvider, type Passage } from '@/reader/provider';
 import { saveReaderPosition } from '@/reader/readerPosition';
 import { updateSettings, useSettings } from '@/settings/settingsStore';
+import { TopBar } from '@/ui/Lockup';
 import {
   AppText,
   Button,
   Cap,
   Screen,
+  ScreenScroll,
   Sheet,
   StateView,
 } from '@/ui/components';
@@ -58,6 +61,7 @@ export default function ReaderScreen() {
   const [reloadTick, setReloadTick] = useState(0);
 
   const dayData = getDay(dayNumber);
+  const unlocked = journey.isDayUnlocked(dayNumber);
   const provider = getBibleProvider();
   const metadata = provider.getMetadata();
 
@@ -80,7 +84,7 @@ export default function ReaderScreen() {
   );
 
   useEffect(() => {
-    if (!reference) return;
+    if (!reference || !unlocked) return;
     let alive = true;
     provider.getPassage(reference).then(
       (loaded) => alive && setResult({ key: chapterKey, passage: loaded }),
@@ -92,7 +96,7 @@ export default function ReaderScreen() {
     return () => {
       alive = false;
     };
-  }, [reference, chapterKey, dayNumber, chapterIndex, provider]);
+  }, [reference, chapterKey, dayNumber, chapterIndex, provider, unlocked]);
 
   const fresh = result?.key === chapterKey ? result : null;
   const passage = fresh?.passage ?? null;
@@ -106,6 +110,25 @@ export default function ReaderScreen() {
       })),
     [],
   );
+
+  // A leitura de cada dia abre no dia oficial da igreja. Vale para toque na
+  // Jornada e para link direto: senão a regra seria só um botão escondido.
+  if (Number.isInteger(dayNumber) && dayNumber >= 1 && dayNumber <= journey.campaign.total_days && !unlocked) {
+    return (
+      <Screen tone="reader">
+        <TopBar />
+        <ScreenScroll>
+          <Icon name="lock" size={26} color={colors.text} />
+          <AppText variant="blockTitleLg">Dia {dayNumber}</AppText>
+          <AppText variant="body">Abre em {formatDayDate(dayNumber, journey.campaign)}.</AppText>
+          <AppText variant="secondary">
+            A leitura de cada dia abre no dia oficial da igreja. Nada foi perdido — é só ainda não ter chegado.
+          </AppText>
+          <Button title="Voltar" variant="outline" onPress={() => router.back()} testID="reader-locked-back" />
+        </ScreenScroll>
+      </Screen>
+    );
+  }
 
   if (!Number.isInteger(dayNumber) || !dayData || chapters.length === 0) {
     return (

@@ -134,11 +134,14 @@ describe('tela Meu ministério', () => {
     expect(screen.getByText(/^Dia 80 · \d\d\/\d\d\/\d{4} · Educação$/)).toBeTruthy();
     expect(screen.getByTestId(`ministry-${indexOf('Kids')}`).props.accessibilityState.checked).toBe(true);
     expect(screen.getByTestId('ministry-none').props.accessibilityState.checked).toBe(false);
+    // O quarto argumento é o que autoriza o diálogo do sistema: aqui existe um
+    // gesto — a pessoa acabou de escolher o ministério nesta tela.
     expect(reminders.syncMinistryReminders).toHaveBeenCalledWith(
       'Kids',
       [30, 80],
       expect.objectContaining({ id: CAMPAIGN }),
       expect.any(Date),
+      { requestPermission: true },
     );
     expect(screen.queryByTestId('ministry-notice')).toBeNull();
 
@@ -218,10 +221,12 @@ describe('Você: comunidade e aviso do altar', () => {
     await fireEvent.press(screen.getByTestId('altar-reminder-toggle'));
     await waitFor(async () => expect((await loadSettings()).altarReminder).toBe(true));
     await waitFor(() =>
+      // Marcar a caixa é o gesto: é o único momento em que o diálogo pode abrir.
       expect(reminders.syncAltarReminders).toHaveBeenCalledWith(
         true,
         expect.objectContaining({ id: CAMPAIGN }),
         expect.any(Date),
+        { requestPermission: true },
       ),
     );
     await waitFor(() =>

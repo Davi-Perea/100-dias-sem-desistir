@@ -31,6 +31,20 @@ export const ALTAR_WINDOW_DAYS = 14;
 
 export type ReminderResult = { ok: true } | { ok: false; reason: string };
 
+/**
+ * `requestPermission` só é verdadeiro quando a chamada nasce de um gesto do
+ * usuário. Em segundo plano (abertura do app, volta do background) o padrão é
+ * falso: agenda o que já está permitido e desiste em silêncio do resto.
+ */
+export type SyncOptions = { requestPermission?: boolean };
+
+const PERMISSION_DENIED = 'Permissão de notificações negada. Você pode ativar nos ajustes do sistema.';
+
+/** Resolve a permissão conforme a origem da chamada: gesto pede, segundo plano só lê. */
+async function permissionFor(options: SyncOptions | undefined): Promise<boolean> {
+  return options?.requestPermission ? ensureNotificationPermission() : hasNotificationPermission();
+}
+
 export const SLOT_TIMES: Record<Exclude<ReminderSlot, 'custom' | 'none'>, { hour: number; minute: number }> = {
   morning: { hour: 7, minute: 0 },
   // 13:00 é o horário concreto que o handoff mostra na tela 01d.
@@ -64,7 +78,18 @@ export function setupNotificationHandler() {
   });
 }
 
-/** A permissão do SO só é pedida depois de o usuário escolher um horário (spec §5, tela 6). */
+/** Só LÊ o estado da permissão. Não abre diálogo, então pode rodar a qualquer momento. */
+export async function hasNotificationPermission(): Promise<boolean> {
+  const current = await Notifications.getPermissionsAsync();
+  return current.granted;
+}
+
+/**
+ * Pede a permissão ao sistema. Só pode ser chamada a partir de um GESTO do
+ * usuário: escolher um horário, marcar o aviso do altar, escolher o ministério.
+ * O iOS só mostra o diálogo uma vez na vida do aplicativo; gastá-lo na abertura,
+ * antes de a pessoa entender para quê, é perder o lembrete para sempre.
+ */
 export async function ensureNotificationPermission(): Promise<boolean> {
   const current = await Notifications.getPermissionsAsync();
   if (current.granted) return true;
@@ -92,7 +117,7 @@ export async function cancelDailyReminder(): Promise<void> {
 export async function scheduleDailyReminder(hour: number, minute: number): Promise<ReminderResult> {
   if (!isReminderSupported()) return { ok: false, reason: 'Notificações locais não são suportadas na web.' };
   const granted = await ensureNotificationPermission();
-  if (!granted) return { ok: false, reason: 'Permissão de notificações negada. Você pode ativar nos ajustes do sistema.' };
+  if (!granted) return { ok: false, reason: PERMISSION_DENIED };
   await ensureAndroidChannel();
   await cancelDailyReminder();
   await Notifications.scheduleNotificationAsync({
@@ -196,18 +221,28 @@ async function cancelWithPrefix(prefix: string): Promise<void> {
   );
 }
 
-async function schedulePlan(plan: PlannedReminder[]): Promise<void> {
+/**
+ * Agenda o plano. Uma recusa do SO (cota de agendamentos, canal removido) vira
+ * `{ ok: false }` em vez de exceção solta: quem chamou precisa saber para poder
+ * desfazer a preferência em vez de prometer um aviso que não vem.
+ */
+async function schedulePlan(plan: PlannedReminder[]): Promise<ReminderResult> {
   for (const item of plan) {
-    await Notifications.scheduleNotificationAsync({
-      identifier: item.id,
-      content: { title: item.title, body: item.body },
-      trigger: {
-        type: Notifications.SchedulableTriggerInputTypes.DATE,
-        date: item.when,
-        channelId: ANDROID_CHANNEL_ID,
-      },
-    });
+    try {
+      await Notifications.scheduleNotificationAsync({
+        identifier: item.id,
+        content: { title: item.title, body: item.body },
+        trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.DATE,
+          date: item.when,
+          channelId: ANDROID_CHANNEL_ID,
+        },
+      });
+    } catch {
+      return { ok: false, reason: 'O sistema recusou o agendamento do lembrete. Tente de novo mais tarde.' };
+    }
   }
+  return { ok: true };
 }
 
 /**
@@ -220,33 +255,37 @@ export function syncMinistryReminders(
   days: number[],
   campaign: Campaign,
   now: Date,
+  options?: SyncOptions,
 ): Promise<ReminderResult> {
   if (!isReminderSupported()) return Promise.resolve({ ok: false, reason: 'Notificações locais não são suportadas na web.' });
   return serialized(async () => {
     await cancelWithPrefix(MINISTRY_REMINDER_PREFIX);
     const plan = ministryReminderPlan(ministry, days, campaign, now);
     if (plan.length === 0) return { ok: true };
-    const granted = await ensureNotificationPermission();
-    if (!granted) return { ok: false, reason: 'Permissão de notificações negada. Você pode ativar nos ajustes do sistema.' };
+    const granted = await permissionFor(options);
+    if (!granted) return { ok: false, reason: PERMISSION_DENIED };
     await ensureAndroidChannel();
-    await schedulePlan(plan);
-    return { ok: true };
+    return schedulePlan(plan);
   });
 }
 
 /** Janela rolante do altar de hoje. Chamar a cada abertura do app. */
-export function syncAltarReminders(enabled: boolean, campaign: Campaign, now: Date): Promise<ReminderResult> {
+export function syncAltarReminders(
+  enabled: boolean,
+  campaign: Campaign,
+  now: Date,
+  options?: SyncOptions,
+): Promise<ReminderResult> {
   if (!isReminderSupported()) return Promise.resolve({ ok: false, reason: 'Notificações locais não são suportadas na web.' });
   return serialized(async () => {
     await cancelWithPrefix(ALTAR_REMINDER_PREFIX);
     if (!enabled) return { ok: true };
     const plan = altarReminderPlan(campaign, now);
     if (plan.length === 0) return { ok: true };
-    const granted = await ensureNotificationPermission();
-    if (!granted) return { ok: false, reason: 'Permissão de notificações negada. Você pode ativar nos ajustes do sistema.' };
+    const granted = await permissionFor(options);
+    if (!granted) return { ok: false, reason: PERMISSION_DENIED };
     await ensureAndroidChannel();
-    await schedulePlan(plan);
-    return { ok: true };
+    return schedulePlan(plan);
   });
 }
 

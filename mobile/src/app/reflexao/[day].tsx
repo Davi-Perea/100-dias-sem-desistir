@@ -59,7 +59,9 @@ export default function ReflectionScreen() {
     );
   }
 
-  const summary = readingSummary(getDay(day));
+  // A referência da leitura é conteúdo do dia: num dia que ainda não abriu ela
+  // não aparece, mesmo que a rota seja alcançada por link direto.
+  const summary = journey.isDayUnlocked(day) ? readingSummary(getDay(day)) : null;
 
   const save = async () => {
     setBusy(true);

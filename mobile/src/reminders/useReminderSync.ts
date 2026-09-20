@@ -12,8 +12,11 @@ import { syncAltarReminders, syncMinistryReminders } from './reminders';
  *  - mudou o ministério → refaz as vésperas;
  *  - ligou/desligou o altar de hoje, ou o app voltou ao primeiro plano → refaz a
  *    janela rolante (ela só cobre 14 dias, então precisa avançar com o uso).
- * Falhas (web, permissão negada) são silenciosas aqui: as telas que ligam o
- * lembrete já mostram o motivo na hora da escolha.
+ * Este hook NUNCA pede a permissão do sistema: ele roda na abertura do app e num
+ * retorno do background, sem gesto nenhum. Pedir ali gastaria o único diálogo que
+ * o iOS concede, antes de a pessoa saber para quê. Ele agenda o que já está
+ * permitido e desiste em silêncio do resto; quem pede é a tela onde a pessoa
+ * marcou o lembrete, e é lá que o motivo de uma recusa aparece.
  */
 export function useReminderSync() {
   const settings = useSettings();
@@ -24,12 +27,15 @@ export function useReminderSync() {
   useEffect(() => {
     if (!ready) return;
     const campaign = getCampaign();
-    syncMinistryReminders(ministry, daysForMinistry(ministry), campaign, new Date()).catch(() => {});
+    syncMinistryReminders(ministry, daysForMinistry(ministry), campaign, new Date(), {
+      requestPermission: false,
+    }).catch(() => {});
   }, [ready, ministry]);
 
   useEffect(() => {
     if (!ready) return;
-    const run = () => syncAltarReminders(altarEnabled, getCampaign(), new Date()).catch(() => {});
+    const run = () =>
+      syncAltarReminders(altarEnabled, getCampaign(), new Date(), { requestPermission: false }).catch(() => {});
     run();
     const subscription = AppState.addEventListener('change', (state) => {
       if (state === 'active') run();

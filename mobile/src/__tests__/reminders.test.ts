@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
 import { getCampaign, resetToBundledContent } from '@/journey/datasetSource';
 import { daysForMinistry } from '@/journey/ministries';
 import {
@@ -8,6 +11,8 @@ import {
   MINISTRY_EVE_TIME,
   MINISTRY_REMINDER_PREFIX,
   ministryReminderPlan,
+  syncAltarReminders,
+  syncMinistryReminders,
 } from '@/reminders/reminders';
 
 jest.mock('expo-notifications', () => ({
@@ -171,5 +176,108 @@ describe('nomes de líderes nunca vazam para as notificações', () => {
       expect(text).not.toContain('Pra.');
       expect(text).not.toContain('Pr.');
     }
+  });
+});
+
+/* ------------------------------------------------------------------ grupo C */
+
+const notifications = jest.requireMock('expo-notifications') as {
+  getPermissionsAsync: jest.Mock;
+  requestPermissionsAsync: jest.Mock;
+  scheduleNotificationAsync: jest.Mock;
+  cancelScheduledNotificationAsync: jest.Mock;
+  getAllScheduledNotificationsAsync: jest.Mock;
+  setNotificationChannelAsync: jest.Mock;
+};
+
+/** Permissão ainda não concedida: é o estado de quem acabou de instalar o app. */
+function notYetGranted() {
+  notifications.getPermissionsAsync.mockResolvedValue({ granted: false, status: 'undetermined' });
+}
+
+beforeEach(() => {
+  notifications.getPermissionsAsync.mockReset().mockResolvedValue({ granted: true, status: 'granted' });
+  notifications.requestPermissionsAsync.mockReset().mockResolvedValue({ granted: true, status: 'granted' });
+  notifications.scheduleNotificationAsync.mockReset().mockResolvedValue('id');
+  notifications.cancelScheduledNotificationAsync.mockReset().mockResolvedValue(undefined);
+  notifications.getAllScheduledNotificationsAsync.mockReset().mockResolvedValue([]);
+  notifications.setNotificationChannelAsync.mockReset().mockResolvedValue(undefined);
+});
+
+describe('o diálogo de permissão só nasce de um gesto', () => {
+  const ministry = 'Intercessão/Bálsamo';
+  const beforeStart = () => localDateTimeForDay(1, campaign(), { hour: 8, minute: 0 }, -1);
+
+  test('sincronização de fundo não pede permissão nem quando ela ainda não existe', async () => {
+    notYetGranted();
+    const result = await syncMinistryReminders(ministry, daysForMinistry(ministry), campaign(), beforeStart(), {
+      requestPermission: false,
+    });
+
+    // Nunca abre o diálogo: no iOS ele existe uma vez só na vida do aplicativo.
+    expect(notifications.requestPermissionsAsync).not.toHaveBeenCalled();
+    // E desiste em silêncio — sem agendar nada prometido pela metade.
+    expect(notifications.scheduleNotificationAsync).not.toHaveBeenCalled();
+    expect(result.ok).toBe(false);
+  });
+
+  test('sem opção nenhuma, o padrão também é não pedir', async () => {
+    notYetGranted();
+    await syncAltarReminders(true, campaign(), beforeStart());
+    expect(notifications.requestPermissionsAsync).not.toHaveBeenCalled();
+  });
+
+  test('sincronização de fundo agenda normalmente quando a permissão já existe', async () => {
+    await syncAltarReminders(true, campaign(), beforeStart(), { requestPermission: false });
+    expect(notifications.requestPermissionsAsync).not.toHaveBeenCalled();
+    expect(notifications.scheduleNotificationAsync).toHaveBeenCalled();
+  });
+
+  test('um gesto do usuário pede a permissão e agenda', async () => {
+    notYetGranted();
+    const result = await syncMinistryReminders(ministry, daysForMinistry(ministry), campaign(), beforeStart(), {
+      requestPermission: true,
+    });
+    expect(notifications.requestPermissionsAsync).toHaveBeenCalledTimes(1);
+    expect(notifications.scheduleNotificationAsync).toHaveBeenCalledTimes(24);
+    expect(result.ok).toBe(true);
+  });
+
+  test('permissão negada devolve motivo em vez de estourar', async () => {
+    notYetGranted();
+    notifications.requestPermissionsAsync.mockResolvedValue({ granted: false, status: 'denied' });
+    const result = await syncAltarReminders(true, campaign(), beforeStart(), { requestPermission: true });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.reason).toMatch(/ajustes do sistema/);
+    expect(notifications.scheduleNotificationAsync).not.toHaveBeenCalled();
+  });
+
+  test('recusa do sistema ao agendar vira motivo, não exceção solta', async () => {
+    notifications.scheduleNotificationAsync.mockRejectedValue(new Error('too many pending notifications'));
+    const result = await syncAltarReminders(true, campaign(), beforeStart(), { requestPermission: true });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.reason).toMatch(/Tente de novo/);
+  });
+
+  test('nada a agendar não chega a consultar a permissão', async () => {
+    notYetGranted();
+    // Ministério nenhum escolhido: o plano é vazio, então não há o que permitir.
+    const result = await syncMinistryReminders(null, [], campaign(), beforeStart(), { requestPermission: true });
+    expect(notifications.getPermissionsAsync).not.toHaveBeenCalled();
+    expect(result.ok).toBe(true);
+  });
+});
+
+describe('o hook de sincronização nunca pede permissão', () => {
+  // Guarda de regressão por leitura da fonte: o defeito original era exatamente
+  // uma chamada de permissão dentro do hook que roda na abertura do app. Um teste
+  // de comportamento não pegaria alguém reintroduzindo isso em outro caminho.
+  test('useReminderSync não chama ensureNotificationPermission e passa requestPermission: false', () => {
+    const source = readFileSync(join(__dirname, '..', 'reminders', 'useReminderSync.ts'), 'utf8');
+    expect(source).not.toMatch(/ensureNotificationPermission|requestPermissionsAsync/);
+    expect(source.match(/requestPermission: false/g) ?? []).toHaveLength(2);
+    expect(source).not.toMatch(/requestPermission: true/);
   });
 });

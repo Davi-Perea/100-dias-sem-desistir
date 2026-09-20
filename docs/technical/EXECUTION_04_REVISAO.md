@@ -91,6 +91,44 @@ Quatro auditorias independentes sobre a própria correção, cada achado refutad
 O guarda agora se autotesta com onze casos sintéticos, seis que devem ser pegos e cinco que devem passar,
 e declara no próprio comentário o que não alcança: cor vinda de outro módulo ou com duas indireções.
 
+### 1.7 Grupo C — a permissão de notificação era pedida sem gesto (3 achados)
+
+`useReminderSync` roda na abertura do app e a cada volta do segundo plano, e chamava
+`ensureNotificationPermission`. O iOS mostra esse diálogo **uma vez na vida do aplicativo**: gastá-lo na
+abertura, antes de a pessoa saber para quê, é perder o lembrete para sempre. E marcar o aviso do altar
+disparava dois pedidos — o da tela e o do hook, acordado pela mesma mudança de preferência.
+
+A permissão agora é um parâmetro da chamada, não um efeito colateral dela: `syncMinistryReminders` e
+`syncAltarReminders` recebem `{ requestPermission }`. Só as duas telas onde existe gesto — escolher o
+ministério, marcar o aviso do altar — pedem; o hook lê com `hasNotificationPermission` e agenda apenas o
+que já está permitido. Uma recusa deixou de ser exceção solta e virou `{ ok: false, reason }`, porque quem
+chamou precisa desfazer a preferência em vez de prometer um aviso que não vem.
+
+### 1.8 Grupo D — conteúdo de dia futuro chegava por rota (2 achados)
+
+A Jornada, a tela do Dia e a Intercessão checavam `isDayUnlocked`; o leitor, não. `/reader/40` no Dia 17
+abria as leituras do Dia 40, e o efeito ainda pedia a passagem ao provedor — com uma tradução licenciada
+seria uma requisição de conteúdo que não deveria existir. A tela de reflexão mostrava a referência daquele
+dia no rodapé.
+
+As duas rotas passaram a checar o mesmo bloqueio, no mesmo desenho da tela do Dia. Rota é rota: link
+direto, histórico e deep link chegam ali igual ao toque, e uma regra que só existe no botão é decoração.
+
+### 1.9 O que os testes dos grupos C e D garantem
+
+Nenhum dos dois grupos podia ficar só no código: os dois defeitos são invisíveis na tela onde nascem.
+
+- Permissão: sincronização de fundo não abre o diálogo nem quando a permissão ainda não existe, e o padrão
+  sem opção nenhuma também não; o gesto abre e agenda; recusa e falha do sistema devolvem motivo. Um guarda
+  lê a fonte do hook, porque o defeito original era exatamente uma chamada ali e nenhum teste de
+  comportamento pegaria alguém reintroduzindo-a por outro caminho.
+- Dia futuro: o leitor mostra a data em que abre, não pede a passagem ao provedor e não revela a
+  referência; a reflexão esconde o rótulo da leitura. Dois casos de controle no dia de hoje impedem que a
+  correção tranque o app inteiro.
+
+Os cinco testes de dia futuro e os três de permissão foram conferidos com o defeito reintroduzido: falham
+sem a correção, passam com ela, e os casos de controle passam nos dois estados.
+
 ---
 
 ## 2. Verificação
@@ -98,33 +136,31 @@ e declara no próprio comentário o que não alcança: cor vinda de outro módul
 | Checagem | Resultado |
 |---|---|
 | `tsc --noEmit` · `expo lint` | limpos |
-| `jest` | **310 testes, 18 suítes** |
+| `jest` | **323 testes, 19 suítes** |
 | `content:check` | dataset e propósito conferem com as fontes |
 | Navegador, tema claro | citação atribuída; marco por leituras com a régua real; Dia 100 intacto; sem nomes; marca e marcas de seleção no desenho do handoff |
 | Navegador, tema escuro | check, caixa, opção, números de passo e a pomba visíveis; nenhuma superfície invertida perdida |
+| Navegador, rotas diretas | `/reader/40` e `/reflexao/40` mostram o bloqueio sem revelar a leitura; `/reader/17` e `/reflexao/17` intactos; nenhum erro no console |
+| Navegador, aviso do altar | marcar a caixa na web devolve o motivo na própria linha e a caixa volta a desligada |
 
 ---
 
 ## 3. Os achados confirmados que continuam abertos
 
-Os grupos A e H saíram desta tabela: foram corrigidos (seções 1.4 a 1.6). Restam 39.
+Os grupos A, H, C e D saíram desta tabela: foram corrigidos (seções 1.4 a 1.9). Restam 34.
 
 Agrupados por trabalho, não por arquivo.
 
 | # | Tema | Achados | Severidade | Por que importa |
 |---|---|---|---|---|
 | B | **Dynamic Type quebra caixas de altura fixa** (`Button`, `SpherePill`, estatísticas do Dia 100, `getItemLayout` da Jornada) | 6 | 3 médios | Texto transborda ou é cortado a partir de ~1,4× de fonte; no iOS a escala chega a 3,12× |
-| C | **Permissão de notificação pedida sem ação do usuário** (`useReminderSync` na abertura; toque no aviso dispara dois pedidos) | 3 | 2 médios | Pedir permissão sem gesto é o caminho mais curto para o usuário negar para sempre |
-| D | **Conteúdo de dia futuro acessível por rota** (leitor não checa `isDayUnlocked`) | 2 | 1 médio | Fura a regra de que o dia só abre no dia oficial |
 | E | **Leitor de tela** (estado "concluído" não anunciado, rótulos com "~" e "·", cabeçalhos não marcados, anúncio triplicado no modo altar) | 7 | 1 médio | |
 | F | **Cópia e consistência** (altar descrito de três jeitos; "hoje" em dia que não é hoje; "Tema" onde a igreja diz "Ênfase"; enum `pending_authorization` exposto) | 6 | 2 médios | |
 | G | **Jejum** (continua como "propósito" da campanha e ganhou superfície nova, sem a confirmação da igreja) | 2 | 1 médio | Depende de resposta da igreja, não de código |
 | I | **Tokens e higiene** (cores literais fora de `theme.ts`, `gutter.block` sem uso, código sem consumidor, teste tautológico, marco gravado duas vezes) | 14 | baixos | |
 
-**Recomendação de ordem:** C e D primeiro (regras de produto que o app hoje contraria); B antes de qualquer
-teste em aparelho; E e F como um passe único de cópia e acessibilidade; G quando a igreja responder; I por último.
-produto); B antes de qualquer teste em aparelho; E e F como um passe único de cópia e acessibilidade; G quando
-a igreja responder; I por último.
+**Recomendação de ordem:** B antes de qualquer teste em aparelho; E e F como um passe único de cópia e
+acessibilidade; G quando a igreja responder; I por último.
 
 ---
 
