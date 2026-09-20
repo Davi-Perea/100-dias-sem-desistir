@@ -114,12 +114,12 @@ function DayBlock({
               width: 28,
               height: 28,
               borderRadius: 14,
-              backgroundColor: colors.text,
+              backgroundColor: colors.markSurface,
               alignItems: 'center',
               justifyContent: 'center',
             }}
           >
-            <Icon name="check" size={16} color={BRAND_YELLOW} strokeWidth={2.8} />
+            <Icon name="check" size={16} color={colors.onMark} strokeWidth={2.8} />
           </View>
         ) : trailing === 'none' ? null : (
           <Icon name="chevron-right" size={20} color={colors.textMuted} />

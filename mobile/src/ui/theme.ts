@@ -54,6 +54,25 @@ const light = {
   onAccent: '#111111',
   /** Ponto de dia concluído na Jornada. */
   nodeDone: '#3F3D38',
+  /**
+   * Marca invertida: o círculo do check, a pílula selecionada, o número do passo,
+   * o avatar. No claro é tinta com conteúdo amarelo, como o handoff desenhou.
+   * No escuro os papéis se invertem com a superfície (amarelo com tinta), que é
+   * o que o handoff faz na tela do Dia 100 e o que a pílula da aba ativa já faz.
+   * Os dois sentidos medem 12,9:1; escrever o fundo como `text` daria amarelo
+   * sobre branco no escuro, que é ilegível.
+   */
+  markSurface: '#111111',
+  onMark: BRAND_YELLOW,
+  /**
+   * Faixa de alerta (estado sem internet). O handoff pede uma faixa de tinta que
+   * interrompe a página clara; no tema escuro uma faixa de tinta sobre página de
+   * tinta não existiria, então ela clareia o suficiente para continuar sendo uma
+   * faixa: 3,5:1 contra a página, 5,4:1 para o texto branco e 3,7:1 para o ponto
+   * amarelo. O conteúdo é branco nos dois temas.
+   */
+  alertSurface: '#111111',
+  onAlert: '#FFFFFF',
   success: '#2F6B4F',
   warning: '#7E601B',
   danger: '#9E3B33',
@@ -86,6 +105,10 @@ const dark: Record<keyof typeof light, string> = {
   accentSoft: '#3A3100',
   onAccent: '#111111',
   nodeDone: '#C7C4BD',
+  markSurface: BRAND_YELLOW,
+  onMark: '#111111',
+  alertSurface: '#6B6A63',
+  onAlert: '#FFFFFF',
   success: '#6BBF92',
   warning: '#D6AC5A',
   danger: '#E0817A',

@@ -112,7 +112,7 @@
     },
     {
       "heading": "PARTICIPAÇÃO E RESPONSABILIDADE DOS MINISTÉRIOS",
-      "public": false,
+      "public": true,
       "blocks": [
         {
           "kind": "paragraph",

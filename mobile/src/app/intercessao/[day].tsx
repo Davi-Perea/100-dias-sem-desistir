@@ -24,7 +24,7 @@ import {
   StateView,
 } from '@/ui/components';
 import { Icon } from '@/ui/icons';
-import { BRAND_YELLOW, fonts, glass, spacing, useTheme } from '@/ui/theme';
+import { fonts, spacing, useTheme } from '@/ui/theme';
 
 /** A rota pode ser aberta por um lembrete (deep link) sem pilha atrás: cai no Início. */
 function goBack() {
@@ -33,13 +33,12 @@ function goBack() {
 }
 
 /**
- * Círculo de 28px de tinta com o numeral em amarelo. Amarelo sobre preto é o
- * único par em que o amarelo pode ser letra; o fundo é tinta fixa (não o
- * `colors.text` do tema, que no escuro seria branco). Decorativo: o cabeçalho
- * do passo já diz "Passo N de 5".
+ * Círculo de 28px com o numeral, usando o par `markSurface`/`onMark`: tinta com
+ * amarelo no tema claro, amarelo com tinta no escuro (12,9:1 nos dois sentidos).
+ * Decorativo: o cabeçalho do passo já diz "Passo N de 5".
  */
 function StepNumber({ n }: { n: number }) {
-  const { isDark } = useTheme();
+  const { colors } = useTheme();
   return (
     <View
       aria-hidden
@@ -47,14 +46,12 @@ function StepNumber({ n }: { n: number }) {
         width: 28,
         height: 28,
         borderRadius: 14,
-        backgroundColor: '#111111',
-        borderWidth: isDark ? 1 : 0,
-        borderColor: glass.hairlineDark,
+        backgroundColor: colors.markSurface,
         alignItems: 'center',
         justifyContent: 'center',
       }}
     >
-      <Text style={{ fontFamily: fonts.label, fontSize: 13, lineHeight: 16, color: BRAND_YELLOW }}>{n}</Text>
+      <Text style={{ fontFamily: fonts.label, fontSize: 13, lineHeight: 16, color: colors.onMark }}>{n}</Text>
     </View>
   );
 }

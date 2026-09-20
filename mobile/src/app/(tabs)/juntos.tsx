@@ -26,7 +26,7 @@ import {
 } from '@/ui/components';
 import { Icon } from '@/ui/icons';
 import { SpherePill } from '@/ui/SpherePill';
-import { MIN_TOUCH, fonts, spacing, useTheme } from '@/ui/theme';
+import { BRAND_YELLOW, MIN_TOUCH, fonts, spacing, useTheme } from '@/ui/theme';
 
 /**
  * Altar das 12h30 do dia oficial: quem conduz e por qual monte a igreja intercede.
@@ -276,7 +276,7 @@ export default function TogetherScreen() {
           <View style={{ gap: spacing.md }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
               <Dove width={22} tone="white" role="signature" />
-              <AppText variant="cap" style={{ color: '#FFD100' }}>
+              <AppText variant="cap" style={{ color: BRAND_YELLOW }}>
                 Recado da liderança
               </AppText>
             </View>

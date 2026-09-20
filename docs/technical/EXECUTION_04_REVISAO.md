@@ -1,6 +1,6 @@
 # EXECUTION 04 — revisão adversarial e correções
 
-- **Data:** 2026-09-20 · **Estado:** três correções aplicadas, **não commitadas**
+- **Data:** 2026-09-20 · **Estado:** cinco frentes corrigidas; as três primeiras commitadas em `99eb57b`, os grupos A e H **não commitados**
 - **Método:** cinco lentes independentes (design, conteúdo, acessibilidade, correção, completude) produziram
   64 achados; cada achado foi submetido a três refutadores com ângulos distintos (reprodução no código,
   regra escrita que viola, impacto real). Sobrevive o que dois dos três não conseguiram refutar.
@@ -56,6 +56,41 @@ um build de loja sairia com dado pessoal de terceiros sem consentimento.
 - `assertProductionReady` ganhou `production.leader_names`: recusa dataset com nomes sem autorização.
 - Testes: o conteúdo embarcado não casa `/\bPrs?\.|\bPra\./`; o portão recusa contrabando; com autorização o rótulo volta a ser exibível.
 
+### 1.4 Grupo A — a marca invertida sumia no tema escuro (2 médios + 2 baixos)
+
+O idioma do handoff para "marcado" é tinta com conteúdo amarelo. O código escrevia o fundo como
+`colors.text`, que no tema escuro é #FFFFFF: o conteúdo amarelo caía para 1,46:1. Onde o fundo era
+`#111111` fixo, era o inverso — o círculo sumia sobre a página escura.
+
+Par de tokens novo, `markSurface`/`onMark`, que faz o que o §2.2 deste projeto já descrevia para o tema
+escuro: tinta e amarelo trocam de papel com a superfície. Claro é tinta com amarelo, escuro é amarelo com
+tinta, 12,9:1 nos dois sentidos. Aplicado no check de concluído (Início e Dia), caixa de marcação, opção
+selecionada, pílula ativa, avatar e nos números dos passos da intercessão e do propósito.
+
+### 1.5 Grupo H — o rodapé de "Sobre o propósito" afirmava algo falso (1 médio)
+
+Dizia "reproduzido sem alterações", mas a página mostrava 8 das 10 seções.
+
+A auditoria mostrou que o problema era a SELEÇÃO, não só a frase: "Participação e responsabilidade dos
+ministérios" não é instrução a líderes — diz "não é somente o líder que está sendo escalado" e fala a todo
+integrante de ministério. Escondê-la de quem não é líder contraria o que ela mesma pede. Ela passou a ser
+pública; fica de fora só o passo a passo de preparação de quem conduz o altar, e aí a frase ficou verdadeira.
+
+### 1.6 O que a verificação adversarial dos grupos A e H encontrou
+
+Quatro auditorias independentes sobre a própria correção, cada achado refutado por dois ângulos:
+15 sobreviveram, 19 caíram. Os que sobreviveram foram corrigidos no mesmo passo.
+
+| Achado | Severidade | O que era |
+|---|---|---|
+| **A própria pomba não foi convertida** | alto | `Dove` tinha `tone='black'` por padrão e seis telas aceitavam o padrão sobre fundo que segue o tema: no escuro, pomba preta sobre página #111111. A marca do produto, invisível. O tom agora acompanha o tema; as telas de fundo fixo continuam passando o tom |
+| **Faixa de alerta ficou de fora** | médio | A faixa "sem internet" era `#111111` fixo e sumia sobre a página escura. Ganhou par próprio (`alertSurface`/`onAlert`): no escuro clareia o bastante para continuar sendo faixa (3,5:1 contra a página, 5,4:1 no texto, 3,7:1 no ponto amarelo). Usar `markSurface` ali estaria errado — daria texto branco sobre amarelo |
+| **Comentários descreviam o código anterior** | médio | Três docstrings afirmavam o oposto do que o código passou a fazer. Uma delas era o argumento pronto para alguém reintroduzir o defeito ("o círculo é sempre #111111, também no tema escuro") |
+| **O guarda de código era estreito demais** | alto | Casava só a forma literal do bug já corrigido; nove de onze variantes realistas passavam. Reescrito para descrever a regra: fundo de tinta (do tema, literal ou por apelido local) com conteúdo da marca, poupando as superfícies que se declaram fixas. Reporta caminho relativo, porque há cinco `[day].tsx` no projeto |
+
+O guarda agora se autotesta com onze casos sintéticos, seis que devem ser pegos e cinco que devem passar,
+e declara no próprio comentário o que não alcança: cor vinda de outro módulo ou com duas indireções.
+
 ---
 
 ## 2. Verificação
@@ -63,29 +98,31 @@ um build de loja sairia com dado pessoal de terceiros sem consentimento.
 | Checagem | Resultado |
 |---|---|
 | `tsc --noEmit` · `expo lint` | limpos |
-| `jest` | **298 testes, 18 suítes** (11 novos entre as três correções) |
+| `jest` | **310 testes, 18 suítes** |
 | `content:check` | dataset e propósito conferem com as fontes |
-| Navegador | citação atribuída; marco por leituras com a régua real; Dia 100 intacto; Juntos e Início sem nomes; zero erro de console em aba limpa |
+| Navegador, tema claro | citação atribuída; marco por leituras com a régua real; Dia 100 intacto; sem nomes; marca e marcas de seleção no desenho do handoff |
+| Navegador, tema escuro | check, caixa, opção, números de passo e a pomba visíveis; nenhuma superfície invertida perdida |
 
 ---
 
-## 3. Os 45 achados confirmados que continuam abertos
+## 3. Os achados confirmados que continuam abertos
 
-Agrupados por trabalho, não por arquivo. Nenhum foi corrigido.
+Os grupos A e H saíram desta tabela: foram corrigidos (seções 1.4 a 1.6). Restam 39.
+
+Agrupados por trabalho, não por arquivo.
 
 | # | Tema | Achados | Severidade | Por que importa |
 |---|---|---|---|---|
-| A | **Amarelo sobre `colors.text` no tema escuro** (Início, tela do Dia, `Pill`/`Checkbox`/`ChoiceRow`) | 4 | 2 médios | No escuro o check de "concluído" vira amarelo sobre branco (1,46:1): some. É o par que o próprio sistema proíbe. Correção: usar `nodeDone` + `surface`, já auditado no teste de contraste |
 | B | **Dynamic Type quebra caixas de altura fixa** (`Button`, `SpherePill`, estatísticas do Dia 100, `getItemLayout` da Jornada) | 6 | 3 médios | Texto transborda ou é cortado a partir de ~1,4× de fonte; no iOS a escala chega a 3,12× |
 | C | **Permissão de notificação pedida sem ação do usuário** (`useReminderSync` na abertura; toque no aviso dispara dois pedidos) | 3 | 2 médios | Pedir permissão sem gesto é o caminho mais curto para o usuário negar para sempre |
 | D | **Conteúdo de dia futuro acessível por rota** (leitor não checa `isDayUnlocked`) | 2 | 1 médio | Fura a regra de que o dia só abre no dia oficial |
 | E | **Leitor de tela** (estado "concluído" não anunciado, rótulos com "~" e "·", cabeçalhos não marcados, anúncio triplicado no modo altar) | 7 | 1 médio | |
 | F | **Cópia e consistência** (altar descrito de três jeitos; "hoje" em dia que não é hoje; "Tema" onde a igreja diz "Ênfase"; enum `pending_authorization` exposto) | 6 | 2 médios | |
 | G | **Jejum** (continua como "propósito" da campanha e ganhou superfície nova, sem a confirmação da igreja) | 2 | 1 médio | Depende de resposta da igreja, não de código |
-| H | **Rodapé de "Sobre o propósito"** afirma "reproduzido sem alterações", mas a página é uma seleção | 1 | médio | Afirmação falsa sobre o próprio conteúdo |
 | I | **Tokens e higiene** (cores literais fora de `theme.ts`, `gutter.block` sem uso, código sem consumidor, teste tautológico, marco gravado duas vezes) | 14 | baixos | |
 
-**Recomendação de ordem:** A e H primeiro (defeito visível e afirmação falsa, baratos); depois C e D (regras de
+**Recomendação de ordem:** C e D primeiro (regras de produto que o app hoje contraria); B antes de qualquer
+teste em aparelho; E e F como um passe único de cópia e acessibilidade; G quando a igreja responder; I por último.
 produto); B antes de qualquer teste em aparelho; E e F como um passe único de cópia e acessibilidade; G quando
 a igreja responder; I por último.
 

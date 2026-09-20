@@ -35,7 +35,7 @@ import {
   StateView,
 } from '@/ui/components';
 import { Icon } from '@/ui/icons';
-import { BRAND_YELLOW, fonts, spacing, useTheme } from '@/ui/theme';
+import { fonts, spacing, useTheme } from '@/ui/theme';
 
 function haptic(style: 'light' | 'success' = 'light') {
   if (Platform.OS === 'web') return;
@@ -316,12 +316,12 @@ export default function StartScreen() {
                   width: 40,
                   height: 40,
                   borderRadius: 20,
-                  backgroundColor: colors.text,
+                  backgroundColor: colors.markSurface,
                   alignItems: 'center',
                   justifyContent: 'center',
                 }}
               >
-                <Icon name="check" size={20} color={BRAND_YELLOW} strokeWidth={2.6} />
+                <Icon name="check" size={20} color={colors.onMark} strokeWidth={2.6} />
               </View>
               <AppText variant="blockTitle" style={{ flex: 1, fontSize: 24, lineHeight: 28 }}>
                 <Highlight>Leitura de hoje</Highlight> concluída

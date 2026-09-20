@@ -9,7 +9,7 @@ import {
 } from '@/journey/proposito';
 import { useJourney } from '@/journey/useJourney';
 import { AppText, Cap, DevContentBanner, Rule, Screen, ScreenScroll } from '@/ui/components';
-import { BRAND_YELLOW, fonts, spacing, useTheme } from '@/ui/theme';
+import { fonts, spacing, useTheme } from '@/ui/theme';
 
 /**
  * "Sobre o propósito": a orientação da igreja para os 100 dias, reproduzida
@@ -40,10 +40,12 @@ function Bullet({ text }: { text: string }) {
 }
 
 /**
- * Passo do fluxo: numeral amarelo sobre círculo de tinta. O círculo é sempre
- * #111111 (também no tema escuro), porque amarelo só é cor de texto sobre preto.
+ * Passo do fluxo: círculo de `markSurface` com o numeral em `onMark` — tinta com
+ * amarelo no tema claro, amarelo com tinta no escuro. Ver src/ui/theme.ts: fixar
+ * o círculo em #111111 o faria sumir sobre a página escura.
  */
 function Step({ number, title, description }: { number: number; title: string; description: string }) {
+  const { colors } = useTheme();
   return (
     <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md }}>
       <View
@@ -51,14 +53,14 @@ function Step({ number, title, description }: { number: number; title: string; d
           width: 28,
           height: 28,
           borderRadius: 14,
-          backgroundColor: '#111111',
+          backgroundColor: colors.markSurface,
           alignItems: 'center',
           justifyContent: 'center',
         }}
       >
         <Text
           accessibilityLabel={`Passo ${number}`}
-          style={{ fontFamily: fonts.label, fontSize: 13, color: BRAND_YELLOW }}
+          style={{ fontFamily: fonts.label, fontSize: 13, color: colors.onMark }}
         >
           {number}
         </Text>
@@ -170,8 +172,15 @@ export default function PropositoScreen() {
           <Section key={section.heading} section={section} index={index} />
         ))}
 
+        {/*
+          A página mostra as seções públicas da orientação, não o documento
+          inteiro: as instruções de organização dirigidas aos líderes ficam de
+          fora. Dizer "reproduzido sem alterações" seria falso sobre o recorte,
+          ainda que cada trecho exibido seja palavra por palavra.
+        */}
         <AppText variant="caption">
-          {`Texto da orientação da igreja (${PROPOSITO.source.file}), reproduzido sem alterações.`}
+          Orientação da igreja, palavra por palavra. Fica de fora só o passo a passo de preparação pedido a
+          quem conduz o altar.
         </AppText>
       </ScreenScroll>
     </Screen>

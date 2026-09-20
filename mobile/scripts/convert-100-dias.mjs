@@ -290,14 +290,17 @@ function paragraphs(documentXml) {
 
 /**
  * Seções da orientação que fazem sentido para qualquer participante. As demais
- * ("participação e responsabilidade dos ministérios", "responsabilidade do
- * líder") são instruções a líderes e ficam marcadas como não públicas — o app
- * decide o que mostrar; o arquivo derivado guarda o documento inteiro.
+ * A única não pública é "qual é a responsabilidade do líder?", que é um
+ * checklist operacional de quem conduz. "Participação e responsabilidade dos
+ * ministérios" É pública: fala a todo integrante de ministério ("não é somente o
+ * líder que está sendo escalado"), e escondê-la de quem não é líder contraria o
+ * que ela mesma pede. O arquivo derivado guarda o documento inteiro.
  */
 const PUBLIC_SECTIONS = [
   'LEITURA DA BÍBLIA',
   'ENCONTRO DIÁRIO ÀS 12H30',
   'TODA REUNIÃO COMEÇARÁ PELO ARREPENDIMENTO',
+  'PARTICIPAÇÃO E RESPONSABILIDADE DOS MINISTÉRIOS',
   'COMO SERÁ A DIREÇÃO DE CADA DIA?',
   'FLUXO DA REUNIÃO',
   'POR QUE O VERSÍCULO MUDA TODOS OS DIAS?',

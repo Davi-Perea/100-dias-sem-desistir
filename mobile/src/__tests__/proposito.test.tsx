@@ -60,11 +60,11 @@ beforeEach(async () => {
 });
 
 describe('página Sobre o propósito', () => {
-  test('mostra as oito seções públicas da orientação e esconde as de líderes', async () => {
+  test('mostra as nove seções públicas e esconde só o checklist do líder', async () => {
     await render(<PropositoScreen />);
 
     const sections = publicSections();
-    expect(sections).toHaveLength(8);
+    expect(sections).toHaveLength(9);
     for (const section of sections) {
       expect(screen.getByText(section.heading)).toBeTruthy();
     }
@@ -72,11 +72,12 @@ describe('página Sobre o propósito', () => {
 
     // As duas seções dirigidas a líderes existem no dado, mas não nesta página.
     expect(PROPOSITO.sections.filter((s) => !s.public).map((s) => s.heading)).toEqual([
-      'PARTICIPAÇÃO E RESPONSABILIDADE DOS MINISTÉRIOS',
       'QUAL É A RESPONSABILIDADE DO LÍDER?',
     ]);
     expect(screen.queryByText('QUAL É A RESPONSABILIDADE DO LÍDER?')).toBeNull();
-    expect(screen.queryByText('PARTICIPAÇÃO E RESPONSABILIDADE DOS MINISTÉRIOS')).toBeNull();
+    // Passou a ser pública: fala a todo integrante de ministério.
+    expect(screen.getByText('PARTICIPAÇÃO E RESPONSABILIDADE DOS MINISTÉRIOS')).toBeTruthy();
+    expect(screen.getByText(/não é somente o líder que está sendo escalado/)).toBeTruthy();
     expect(screen.queryByText(/Pedimos a cada líder/)).toBeNull();
   });
 
@@ -87,9 +88,13 @@ describe('página Sobre o propósito', () => {
     for (const paragraph of PROPOSITO.intro) {
       expect(screen.getByText(paragraph)).toBeTruthy();
     }
-    expect(
-      screen.getByText(`Texto da orientação da igreja (${PROPOSITO.source.file}), reproduzido sem alterações.`),
-    ).toBeTruthy();
+    // O rodapé precisa descrever o recorte: a página mostra as seções públicas,
+    // não o documento inteiro. Dizer "reproduzido sem alterações" era falso, e
+    // o nome do arquivo interno não diz nada a quem usa o app.
+    expect(screen.getByText(/Orientação da igreja, palavra por palavra/)).toBeTruthy();
+    expect(screen.getByText(/passo a passo de preparação pedido a\s+quem conduz o altar/)).toBeTruthy();
+    expect(screen.queryByText(new RegExp(PROPOSITO.source.file))).toBeNull();
+    expect(screen.queryByText(/sem alterações\./)).toBeNull();
   });
 
   test('o fluxo da reunião usa os cinco passos de flowSteps()', async () => {

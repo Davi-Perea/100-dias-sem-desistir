@@ -316,8 +316,9 @@ export function IconCircle({ name, size = 56 }: { name: IconName; size?: number 
   );
 }
 
-/** Avatar preto com iniciais em amarelo. */
+/** Avatar da marca: superfície invertida (`markSurface`) com as iniciais em `onMark`. */
 export function Avatar({ name, size = 40 }: { name: string; size?: number }) {
+  const { colors } = useTheme();
   const initials = name
     .trim()
     .split(/\s+/)
@@ -330,13 +331,13 @@ export function Avatar({ name, size = 40 }: { name: string; size?: number }) {
         width: size,
         height: size,
         borderRadius: size / 2,
-        backgroundColor: '#111111',
+        backgroundColor: colors.markSurface,
         alignItems: 'center',
         justifyContent: 'center',
       }}
           aria-hidden
     >
-      <Text style={{ fontFamily: fonts.label, fontSize: size * 0.35, color: BRAND_YELLOW }}>{initials}</Text>
+      <Text style={{ fontFamily: fonts.label, fontSize: size * 0.35, color: colors.onMark }}>{initials}</Text>
     </View>
   );
 }
@@ -497,7 +498,7 @@ export function ProgressBar({
   );
 }
 
-/** Pílula. Contornada = inativa; preenchida de tinta com texto amarelo = ativa. */
+/** Pílula. Contornada = inativa; preenchida com `markSurface` e texto `onMark` = ativa. */
 export function Pill({
   label,
   active = false,
@@ -519,12 +520,12 @@ export function Pill({
         borderRadius: radius.pill,
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: active ? colors.text : 'transparent',
+        backgroundColor: active ? colors.markSurface : 'transparent',
         borderWidth: active ? 0 : 1.5,
         borderColor: colors.controlBorder,
       }}
     >
-      <Text style={{ fontFamily: fonts.label, fontSize: 14, color: active ? BRAND_YELLOW : colors.text }}>
+      <Text style={{ fontFamily: fonts.label, fontSize: 14, color: active ? colors.onMark : colors.text }}>
         {label}
       </Text>
     </View>
@@ -579,13 +580,13 @@ export function Checkbox({
           height: 28,
           borderRadius: radius.sm,
           borderWidth: 2,
-          borderColor: checked ? colors.text : colors.controlBorder,
-          backgroundColor: checked ? colors.text : 'transparent',
+          borderColor: checked ? colors.markSurface : colors.controlBorder,
+          backgroundColor: checked ? colors.markSurface : 'transparent',
           alignItems: 'center',
           justifyContent: 'center',
         }}
       >
-        {checked ? <Icon name="check" size={18} color={BRAND_YELLOW} strokeWidth={2.6} /> : null}
+        {checked ? <Icon name="check" size={18} color={colors.onMark} strokeWidth={2.6} /> : null}
       </View>
     </Pressable>
   );
@@ -707,12 +708,12 @@ export function ChoiceRow({
           borderRadius: 14,
           alignItems: 'center',
           justifyContent: 'center',
-          backgroundColor: selected ? colors.text : 'transparent',
+          backgroundColor: selected ? colors.markSurface : 'transparent',
           borderWidth: selected ? 0 : 2,
           borderColor: colors.controlBorder,
         }}
       >
-        {selected ? <Icon name="check" size={16} color={BRAND_YELLOW} strokeWidth={2.8} /> : null}
+        {selected ? <Icon name="check" size={16} color={colors.onMark} strokeWidth={2.8} /> : null}
       </View>
     </Pressable>
   );
@@ -789,13 +790,14 @@ export function StateView({
  * reflexões são locais e não dependem de rede.
  */
 export function OfflineBanner({ message }: { message?: string }) {
+  const { colors } = useTheme();
   return (
     <View
       accessibilityRole="alert"
       style={{
         minHeight: 44,
         borderRadius: radius.button,
-        backgroundColor: '#111111',
+        backgroundColor: colors.alertSurface,
         flexDirection: 'row',
         alignItems: 'center',
         gap: spacing.md,
@@ -804,7 +806,7 @@ export function OfflineBanner({ message }: { message?: string }) {
       }}
     >
       <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: BRAND_YELLOW }} />
-      <Text style={{ flex: 1, fontFamily: fonts.item, fontSize: 13.5, lineHeight: 19, color: '#FFFFFF' }}>
+      <Text style={{ flex: 1, fontFamily: fonts.item, fontSize: 13.5, lineHeight: 19, color: colors.onAlert }}>
         {message ?? 'Sem internet. Sua leitura, progresso e reflexões continuam salvos.'}
       </Text>
     </View>

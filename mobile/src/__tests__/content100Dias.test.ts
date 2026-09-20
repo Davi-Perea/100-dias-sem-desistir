@@ -282,12 +282,15 @@ describe('orientação da igreja (proposito.json)', () => {
     }
   });
 
-  test('das 10 seções, 8 são públicas; as instruções só para líderes ficam fora', () => {
+  test('das 10 seções, 9 são públicas; só o checklist do líder fica fora', () => {
     expect(PROPOSITO.sections).toHaveLength(10);
     const headings = publicSections().map((s) => s.heading);
-    expect(headings).toHaveLength(8);
+    expect(headings).toHaveLength(9);
     expect(headings).not.toContain('QUAL É A RESPONSABILIDADE DO LÍDER?');
-    expect(headings).not.toContain('PARTICIPAÇÃO E RESPONSABILIDADE DOS MINISTÉRIOS');
+    // Esta seção fala a todo integrante de ministério ("não é somente o líder
+    // que está sendo escalado"): esconder de quem não é líder seria o contrário
+    // do que ela pede. A única não pública é o passo a passo de quem conduz.
+    expect(headings).toContain('PARTICIPAÇÃO E RESPONSABILIDADE DOS MINISTÉRIOS');
   });
 
   test('a introdução tem 4 parágrafos e nenhum é a saudação aos líderes', () => {
