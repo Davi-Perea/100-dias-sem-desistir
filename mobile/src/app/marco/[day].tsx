@@ -8,7 +8,6 @@ import { fastingKeptCount, useFasting } from '@/fasting/fastingStore';
 import { getDay } from '@/journey/datasetSource';
 import { milestoneForDay } from '@/journey/milestones';
 import { formatDayDate } from '@/journey/officialDay';
-import { SPHERE_LABEL } from '@/journey/spheres';
 import { useJourney } from '@/journey/useJourney';
 import { completedDayNumbers } from '@/progress/completionsStore';
 import { reflectionCount, useReflections } from '@/reflections/reflectionsStore';
@@ -85,6 +84,9 @@ export default function MilestoneScreen() {
   const available = Math.max(200, width - gutter * 2);
   const numeralSize = Math.floor(Math.min(designSize, available / (digits * 0.72 - (digits - 1) * 0.07)));
   const total = journey.campaign.total_days;
+  // Só a chegada usa data: 100 leituras implicam ter lido o Dia 100, então ali
+  // a data do dia é verdadeira. Nos marcos intermediários a contagem pessoal e o
+  // dia da igreja podem estar longe um do outro.
   const date = formatDayDate(day, journey.campaign);
 
   // Chegada: a ênfase do Dia 100 é o título; o rótulo do marco sobe para um cap.
@@ -93,16 +95,12 @@ export default function MilestoneScreen() {
   const verseReference =
     isArrival && dayData?.key_verse_reference ? formatReference(dayData.key_verse_reference) : null;
 
-  // Marcos intermediários: "Monte · Ênfase do dia" logo abaixo do título.
-  const sphere = dayData?.sphere ?? null;
-  const dayLine = !isArrival && sphere ? [SPHERE_LABEL[sphere], dayTitle].filter(Boolean).join(' · ') : null;
-
   return (
     <Screen tone={isArrival ? 'ink' : 'yellow'} edges={['top', 'bottom', 'left', 'right']}>
       <ScreenScroll gap={spacing.lg}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
           <Cap style={{ flex: 1, color: isArrival ? BRAND_YELLOW : '#111111' }}>
-            {isArrival ? `Chegada · Dia ${total} · ${date}` : `Marco · Dia ${day} de ${total} · ${date}`}
+            {isArrival ? `Chegada · Dia ${total} · ${date}` : `Marco · ${day} de ${total} dias lidos`}
           </Cap>
           <Dove width={46} tone={isArrival ? 'white' : 'black'} role="signature" />
         </View>
@@ -133,11 +131,6 @@ export default function MilestoneScreen() {
           >
             {title}
           </AppText>
-          {dayLine ? (
-            <AppText style={{ fontFamily: fonts.item, fontSize: 15, lineHeight: 21, color: ink }} testID="milestone-day-line">
-              {dayLine}
-            </AppText>
-          ) : null}
         </View>
 
         <View style={{ gap: spacing.md }}>
@@ -159,7 +152,7 @@ export default function MilestoneScreen() {
           officialDay={day}
           completed={completedDayNumbers(journey.completions)}
           variant={isArrival ? 'onInk' : 'onYellow'}
-          accessibilityLabel={`Régua da jornada até o dia ${day}.`}
+          accessibilityLabel={`Régua com os ${journey.completedCount} dias que você já leu, de ${total}.`}
         />
 
         {/* A história pessoal do Dia 100 vem toda de dados locais reais. */}

@@ -77,15 +77,11 @@ export function HundredDayRuler({
         {Array.from({ length: totalDays }, (_, index) => {
           const day = index + 1;
           const cx = x(day);
-          // Nas telas de marco a régua conta o caminho percorrido, não o que
-          // ficou em aberto: ali o dia já é história. Antes da campanha, nada
-          // está percorrido, então tudo cai no traço de futuro.
-          const isDone =
-            variant === 'inactive'
-              ? false
-              : variant === 'default'
-                ? done.has(day)
-                : day <= officialDay;
+          // "Percorrido" é sempre o que a PESSOA leu, nunca o que o calendário
+          // já passou: a tela de marco celebra a contagem dela, e pintar 1..N
+          // como lidos mentiria para quem entrou atrasado. Antes da campanha
+          // nada está percorrido, então tudo cai no traço de futuro.
+          const isDone = variant === 'inactive' ? false : done.has(day);
           const isToday = variant === 'default' && day === officialDay && !isDone;
           const isOpen = variant === 'default' && day < officialDay && !isDone;
 

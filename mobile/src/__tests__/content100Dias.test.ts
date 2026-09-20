@@ -1,4 +1,5 @@
 import { execFileSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { BOOKS } from '@/bible/books';
@@ -15,7 +16,7 @@ import {
 } from '@/journey/datasetSource';
 import { MILESTONES } from '@/journey/milestones';
 import { altarOfDay, listMinistries, nextMinistryDay } from '@/journey/ministries';
-import { flowSteps, PROPOSITO, publicSections } from '@/journey/proposito';
+import { flowSteps, PROPOSITO, publicSections, scriptureQuotes } from '@/journey/proposito';
 import { SPHERE_ORDER } from '@/journey/spheres';
 import type { JourneyDataset } from '@/journey/types';
 import { assertProductionReady, validateDataset } from '@/journey/validator';
@@ -183,12 +184,26 @@ describe('proveniência e direitos do conteúdo real', () => {
     expect(assertProductionReady(authorized).valid).toBe(true);
   });
 
-  test('nomes de líderes ficam ocultos até autorização explícita', () => {
-    const day = getDay(1)!;
-    expect(day.altar?.leaders_label).toBeTruthy();
-    expect(altarForDisplay(day)).toEqual({ ministry: 'Intercessão/Bálsamo', leaders_label: null });
+  test('nenhum nome de pessoa é embarcado sem autorização', () => {
+    // A defesa principal é a ORIGEM: sem autorização o conversor não gera o
+    // rótulo. Esconder só na tela deixaria os nomes legíveis no binário.
+    expect(dataset.provenance.leader_names_authorized).toBe(false);
+    expect(dataset.days.filter((d) => d.altar?.leaders_label)).toEqual([]);
+    expect(JSON.stringify(dataset)).not.toMatch(/\bPrs?\.|\bPra\./);
+    expect(altarForDisplay(getDay(1))).toEqual({ ministry: 'Intercessão/Bálsamo', leaders_label: null });
+  });
 
-    // Liberar nomes num dataset ainda pendente é erro de validação.
+  test('o portão de produção recusa um dataset que traga nomes sem autorização', () => {
+    const smuggled = clone(dataset);
+    smuggled.provenance.rights_status = 'authorized';
+    smuggled.provenance.rights_reference = 'autorizacao';
+    smuggled.days[0].altar = { ministry: 'Intercessão/Bálsamo', leaders_label: 'Prs. Leandra e Daniel' };
+    expect(assertProductionReady(smuggled).issues.map((i) => i.code)).toContain('production.leader_names');
+    expect(loadDataset(smuggled, 'production').ok).toBe(false);
+  });
+
+  test('com autorização, o rótulo passa a ser exibível', () => {
+    // Liberar nomes num dataset ainda pendente continua sendo erro de validação.
     const pendingWithNames = clone(dataset);
     pendingWithNames.provenance.leader_names_authorized = true;
     expect(validateDataset(pendingWithNames).issues.map((i) => i.code)).toContain('provenance.leader_names');
@@ -197,6 +212,7 @@ describe('proveniência e direitos do conteúdo real', () => {
     authorized.provenance.rights_status = 'authorized';
     authorized.provenance.rights_reference = 'autorizacao';
     authorized.provenance.leader_names_authorized = true;
+    authorized.days[0].altar = { ministry: 'Intercessão/Bálsamo', leaders_label: 'Prs. Leandra e Daniel' };
     expect(loadDataset(authorized, 'production').ok).toBe(true);
     expect(altarForDisplay(getDay(1))?.leaders_label).toBe('Prs. Leandra e Daniel');
   });
@@ -206,6 +222,43 @@ describe('proveniência e direitos do conteúdo real', () => {
     expect(contentStateOf(getDataset())).toBe('fixture');
     resetToBundledContent();
     expect(contentStateOf(getDataset())).toBe('pending');
+  });
+});
+
+/**
+ * O app não exibe NENHUMA tradução bíblica enquanto o Gate 1 não fechar. A
+ * exceção é a citação que a própria igreja fez no material: avulsa, atribuída e
+ * limitada por guarda no conversor. Estes testes existem para que ela continue
+ * sendo exceção, e não vire porta de entrada.
+ */
+describe('citação bíblica no material da igreja', () => {
+  test('existe exatamente uma, atribuída e com referência canônica', () => {
+    expect(scriptureQuotes()).toEqual([{ reference: 'Levítico 6:13', canonical_reference: 'LEV 6:13' }]);
+  });
+
+  test('vem marcada como bloco próprio, com o trecho separado da referência', () => {
+    const blocks = PROPOSITO.sections.flatMap((s) => s.blocks).filter((b) => b.kind === 'scripture');
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0].quote).toBe('O fogo arderá continuamente sobre o altar; não se apagará.');
+    expect(blocks[0].reference).toBe('Levítico 6:13');
+    // O trecho citado não pode sobrar solto num parágrafo comum.
+    const paragraphs = PROPOSITO.sections.flatMap((s) => s.blocks).filter((b) => b.kind !== 'scripture');
+    expect(paragraphs.some((b) => b.text.includes('O fogo arderá'))).toBe(false);
+  });
+
+  test('nenhum outro texto entre aspas escapou para os parágrafos', () => {
+    const quoted = PROPOSITO.sections
+      .flatMap((s) => s.blocks)
+      .filter((b) => b.kind !== 'scripture')
+      .filter((b) => /[\u201C\u201D\u0022]/.test(b.text));
+    expect(quoted).toEqual([]);
+    expect(PROPOSITO.intro.filter((p) => /[\u201C\u201D\u0022]/.test(p))).toEqual([]);
+  });
+
+  test('o conversor recusa material com citações demais', () => {
+    const source = readFileSync(join(MOBILE_ROOT, 'scripts', 'convert-100-dias.mjs'), 'utf8');
+    expect(source).toContain('MAX_SCRIPTURE_QUOTES');
+    expect(source).toMatch(/scripture\.length > MAX_SCRIPTURE_QUOTES/);
   });
 });
 

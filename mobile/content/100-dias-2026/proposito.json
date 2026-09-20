@@ -343,8 +343,11 @@
           "text": "100 DIAS DE PALAVRA, CONSAGRAÇÃO, ARREPENDIMENTO, ADORAÇÃO E INTERCESSÃO"
         },
         {
-          "kind": "paragraph",
-          "text": "“O fogo arderá continuamente sobre o altar; não se apagará.” Levítico 6:13"
+          "kind": "scripture",
+          "text": "“O fogo arderá continuamente sobre o altar; não se apagará.” Levítico 6:13",
+          "quote": "O fogo arderá continuamente sobre o altar; não se apagará.",
+          "reference": "Levítico 6:13",
+          "canonical_reference": "LEV 6:13"
         }
       ]
     }
@@ -374,6 +377,12 @@
       "step": 5,
       "title": "Adoração e entrega",
       "description": "Concluiremos entregando ao Senhor aquilo pelo qual intercedemos e exaltando Seu governo sobre aquela área."
+    }
+  ],
+  "scripture_quotes": [
+    {
+      "reference": "Levítico 6:13",
+      "canonical_reference": "LEV 6:13"
     }
   ],
   "source": {

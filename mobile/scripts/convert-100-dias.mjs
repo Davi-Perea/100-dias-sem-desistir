@@ -307,6 +307,23 @@ const PUBLIC_SECTIONS = [
 
 const FLOW_HEADING = norm('FLUXO DA REUNIÃO');
 
+/**
+ * Citação bíblica dentro do texto da igreja: trecho entre aspas seguido da
+ * referência ("“O fogo arderá…” Levítico 6:13").
+ */
+const SCRIPTURE_QUOTE = /^[\u201C\u0022]([\s\S]+?)[\u201D\u0022]\s*(.+)$/;
+
+/**
+ * Teto de citações bíblicas no material.
+ *
+ * Uma citação avulsa e atribuída é lícita (Lei 9.610/98 art. 46, III; a SBB
+ * admite até 500 versículos sem autorização escrita). Mas o app não exibe
+ * NENHUMA tradução enquanto o Gate 1 não fechar, então cada versículo que entra
+ * por aqui precisa ser uma decisão consciente, não um efeito colateral da
+ * conversão. Passar deste teto interrompe a geração de propósito.
+ */
+const MAX_SCRIPTURE_QUOTES = 3;
+
 function parseOrientation(source) {
   const paras = paragraphs(source.xml);
   if (paras.length < 20) throw new Error('Orientação: documento curto demais para ser o esperado.');
@@ -319,6 +336,7 @@ function parseOrientation(source) {
 
   const intro = [];
   const sections = [];
+  const scripture = [];
   let current = null;
   for (const p of rest) {
     if (isHeading(p)) {
@@ -327,12 +345,33 @@ function parseOrientation(source) {
       continue;
     }
     const block = { kind: p.numId === '3' ? 'step' : p.numId ? 'bullet' : 'paragraph', text: p.text };
+
+    // Citação bíblica vira um bloco próprio, com a referência canônica ao lado:
+    // assim ela é auditável, atribuível e contável, em vez de virar parágrafo.
+    const quoted = !p.numId && SCRIPTURE_QUOTE.exec(p.text);
+    if (quoted) {
+      const verse = parseVerse(quoted[2], 'Orientação (citação bíblica)');
+      block.kind = 'scripture';
+      block.quote = quoted[1].trim();
+      block.reference = quoted[2].trim();
+      block.canonical_reference = verse.canonical;
+      scripture.push(block);
+    }
     if (!current) {
       // A saudação ("Queridos líderes,") é endereçamento, não conteúdo.
       if (!/^queridos\b/i.test(block.text)) intro.push(block.text);
       continue;
     }
     current.blocks.push(block);
+  }
+
+  if (scripture.length > MAX_SCRIPTURE_QUOTES) {
+    throw new Error(
+      `Orientação: ${scripture.length} citações bíblicas (teto ${MAX_SCRIPTURE_QUOTES}). ` +
+        'Acima disso deixa de ser citação e vira reprodução de tradução, que exige licença (Gate 1). ' +
+        'Referências encontradas: ' +
+        scripture.map((s) => s.canonical_reference).join(', '),
+    );
   }
 
   for (const wanted of PUBLIC_SECTIONS) {
@@ -355,6 +394,9 @@ function parseOrientation(source) {
     intro,
     sections,
     flow,
+    // Toda citação bíblica do material, reunida para auditoria: é o único texto
+    // de tradução que o app exibe enquanto o Gate 1 não fechar.
+    scripture_quotes: scripture.map((s) => ({ reference: s.reference, canonical_reference: s.canonical_reference })),
     source: { file: source.file, sha256: source.sha256 },
   };
 }
@@ -426,7 +468,13 @@ function build() {
         official_direction: null,
         prayer_focus: g.motives,
         prayer_points: prayerPoints(g.motives),
-        altar: s ? { ministry: s.ministry, leaders_label: s.leaders || null } : null,
+        // Sem autorização de nomes, o rótulo com pessoas NÃO é gerado: esconder
+        // na tela não bastaria, porque o JSON inteiro vai para o binário e
+        // qualquer um descompacta o pacote. A fonte .docx (com hash em
+        // provenance.source_files) continua guardando o dado original.
+        altar: s
+          ? { ministry: s.ministry, leaders_label: rights.leader_names_authorized ? s.leaders || null : null }
+          : null,
         milestone: MILESTONES[g.day] ?? null,
         next_day_teaser: null,
         publish_status: 'published',
@@ -466,7 +514,9 @@ function build() {
       source_type: 'original_church_content',
       source_name: `100 Dias — Guia Diário de Intercessão (${guide.startDate} a ${guide.year}-12-31)`,
       source_external_id: null,
-      source_provider: 'Lagoinha — material recebido de Davi em 2026-09-19 (autoria no arquivo: Leandra Pedroso, 28/08/2026)',
+      // Sem nome de pessoa: este campo vai para o bundle. A autoria do arquivo
+      // fica registrada em content/source/README.md, que não é embarcado.
+      source_provider: 'Lagoinha — material recebido em 2026-09-19',
       // Direitos vêm de content/100-dias-2026/rights.json: fica "pending_authorization"
       // até a igreja autorizar por escrito; nomes de líderes só com liberação explícita.
       rights_status: rights.rights_status,

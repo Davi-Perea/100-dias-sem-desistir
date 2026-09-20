@@ -181,5 +181,18 @@ export function assertProductionReady(dataset: JourneyDataset): ValidationResult
   if (dataset.days.some((d) => d.publish_status !== 'published')) {
     issues.push(err('production.publish_status', 'Todos os dias devem estar "published" em produção.'));
   }
+  // Nome de pessoa dentro do dataset vira nome de pessoa dentro do binário.
+  // Sem autorização explícita, nem gerado ele deve ser — e o portão confere.
+  if (
+    dataset.provenance.leader_names_authorized !== true &&
+    dataset.days.some((d) => d.altar?.leaders_label)
+  ) {
+    issues.push(
+      err(
+        'production.leader_names',
+        'O dataset traz nomes de líderes sem leader_names_authorized: eles iriam para o binário. Regenere o conteúdo.',
+      ),
+    );
+  }
   return { valid: issues.every((i) => i.severity !== 'error'), issues };
 }

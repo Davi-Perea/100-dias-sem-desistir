@@ -84,6 +84,9 @@ function SectionBlocks({ blocks }: { blocks: PropositoBlock[] }) {
     <>
       {blocks.map((block, index) => {
         if (block.kind === 'bullet') return <Bullet key={index} text={block.text} />;
+        if (block.kind === 'scripture') {
+          return <Scripture key={index} quote={block.quote ?? block.text} reference={block.reference ?? ''} />;
+        }
         if (block.kind === 'step') {
           // O fluxo já vem separado em título e descrição pelo conversor; o texto
           // corrido só é dividido se um passo não estiver lá.
@@ -95,6 +98,33 @@ function SectionBlocks({ blocks }: { blocks: PropositoBlock[] }) {
         return <Paragraph key={index} text={block.text} />;
       })}
     </>
+  );
+}
+
+/**
+ * Citação bíblica do material da igreja.
+ *
+ * É o único texto de tradução no aplicativo enquanto a licença não fechar, por
+ * isso aparece identificado como citação e com a referência ao lado, em vez de
+ * se misturar aos parágrafos. A tradução ainda não foi informada pela igreja.
+ */
+function Scripture({ quote, reference }: { quote: string; reference: string }) {
+  const { colors } = useTheme();
+  return (
+    <View
+      testID="proposito-scripture"
+      accessible
+      accessibilityLabel={`Citação bíblica: ${quote} ${reference}`}
+      style={{
+        gap: spacing.xs,
+        borderLeftWidth: 3,
+        borderLeftColor: colors.border,
+        paddingLeft: spacing.lg,
+      }}
+    >
+      <AppText variant="readItalic">{quote}</AppText>
+      <AppText variant="caption">{reference} · citação da orientação da igreja</AppText>
+    </View>
   );
 }
 

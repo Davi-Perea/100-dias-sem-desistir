@@ -111,12 +111,11 @@ describe('tela Meu ministério', () => {
     expect(screen.getByTestId('ministry-none').props.accessibilityState.checked).toBe(true);
     expect(screen.queryByTestId('ministry-days')).toBeNull();
 
-    // Os nomes das pessoas da escala existem no dataset e NUNCA chegam à tela.
+    // Sem autorização, nome de pessoa não existe nem no dado nem na tela.
     for (const day of [1, 17, 30]) {
-      const label = getDay(day)?.altar?.leaders_label;
-      expect(label).toBeTruthy();
-      expect(screen.queryByText(label as string, { exact: false })).toBeNull();
+      expect(getDay(day)?.altar?.leaders_label).toBeNull();
     }
+    expect(screen.queryByText(/Prs?\.|Pra\./)).toBeNull();
     expect(screen.getByText(/Fica só neste aparelho/)).toBeTruthy();
     expect(screen.getByTestId('content-banner')).toBeTruthy();
   });
@@ -194,9 +193,9 @@ describe('Você: comunidade e aviso do altar', () => {
     expect(today?.ministry).toBeTruthy();
     expect(today?.leaders_label).toBeNull();
     expect(screen.getByText(today?.ministry as string)).toBeTruthy();
-    const rawLabel = getDay(17)?.altar?.leaders_label as string;
-    expect(rawLabel).toBeTruthy();
-    expect(screen.queryByText(rawLabel, { exact: false })).toBeNull();
+    // Sem autorização, o nome nem existe no dado: a defesa é na origem, não na tela.
+    expect(getDay(17)?.altar?.leaders_label).toBeNull();
+    expect(screen.queryByText(/Prs?\.|Pra\./)).toBeNull();
     await fireEvent.press(screen.getByTestId('row-altar-today'));
     expect(mockRouter.push).toHaveBeenCalledWith('/(tabs)/juntos');
   });

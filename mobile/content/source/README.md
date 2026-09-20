@@ -23,4 +23,11 @@ originais; só o nome foi trocado para ASCII, porque nomes com travessão e acen
    quando `provenance.leader_names_authorized` for `true`, o que também depende de autorização explícita.
 5. **A orientação aos líderes** não vira dataset: é comunicação (WhatsApp/PDF). Fica aqui como parte do
    pacote recebido e como fonte da futura página "Sobre o propósito", que também depende do item 3.
-6. Nada de texto bíblico está nestes arquivos, só referências. A licença da tradução (Gate 1) é independente.
+6. **Texto bíblico.** O guia e a escala só trazem referências. A orientação aos líderes, porém, **cita um
+   versículo** no fecho (Levítico 6:13). O conversor reconhece citações (trecho entre aspas seguido de referência),
+   separa-as num bloco `scripture` com a referência canônica e **recusa a geração acima de três citações**: além
+   disso deixa de ser citação e vira reprodução de tradução, que exige licença. Hoje há exatamente uma, exibida na
+   página "Sobre o propósito" identificada como citação e atribuída.
+   - Base: uma citação avulsa e atribuída é lícita (Lei 9.610/98, art. 46, III), e a SBB admite até 500 versículos
+     sem autorização escrita. Isso **não** libera o Gate 1: o leitor continua sem exibir tradução nenhuma.
+   - **Pendente:** a igreja precisa informar **qual tradução** é essa, para a atribuição ficar completa.
