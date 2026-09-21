@@ -4,7 +4,7 @@ import Constants from 'expo-constants';
 import { getCommunityApi, type CommunityApi } from '@/community/api';
 import { communityError, toCommunityError } from '@/community/errors';
 import type { CommunityStatus } from '@/community/types';
-import { useCloudSession } from '@/cloud/useSession';
+import { useCommunitySession } from '@/community/useCommunitySession';
 
 /**
  * Estado da Comunidade para as telas de publicar, regras e consentimento.
@@ -23,14 +23,14 @@ export type CommunityStatusState =
 
 export function useCommunityStatus(): CommunityStatusState & { reload: () => void } {
   const api = useMemo(() => getCommunityApi(), []);
-  const session = useCloudSession();
+  const session = useCommunitySession();
   const [tick, setTick] = useState(0);
   const [result, setResult] = useState<
     { key: string; status: CommunityStatus } | { key: string; error: { message: string; code: string } } | null
   >(null);
 
   const reload = useCallback(() => setTick((value) => value + 1), []);
-  const userId = session.session?.user?.id ?? null;
+  const userId = session.userId;
   const key = `${userId ?? 'anon'}#${tick}`;
 
   useEffect(() => {

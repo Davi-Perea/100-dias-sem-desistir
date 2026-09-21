@@ -4,7 +4,7 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import { getCommunityApi, type CommunityApi } from '@/community/api';
 import { CommunityError } from '@/community/errors';
 import type { CommunityStatus } from '@/community/types';
-import { useCloudSession } from '@/cloud/useSession';
+import { useCommunitySession } from '@/community/useCommunitySession';
 
 /**
  * Em que pé a pessoa está na Comunidade, do ponto de vista das telas de feed e
@@ -41,7 +41,7 @@ export function needsConsent(status: CommunityStatus): boolean {
 }
 
 export function useCommunity(): { gate: CommunityGate; reload: () => void } {
-  const session = useCloudSession();
+  const session = useCommunitySession();
   // Um cliente por montagem: getCommunityApi() cria um objeto novo a cada chamada.
   const api = useMemo(() => getCommunityApi(), []);
   const [status, setStatus] = useState<

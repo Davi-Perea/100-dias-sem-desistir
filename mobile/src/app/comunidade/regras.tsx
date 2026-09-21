@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { DEMO_TERMS_NOTICE } from '@/community/demoApi';
 import { BackBar, goBackOrHome } from '@/ui/BackBar';
 import { AppText, Button, LoadingCaption, Screen } from '@/ui/components';
 import { availabilityNotice, continueFlow, useTermsAcceptance } from '@/ui/comunidade/publicar/aceite';
@@ -30,7 +31,7 @@ export default function RulesScreen() {
   const inset = useGutter();
   const state = useCommunityStatus();
   const [doc] = useState(() => rulesDocument());
-  const { availability, accept, busy, error } = useTermsAcceptance(doc, state);
+  const { availability, accept, busy, error, demo } = useTermsAcceptance(doc, state);
 
   const [viewport, setViewport] = useState(0);
   const [contentHeight, setContentHeight] = useState(0);
@@ -140,6 +141,7 @@ export default function RulesScreen() {
         {!readOnly && notice && state.kind === 'ready' && !alreadyAccepted ? (
           <NoticeBand text={notice} colors={colors} testID="rules-top-notice" />
         ) : null}
+        {demo ? <NoticeBand text={DEMO_TERMS_NOTICE} colors={colors} testID="rules-demo-notice" /> : null}
         <TermsBody doc={doc} colors={colors} marker={colors.text} />
         <View style={{ gap: spacing.md, paddingTop: spacing.md }}>
           {acceptArea}

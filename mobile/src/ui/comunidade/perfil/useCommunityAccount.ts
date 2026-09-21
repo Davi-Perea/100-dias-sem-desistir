@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import { useCloudSession } from '@/cloud/useSession';
 import { getCommunityApi, type CommunityApi } from '@/community/api';
 import { CommunityError } from '@/community/errors';
 import type { CommunityStatus } from '@/community/types';
+import { useCommunitySession } from '@/community/useCommunitySession';
 import { COMMUNITY_ENABLED } from '@/config/features';
 
 /**
@@ -35,15 +35,14 @@ type Loaded =
   | { key: string; status: null; error: string };
 
 export function useCommunityAccount(): CommunityAccount {
-  const cloud = useCloudSession();
+  const cloud = useCommunitySession();
   const api = useMemo(() => (COMMUNITY_ENABLED && cloud.configured ? getCommunityApi() : null), [cloud.configured]);
   const [tick, setTick] = useState(0);
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   const reload = useCallback(() => setTick((value) => value + 1), []);
 
-  const user = cloud.session?.user as { id?: string; email?: string | null; is_anonymous?: boolean } | undefined;
-  const email = user && user.is_anonymous !== true && user.email ? user.email : null;
-  const key = `${user?.id ?? email ?? 'none'}#${tick}`;
+  const email = cloud.email;
+  const key = `${cloud.userId ?? email ?? 'none'}#${tick}`;
 
   useEffect(() => {
     if (!api || !email) return;

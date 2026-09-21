@@ -1,6 +1,7 @@
 import { router } from 'expo-router';
 import { View } from 'react-native';
 
+import { isCommunityDemo } from '@/community/demoApi';
 import { Dove } from '@/ui/brand';
 import {
   AppText,
@@ -131,7 +132,11 @@ export function GateView({ gate, onRetry }: { gate: Exclude<CommunityGate, { kin
               Para ler e escrever aqui, entre com o seu e-mail e depois use o código que a sua igreja passou. Sua
               leitura, seu progresso e as suas reflexões continuam funcionando sem conta.
             </AppText>
-            <Button title="Entrar com meu e-mail" onPress={() => router.push(COMMUNITY_ROUTES.conta)} testID="gate-sign-in" />
+            <Button
+              title="Entrar com meu e-mail"
+              onPress={() => router.push(isCommunityDemo() ? COMMUNITY_ROUTES.entrar : COMMUNITY_ROUTES.conta)}
+              testID="gate-sign-in"
+            />
           </View>
         </Block>
       );

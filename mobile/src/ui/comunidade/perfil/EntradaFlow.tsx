@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { BackHandler, View } from 'react-native';
 
 import type { CommunityApi } from '@/community/api';
+import { DEMO_INVITE_CODE, isDemoCommunityApi } from '@/community/demoApi';
 import { CommunityError } from '@/community/errors';
 import type { CommunityStatus } from '@/community/types';
 import { charLength, formatInviteCode, isValidDisplayName, LIMITS, normalizeInviteCode } from '@/community/validation';
@@ -58,7 +59,8 @@ function Steps({ api, status }: { api: CommunityApi; status: CommunityStatus }) 
   const { colors } = useTheme();
   const first = initialStep(status);
   const [step, setStep] = useState<Step | 'membro'>(first);
-  const [code, setCode] = useState('');
+  const demo = isDemoCommunityApi(api);
+  const [code, setCode] = useState(() => (demo ? formatInviteCode(DEMO_INVITE_CODE) : ''));
   const [codeError, setCodeError] = useState<string | null>(null);
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
@@ -210,6 +212,11 @@ function Steps({ api, status }: { api: CommunityApi; status: CommunityStatus }) 
         <AppText variant="body">
           Quem te convidou tem um código de 10 letras e números, como ABCDE-23456. Pode digitar com ou sem o traço.
         </AppText>
+        {demo ? (
+          <AppText variant="caption" testID="entrar-codigo-demo">
+            Demonstração: o código {formatInviteCode(DEMO_INVITE_CODE)} já vem preenchido.
+          </AppText>
+        ) : null}
         <View style={{ gap: spacing.sm }}>
           <LineField
             value={code}

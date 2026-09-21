@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { DEMO_TERMS_NOTICE } from '@/community/demoApi';
 import { BackBar, goBackOrHome } from '@/ui/BackBar';
 import { AppText, Button, LoadingCaption, Screen } from '@/ui/components';
 import { availabilityNotice, continueFlow, useTermsAcceptance } from '@/ui/comunidade/publicar/aceite';
@@ -38,7 +39,7 @@ export default function ConsentScreen() {
   const inset = useGutter();
   const state = useCommunityStatus();
   const [doc] = useState(() => consentDocument());
-  const { availability, accept, busy, error } = useTermsAcceptance(doc, state);
+  const { availability, accept, busy, error, demo } = useTermsAcceptance(doc, state);
 
   const keepForMe = () => {
     if (day !== null) router.replace({ pathname: '/reflexao/[day]', params: { day: String(day) } });
@@ -141,6 +142,7 @@ export default function ConsentScreen() {
         {notice && state.kind === 'ready' ? (
           <NoticeBand text={notice} colors={colors} testID="consent-top-notice" />
         ) : null}
+        {demo ? <NoticeBand text={DEMO_TERMS_NOTICE} colors={colors} testID="consent-demo-notice" /> : null}
         <TermsBody doc={doc} colors={colors} marker={BRAND_YELLOW} />
         <Button
           title="Regras da comunidade"

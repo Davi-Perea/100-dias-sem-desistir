@@ -3,6 +3,7 @@ import { useEffect, useState, type PropsWithChildren, type ReactNode } from 'rea
 import { ScrollView, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { DEMO_BADGE, demoSignIn, isCommunityDemo } from '@/community/demoApi';
 import { BackBar } from '@/ui/BackBar';
 import { AppText, Button, Screen, Sheet, StateView, useFace } from '@/ui/components';
 import { faces, MAX_CONTENT_WIDTH, radius, spacing, useGutter, useTheme } from '@/ui/theme';
@@ -67,6 +68,20 @@ export function AccountStateView({ account }: { account: Exclude<CommunityAccoun
           icon="community"
           title="Comunidade indisponível"
           message="A comunidade não está disponível nesta versão do app. Sua jornada pessoal continua funcionando por completo neste aparelho."
+        />
+      </ProfileScreen>
+    );
+  }
+  if (account.kind === 'signed_out' && isCommunityDemo()) {
+    // Demonstração: o passo do e-mail é simulado. Nenhum e-mail sai, nenhum código é pedido.
+    return (
+      <ProfileScreen testID="community-account-demo-sign-in">
+        <StateView
+          kind="empty"
+          icon="person"
+          title="Entrar com o seu e-mail"
+          message={`${DEMO_BADGE}. No app de verdade, aqui você digita o e-mail e recebe um código. Na demonstração, este passo é simulado.`}
+          action={<Button title="Continuar na demonstração" onPress={demoSignIn} testID="community-demo-sign-in" />}
         />
       </ProfileScreen>
     );

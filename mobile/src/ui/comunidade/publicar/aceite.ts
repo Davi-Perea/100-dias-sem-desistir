@@ -2,6 +2,7 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 
 import { termsSha256 } from '@/community/api';
+import { isDemoCommunityApi } from '@/community/demoApi';
 import { toCommunityError } from '@/community/errors';
 import type { CommunityStatus } from '@/community/types';
 import { goBackOrHome } from '@/ui/BackBar';
@@ -56,7 +57,9 @@ export function useTermsAcceptance(doc: TermsDocument, state: CommunityStatusSta
 
   const ready = state.kind === 'ready' ? state : null;
   const serverVersion = ready ? serverVersionFor(doc, ready.status) : null;
-  const computed: TermsAvailability | null = ready ? termsAvailability(doc, serverVersion) : null;
+  // Demonstração (demoApi.ts): o texto continua o rascunho PENDENTE, com aviso na tela, mas dá para seguir.
+  const demo = ready !== null && isDemoCommunityApi(ready.api);
+  const computed: TermsAvailability | null = ready ? (demo ? 'ready' : termsAvailability(doc, serverVersion)) : null;
   const availability: TermsAvailability | null = outdated ? 'mismatch' : computed;
 
   /** true = aceito e registrado no servidor. */
@@ -78,5 +81,5 @@ export function useTermsAcceptance(doc: TermsDocument, state: CommunityStatusSta
     }
   };
 
-  return { availability, accept, busy, error };
+  return { availability, accept, busy, error, demo };
 }

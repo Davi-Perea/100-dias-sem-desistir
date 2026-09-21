@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { View } from 'react-native';
 
 import { signOut } from '@/cloud/auth';
+import { demoSignOut } from '@/community/demoApi';
 import { CloudError } from '@/cloud/errors';
 import type { CommunityApi } from '@/community/api';
 import type { CommunityStatus, MyBlock } from '@/community/types';
@@ -114,6 +115,7 @@ function AccountAndPrivacy({
     setSignOutError(null);
     try {
       await signOut();
+      demoSignOut();
       router.replace('/');
     } catch (error) {
       setSignOutError(error instanceof CloudError ? error.message : 'Não foi possível sair da conta.');

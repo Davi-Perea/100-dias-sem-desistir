@@ -3,6 +3,7 @@ import { type ReactNode, useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, View } from 'react-native';
 
 import type { CommunityApi } from '@/community/api';
+import { DEMO_BADGE, isCommunityDemo } from '@/community/demoApi';
 import type { CommunityStatus } from '@/community/types';
 import { getDay } from '@/journey/datasetSource';
 import { readingSummary } from '@/journey/readingSummary';
@@ -135,6 +136,7 @@ function FeedHeader({ canWrite, onWrite, day }: { canWrite: boolean; onWrite: ()
           </Pressable>
         ) : null}
       </View>
+      {isCommunityDemo() ? <DemoBadge /> : null}
       {line ? (
         <Pressable
           onPress={() => router.navigate(COMMUNITY_ROUTES.jornada)}
@@ -152,6 +154,31 @@ function FeedHeader({ canWrite, onWrite, day }: { canWrite: boolean; onWrite: ()
         </Pressable>
       ) : null}
       <Rule />
+    </View>
+  );
+}
+
+/** Selo discreto da demonstração (demoApi.ts): nada sai do aparelho. */
+function DemoBadge() {
+  const { colors } = useTheme();
+  return (
+    <View style={{ paddingHorizontal: FEED_GUTTER, paddingBottom: spacing.xs, flexDirection: 'row' }}>
+      <View
+        testID="feed-demo-badge"
+        accessible
+        accessibilityLabel="Demonstração. Nada é enviado."
+        style={{
+          borderWidth: 1,
+          borderColor: colors.controlBorder,
+          borderRadius: 999,
+          paddingVertical: spacing.xs,
+          paddingHorizontal: spacing.md,
+        }}
+      >
+        <AppText variant="caption" style={{ color: colors.textSecondary }}>
+          {DEMO_BADGE}
+        </AppText>
+      </View>
     </View>
   );
 }

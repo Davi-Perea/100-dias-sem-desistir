@@ -4,6 +4,7 @@ import * as Crypto from 'expo-crypto';
 import { getSupabase } from '@/cloud/client';
 import { COMMUNITY_ENABLED } from '@/config/features';
 
+import { getDemoCommunityApi } from './demoApi';
 import { communityError, toCommunityError } from './errors';
 import { assertPhotoSafeToUpload, isPhotoPath, newPhotoPath, PHOTO_BUCKET, SIGNED_URL_TTL_SECONDS } from './photos';
 import type {
@@ -418,7 +419,11 @@ export function getCommunityApi(
   const enabled = deps.enabled ?? COMMUNITY_ENABLED;
   if (!enabled) return null;
   const supabase = deps.supabase === undefined ? getSupabase() : deps.supabase;
-  if (!supabase) return null;
+  if (!supabase) {
+    // Demonstração em memória: só em build de desenvolvimento, com EXPO_PUBLIC_DEMO_MODE=true
+    // e sem nuvem (ver demoApi.ts). Em release getDemoCommunityApi() é sempre null.
+    return deps.supabase === undefined ? getDemoCommunityApi() : null;
+  }
   return createCommunityApi(communityClientFrom(supabase), {
     randomUUID: deps.randomUUID ?? (() => Crypto.randomUUID()),
   });
