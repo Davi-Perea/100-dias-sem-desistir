@@ -392,11 +392,13 @@ export function IconCircle({ name, size = 56 }: { name: IconName; size?: number 
 export function Avatar({ name, size = 40 }: { name: string; size?: number }) {
   const { colors } = useTheme();
   const face = useFace();
+  // Só palavras que começam com letra: "Maria (exemplo)" vira "M", não "M(".
   const initials = name
     .trim()
     .split(/\s+/)
+    .filter((part) => /^\p{L}/u.test(part))
     .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase() ?? '')
+    .map((part) => part[0].toUpperCase())
     .join('');
   return (
     <View
