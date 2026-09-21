@@ -1,0 +1,9 @@
+# Fim de linha fixo para o conteúdo derivado (DIR-03). O conversor gera LF e o
+# `npm run content:check` compara com o que está no disco; com core.autocrlf=true
+# (padrão do Git para Windows) um clone novo gravaria CRLF e o check acusaria
+# "DESATUALIZADO" sem nada ter mudado.
+content/**/*.json text eol=lf
+content/**/*.md   text eol=lf
+
+# Fontes originais da igreja: cópias byte a byte, nunca converter.
+*.docx binary

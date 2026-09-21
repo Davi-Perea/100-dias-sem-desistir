@@ -6,6 +6,8 @@
  *   node scripts/convert-100-dias.mjs          gera content/100-dias-2026/dataset.json
  *   node scripts/convert-100-dias.mjs --check  falha se o JSON versionado estiver
  *                                              desatualizado em relação às fontes
+ *   ... --require-authorized                   falha se rights_status não for "authorized"
+ *   ... --rights <arquivo>                     lê outro rights.json (só para testes; use com --check)
  *
  * O que este script NÃO faz: não inventa dia, não corrige texto da igreja, não
  * reordena capítulos, não preenche lacunas. Qualquer inconsistência entre o
@@ -13,6 +15,7 @@
  *
  * Sem dependências: o .docx é um ZIP com XML; o leitor de ZIP abaixo usa só zlib.
  */
+import { Buffer } from 'node:buffer';
 import { createHash } from 'node:crypto';
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -25,7 +28,54 @@ const OUTPUT = join(ROOT, 'content', '100-dias-2026', 'dataset.json');
 /** Texto da orientação (propósito, fluxo da reunião), extraído do terceiro .docx. */
 const PROPOSITO_OUTPUT = join(ROOT, 'content', '100-dias-2026', 'proposito.json');
 /** Estado dos direitos, mantido à mão e versionado: é aqui que a autorização da igreja entra. */
-const RIGHTS = join(ROOT, 'content', '100-dias-2026', 'rights.json');
+const RIGHTS_DEFAULT = join(ROOT, 'content', '100-dias-2026', 'rights.json');
+const rightsFlag = process.argv.indexOf('--rights');
+const RIGHTS = rightsFlag > -1 && process.argv[rightsFlag + 1] ? process.argv[rightsFlag + 1] : RIGHTS_DEFAULT;
+
+/**
+ * rights_reference VAI PARA O BUNDLE (provenance do dataset.json, importado inteiro
+ * pelo app). Por isso é só um identificador neutro, como "autorizacao-2026-09-25":
+ * minúsculas ASCII, dígitos, ponto, hífen ou sublinhado, sem espaço (DIR-02).
+ * Quem autorizou, quando e por qual canal fica registrado FORA do bundle, em
+ * content/source/README.md (seção "Autorizações").
+ */
+const NEUTRAL_REFERENCE = /^[a-z0-9][a-z0-9._-]{2,79}$/;
+/** Tratamentos que denunciam nome de pessoa mesmo sem o nome (Pr., Pra., Prs., pastor...). */
+const PERSON_TITLES = /(^|[._-])(prs?|pra|pastor|pastora|pastores|ap|apostolo|apostola|bispo|bispa|dr|dra|sr|sra)([._-]|$)/;
+const LEADER_STOPWORDS = new Set(['e', 'de', 'da', 'do', 'das', 'dos', 'pr', 'pra', 'prs', 'pastor', 'pastora', 'lider', 'lideres']);
+
+function ascii(text) {
+  return text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+}
+
+/**
+ * Recusa rights_reference que não seja identificador neutro ou que contenha
+ * qualquer palavra dos nomes da escala. Recebe a escala já lida.
+ */
+function checkRightsReference(reference, schedule) {
+  if (reference === null) return;
+  if (typeof reference !== 'string' || !NEUTRAL_REFERENCE.test(reference)) {
+    throw new Error(
+      'rights.json: rights_reference vai para o app e precisa ser um identificador neutro, ' +
+        'ex.: "autorizacao-2026-09-25" (minúsculas, dígitos, ".", "-" ou "_", sem espaço). ' +
+        'Quem autorizou, quando e por qual canal fica em content/source/README.md, seção "Autorizações".',
+    );
+  }
+  if (PERSON_TITLES.test(reference)) {
+    throw new Error('rights.json: rights_reference não pode trazer tratamento de pessoa (pr, pra, pastor...): ele vai para o app.');
+  }
+  const parts = new Set(reference.split(/[._-]/));
+  const names = new Set();
+  for (const row of schedule) {
+    for (const word of ascii(row.leaders || '').split(/[^a-z]+/)) {
+      if (word.length >= 3 && !LEADER_STOPWORDS.has(word)) names.add(word);
+    }
+  }
+  const hit = [...parts].find((part) => names.has(part));
+  if (hit) {
+    throw new Error('rights.json: rights_reference contém um nome que aparece na escala; nome de pessoa não vai para o app.');
+  }
+}
 
 function readRights() {
   if (!existsSync(RIGHTS)) throw new Error(`Arquivo de direitos ausente: ${RIGHTS}`);
@@ -35,7 +85,7 @@ function readRights() {
     throw new Error(`rights.json: rights_status inválido "${rights.rights_status}" (use ${allowed.join(' | ')}).`);
   }
   if (rights.rights_status === 'authorized' && !rights.rights_reference) {
-    throw new Error('rights.json: "authorized" exige rights_reference (quem autorizou, quando, por qual canal).');
+    throw new Error('rights.json: "authorized" exige rights_reference (identificador neutro da autorização, ex.: "autorizacao-2026-09-25").');
   }
   if (rights.leader_names_authorized === true && rights.rights_status !== 'authorized') {
     throw new Error('rights.json: nomes de líderes só podem ser liberados com rights_status "authorized".');
@@ -420,6 +470,7 @@ function build() {
   const guide = parseGuide(guideSource);
   const schedule = parseSchedule(scheduleSource);
   const proposito = parseOrientation(orientationSource);
+  checkRightsReference(rights.rights_reference, schedule);
 
   const problems = [];
   if (guide.days.length !== 100) problems.push(`Guia com ${guide.days.length} dias (esperado 100).`);
@@ -560,7 +611,10 @@ try {
   ];
   if (check) {
     for (const [path, expected] of outputs) {
-      const current = existsSync(path) ? readFileSync(path, 'utf8') : null;
+      // CRLF -> LF antes de comparar (DIR-03): num clone com core.autocrlf=true e sem
+      // .gitattributes o checkout grava CRLF, e o conteúdo idêntico dava "DESATUALIZADO".
+      // O mobile/.gitattributes fixa eol=lf; isto só impede o falso alarme se ele faltar.
+      const current = existsSync(path) ? readFileSync(path, 'utf8').replace(/\r\n/g, '\n') : null;
       if (current !== expected) {
         console.error(`DESATUALIZADO: ${path} não corresponde às fontes. Rode: node scripts/convert-100-dias.mjs`);
         process.exit(1);
@@ -574,7 +628,8 @@ try {
     }
   }
   if (requireAuthorized && summary.rightsStatus !== 'authorized') {
-    // Para rodar antes de qualquer build de loja: sem autorização escrita, sem build.
+    // Portão manual/CI. O build de loja também é barrado em app.config.ts (variante
+    // production recusa gerar config sem "authorized"); veja content/source/README.md.
     console.error(`BLOQUEADO: rights_status é "${summary.rightsStatus}"; build de loja exige "authorized" (content/100-dias-2026/rights.json).`);
     process.exit(1);
   }
