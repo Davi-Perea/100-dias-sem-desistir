@@ -180,8 +180,8 @@ describe('tela Meu ministério', () => {
   });
 });
 
-describe('Você: comunidade e aviso do altar', () => {
-  test('"Meu ministério" e "Altar de hoje" substituem "Meu grupo"', async () => {
+describe('Você: comunidade e ministério', () => {
+  test('sem servidor não há "Meu grupo"; "Meu ministério" continua', async () => {
     await seedSettings();
     await render(<YouScreen />);
     await waitFor(() => expect(screen.getByTestId('row-ministry')).toBeTruthy());
@@ -192,72 +192,26 @@ describe('Você: comunidade e aviso do altar', () => {
     expect(mockRouter.push).toHaveBeenCalledWith('/ministerio');
 
     // O altar de hoje vem já filtrado: ministério sim, nome de pessoa não.
+    // (A linha "Altar de hoje" saiu do Você em 2026-09-21; o dado continua sem nome.)
     const today = altarOfDay(17);
     expect(today?.ministry).toBeTruthy();
     expect(today?.leaders_label).toBeNull();
-    expect(screen.getByText(today?.ministry as string)).toBeTruthy();
     // Sem autorização, o nome nem existe no dado: a defesa é na origem, não na tela.
     expect(getDay(17)?.altar?.leaders_label).toBeNull();
     expect(screen.queryByText(/Prs?\.|Pra\./)).toBeNull();
-    await fireEvent.press(screen.getByTestId('row-altar-today'));
-    expect(mockRouter.push).toHaveBeenCalledWith('/(tabs)/juntos');
   });
 
   test('a linha mostra o ministério escolhido', async () => {
     await seedSettings({ ministry: 'Kids' });
     await render(<YouScreen />);
     await waitFor(() => expect(screen.getByTestId('row-ministry')).toBeTruthy());
-    expect(screen.getByText('Kids')).toBeTruthy();
+    expect(screen.getByTestId('row-ministry').props.accessibilityLabel).toBe('Meu ministério, Kids');
+    // A identidade saiu do Você: o ministério aparece só como valor da linha.
+    expect(screen.getAllByText('Kids')).toHaveLength(1);
     expect(screen.queryByText('Escolher')).toBeNull();
   });
 
-  test('o aviso do altar liga, agenda a janela e desliga', async () => {
-    await seedSettings();
-    await render(<YouScreen />);
-    await waitFor(() => expect(screen.getByTestId('altar-reminder-toggle')).toBeTruthy());
-    expect(screen.getByTestId('altar-reminder-toggle').props.accessibilityState.checked).toBe(false);
-    expect(screen.getByText('Um aviso local por dia com quem conduz o altar. Só neste aparelho.')).toBeTruthy();
-
-    await fireEvent.press(screen.getByTestId('altar-reminder-toggle'));
-    await waitFor(async () => expect((await loadSettings()).altarReminder).toBe(true));
-    await waitFor(() =>
-      // Marcar a caixa é o gesto: é o único momento em que o diálogo pode abrir.
-      expect(reminders.syncAltarReminders).toHaveBeenCalledWith(
-        true,
-        expect.objectContaining({ id: CAMPAIGN }),
-        expect.any(Date),
-        { requestPermission: true },
-      ),
-    );
-    await waitFor(() =>
-      expect(screen.getByTestId('altar-reminder-toggle').props.accessibilityState.checked).toBe(true),
-    );
-    expect(screen.queryByTestId('altar-reminder-notice')).toBeNull();
-
-    // Desligar só grava a preferência; o hook do layout cancela os agendamentos.
-    reminders.syncAltarReminders.mockClear();
-    await fireEvent.press(screen.getByTestId('altar-reminder-toggle'));
-    await waitFor(async () => expect((await loadSettings()).altarReminder).toBe(false));
-    await waitFor(() =>
-      expect(screen.getByTestId('altar-reminder-toggle').props.accessibilityState.checked).toBe(false),
-    );
-    expect(reminders.syncAltarReminders).not.toHaveBeenCalled();
-  });
-
-  test('sem permissão (ou na web) o motivo aparece como aviso e a caixa volta a desligada', async () => {
-    reminders.syncAltarReminders.mockResolvedValueOnce({
-      ok: false,
-      reason: 'Notificações locais não são suportadas na web.',
-    });
-    await seedSettings();
-    await render(<YouScreen />);
-    await waitFor(() => expect(screen.getByTestId('altar-reminder-toggle')).toBeTruthy());
-
-    await fireEvent.press(screen.getByTestId('altar-reminder-toggle'));
-
-    await waitFor(() => expect(screen.getByTestId('altar-reminder-notice')).toBeTruthy());
-    expect(screen.getByText('Notificações locais não são suportadas na web.')).toBeTruthy();
-    expect((await loadSettings()).altarReminder).toBe(false);
-    expect(screen.getByTestId('altar-reminder-toggle').props.accessibilityState.checked).toBe(false);
-  });
+  // O aviso do altar mudou do Você para a tela de Lembretes (2026-09-21):
+  // ligar/desligar e a recusa de permissão estão em voce-simples.test.tsx,
+  // e a legenda D-5 em voce-correcoes.test.tsx.
 });

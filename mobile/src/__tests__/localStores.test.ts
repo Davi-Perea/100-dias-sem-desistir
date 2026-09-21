@@ -16,12 +16,13 @@ import {
   completedCount,
   completedDayNumbers,
   COMPLETIONS_PREFIX,
-  daysSinceLastCompletion,
   isDayCompleted,
   loadCompletions,
   pendingDaysUpTo,
   setDayCompleted,
 } from '@/progress/completionsStore';
+import { daysSinceLastCompletion } from '@/journey/returnGap';
+import type { Campaign } from '@/journey/types';
 import {
   _resetReflectionsCacheForTests,
   deleteReflection,
@@ -68,11 +69,12 @@ describe('progresso local', () => {
     expect(pendingDaysUpTo(completions, 17)).toEqual(Array.from({ length: 16 }, (_, i) => i + 1));
   });
 
-  test('retomada após intervalo é medida em dias, sem punição', async () => {
-    await setDayCompleted(CAMPAIGN, 12, true);
-    const completions = await loadCompletions(CAMPAIGN);
-    expect(daysSinceLastCompletion(completions, 17)).toBe(5);
-    expect(daysSinceLastCompletion(null, 17)).toBeNull();
+  test('retomada após intervalo é medida em dias desde QUANDO concluiu, sem punição (DIA-02)', async () => {
+    const campaign = { start_date: '2026-09-23', utc_offset_minutes: -180 } as Campaign;
+    // Dia 12 concluído no dia 12 da campanha (04/10, meio-dia em São Paulo).
+    const completions = { days: { 12: '2026-10-04T15:00:00.000Z' }, updatedAt: '' };
+    expect(daysSinceLastCompletion(completions, 17, campaign)).toBe(5);
+    expect(daysSinceLastCompletion(null, 17, campaign)).toBeNull();
   });
 
   test('dados corrompidos no disco não quebram o app', async () => {
@@ -162,8 +164,7 @@ describe('garantia de privacidade local', () => {
   test('o registro de jejum diário nunca é enviado a analytics', () => {
     const source = read('analytics/analytics.ts');
     expect(source).not.toMatch(/fasting_(kept|completed|logged)/);
-    // O único uso permitido é o booleano de opt-in no fim do onboarding.
-    const fastingMentions = source.match(/fasting/g) ?? [];
-    expect(fastingMentions).toHaveLength(1);
+    // PER-06: nem o booleano de adesão ao jejum no fim do onboarding vai mais para os eventos.
+    expect(source).not.toMatch(/fasting/);
   });
 });

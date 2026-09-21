@@ -2,25 +2,34 @@ import { Text, View } from 'react-native';
 
 import { SPHERE_LABEL, type Sphere } from '@/journey/spheres';
 
-import { BRAND_YELLOW, fonts, radius, useTheme } from './theme';
+import { useFace } from './components';
+import { BRAND_YELLOW, faces, radius, useTheme } from './theme';
 
 /**
- * Pílula do monte do dia ("GOVERNO"). Contornada em tinta sobre superfície clara;
- * nas telas invertidas (marco, Dia 100) a tinta acompanha o fundo.
+ * Pílula do monte do dia ("GOVERNO"), TELAS A1: piso 30, raio 999, fundo
+ * `markSurface`, calha lateral 14, rótulo Schibsted 700 11/14 com tracking +1,4
+ * em caixa alta, na cor `onMark`. É o "marcado" da marca: inverte no tema escuro.
  *
- * Amarelo nunca vira texto: a variante `yellow` só preenche o fundo.
+ * Piso, não altura: "ARTES E ENTRETENIMENTO" quebra em duas linhas em telas
+ * estreitas, e com altura travada a borda cortava o rótulo no meio. O rótulo é
+ * conteúdo da igreja, então não tem teto de escala.
+ *
+ * Nas superfícies fixas o tema não vale: sobre tinta a pílula é amarela com
+ * tinta; sobre amarelo, tinta com amarelo.
  */
 export function SpherePill({
   sphere,
-  tone = 'ink',
+  tone = 'theme',
   testID,
 }: {
   sphere: Sphere;
-  tone?: 'ink' | 'onInk' | 'yellow';
+  tone?: 'theme' | 'onInk' | 'yellow' | 'ink';
   testID?: string;
 }) {
   const { colors } = useTheme();
-  const ink = tone === 'onInk' ? '#FFFFFF' : tone === 'yellow' ? '#111111' : colors.text;
+  const face = useFace();
+  const fill = tone === 'onInk' ? BRAND_YELLOW : tone === 'yellow' ? '#111111' : colors.markSurface;
+  const ink = tone === 'onInk' ? '#111111' : tone === 'yellow' ? BRAND_YELLOW : colors.onMark;
   return (
     <View
       accessible
@@ -28,25 +37,21 @@ export function SpherePill({
       testID={testID}
       style={{
         alignSelf: 'flex-start',
-        // Piso, não altura: "ARTES E ENTRETENIMENTO" quebra em duas linhas em
-        // telas estreitas e a borda cortava o rótulo no meio. O raio é 999, então
-        // a pílula continua pílula em qualquer altura.
-        minHeight: 28,
-        paddingVertical: 4,
-        paddingHorizontal: 12,
+        minHeight: 30,
+        paddingVertical: 8,
+        paddingHorizontal: 14,
         borderRadius: radius.pill,
-        borderWidth: tone === 'yellow' ? 0 : 1.5,
-        borderColor: ink,
-        backgroundColor: tone === 'yellow' ? BRAND_YELLOW : 'transparent',
+        backgroundColor: fill,
         alignItems: 'center',
         justifyContent: 'center',
       }}
     >
       <Text
         style={{
-          fontFamily: fonts.label,
+          fontFamily: face(faces.sg700),
           fontSize: 11,
-          letterSpacing: 1.54,
+          lineHeight: 14,
+          letterSpacing: 1.4,
           textTransform: 'uppercase',
           color: ink,
         }}

@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
-import { BackHandler } from 'react-native';
+import { AccessibilityInfo, BackHandler } from 'react-native';
 
 import IntercessionScreen from '@/app/intercessao/[day]';
 import { formatReference } from '@/bible/references';
@@ -16,7 +16,7 @@ import { _resetSettingsCacheForTests, SETTINGS_KEY } from '@/settings/settingsSt
 let mockDay = '17';
 
 jest.mock('expo-router', () => ({
-  router: { push: jest.fn(), replace: jest.fn(), back: jest.fn(), canGoBack: () => true },
+  router: { push: jest.fn(), replace: jest.fn(), back: jest.fn(), canGoBack: jest.fn(() => true) },
   useLocalSearchParams: () => ({ day: mockDay }),
   useSegments: () => [],
   useFocusEffect: () => {},
@@ -39,6 +39,7 @@ const mockRouter = jest.requireMock('expo-router').router as {
   push: jest.Mock;
   replace: jest.Mock;
   back: jest.Mock;
+  canGoBack: jest.Mock;
 };
 const mockKeepAwake = jest.requireMock('expo-keep-awake').useKeepAwake as jest.Mock;
 
@@ -76,7 +77,7 @@ async function enterAltarMode() {
 const STEPS = flowSteps();
 /** Dia 17 nas fixtures: monte "Educação", versículo PRO 3:5, ministério de exemplo 2. */
 const DAY17_VERSE = formatReference('PRO 3:5');
-const DAY17_CAPTION = 'Altar das 12h30 · conduz: Ministério de exemplo 2';
+const DAY17_CAPTION = 'Altar das 12h30 · hoje conduz: Ministério de exemplo 2';
 
 beforeEach(async () => {
   await AsyncStorage.clear();
@@ -84,6 +85,8 @@ beforeEach(async () => {
   mockRouter.push.mockClear();
   mockRouter.replace.mockClear();
   mockRouter.back.mockClear();
+  mockRouter.canGoBack.mockReset();
+  mockRouter.canGoBack.mockReturnValue(true);
   mockKeepAwake.mockClear();
   mockDay = '17';
   resetToDevFixtures(new Date());
@@ -102,7 +105,12 @@ describe('Intercessão do dia', () => {
     const day = getDay(17);
     if (!day?.title) throw new Error('fixture do dia 17 sem título');
 
-    expect(screen.getByText(`Intercessão do dia · Dia 17 · ${formatDayDate(17, getCampaign())}`)).toBeTruthy();
+    const date = formatDayDate(17, getCampaign());
+    expect(screen.getByText(`Intercessão do dia · ${date}`)).toBeTruthy();
+    // O leitor de tela não ouve o "·" (REGRAS 32).
+    expect(screen.getByLabelText(`Intercessão do dia, ${date}`)).toBeTruthy();
+    // Voltar leva o número do dia (TELAS E1: "‹ Dia 17").
+    expect(screen.getByLabelText('Voltar para Dia 17')).toBeTruthy();
     expect(screen.getByTestId('content-banner')).toBeTruthy();
     expect(screen.getByLabelText('Monte do dia: Educação')).toBeTruthy();
     expect(screen.getAllByText(day.title).length).toBeGreaterThanOrEqual(1);
@@ -142,12 +150,17 @@ describe('Intercessão do dia', () => {
     await enterAltarMode();
     expect(mockKeepAwake).toHaveBeenCalled();
     expect(screen.getByText(STEPS[0].title)).toBeTruthy();
-    expect(screen.getByLabelText(`Passo 1 de 5: ${STEPS[0].title}`)).toBeTruthy();
     // Só o passo corrente está na tela; o modo normal saiu.
     expect(screen.queryByText(STEPS[1].title)).toBeNull();
     expect(screen.queryByTestId('flow-step-1')).toBeNull();
     expect(screen.queryByTestId('enter-altar-mode')).toBeNull();
-    expect(screen.getByText('Próximo passo')).toBeTruthy();
+    // Rótulo visível "Passo 2", e o nome acessível contém o texto visível (WCAG 2.5.3).
+    expect(screen.getByText('Passo 2')).toBeTruthy();
+    expect(screen.getByTestId('altar-next').props.accessibilityLabel).toBe('Passo 2');
+    // Passo 1 não tem passo anterior: o "‹" fica montado e inativo (R3-2).
+    expect(screen.getByTestId('altar-previous').props.accessibilityState).toMatchObject({ disabled: true });
+    // O aviso de conteúdo (C-07) continua durante o modo altar.
+    expect(screen.getByTestId('content-banner')).toBeTruthy();
 
     fireEvent.press(screen.getByTestId('altar-next'));
     await waitFor(() => expect(screen.getByText('Passo 2 de 5')).toBeTruthy());
@@ -169,7 +182,7 @@ describe('Intercessão do dia', () => {
     fireEvent.press(screen.getByTestId('altar-next'));
     await waitFor(() => expect(screen.getByText('Passo 5 de 5')).toBeTruthy());
     expect(screen.getByText('Concluir')).toBeTruthy();
-    expect(screen.queryByText('Próximo passo')).toBeNull();
+    expect(screen.getByTestId('altar-next').props.accessibilityLabel).toBe('Concluir');
 
     fireEvent.press(screen.getByTestId('altar-next'));
     await waitFor(() => expect(screen.getByTestId('enter-altar-mode')).toBeTruthy());
@@ -194,6 +207,57 @@ describe('Intercessão do dia', () => {
     // Entrar de novo recomeça do passo 1.
     await enterAltarMode();
     expect(screen.getByText(STEPS[0].title)).toBeTruthy();
+  });
+
+  test('modo altar: cada passo é dito UMA vez, por um mecanismo só', async () => {
+    const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility').mockImplementation(() => {});
+    const focus = jest.spyOn(AccessibilityInfo, 'sendAccessibilityEvent').mockImplementation(() => {});
+    // O jest-expo já entrega um jest.fn aqui: zera o que outros testes chamaram.
+    announce.mockClear();
+    focus.mockClear();
+    try {
+      await renderToday();
+      expect(announce).not.toHaveBeenCalled();
+      await enterAltarMode();
+      // Entrada: o foco vai para o título do passo 1 (que diz "Passo 1 de 5: …"),
+      // sem anúncio somado.
+      await waitFor(() => expect(focus).toHaveBeenCalledTimes(1));
+      expect(announce).not.toHaveBeenCalled();
+      expect(focus.mock.calls[0][1]).toBe('focus');
+      expect(screen.getByTestId('altar-step-heading').props.accessibilityLabel).toBe(`Passo 1 de 5: ${STEPS[0].title}`);
+
+      // Troca: o foco fica no rodapé e o passo novo é anunciado uma vez.
+      fireEvent.press(screen.getByTestId('altar-next'));
+      await waitFor(() => expect(screen.getByText('Passo 2 de 5')).toBeTruthy());
+      expect(announce).toHaveBeenCalledTimes(1);
+      expect(announce).toHaveBeenLastCalledWith(`Passo 2 de 5: ${STEPS[1].title}`);
+      expect(focus).toHaveBeenCalledTimes(1);
+    } finally {
+      announce.mockRestore();
+      focus.mockRestore();
+    }
+  });
+
+  test('modo altar: "‹" volta um passo e tem nome acessível', async () => {
+    await renderToday();
+    await enterAltarMode();
+    fireEvent.press(screen.getByTestId('altar-next'));
+    await waitFor(() => expect(screen.getByText('Passo 2 de 5')).toBeTruthy());
+
+    expect(screen.getByLabelText('Passo anterior')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('altar-previous'));
+    await waitFor(() => expect(screen.getByText('Passo 1 de 5')).toBeTruthy());
+    expect(screen.getByText(STEPS[0].title)).toBeTruthy();
+  });
+
+  test('dia passado não diz "hoje conduz", diz "conduziu"', async () => {
+    mockDay = '10';
+    await render(<IntercessionScreen />);
+    await waitFor(() => expect(screen.getByTestId('flow-step-1')).toBeTruthy());
+    const caption = screen.getByTestId('altar-caption');
+    expect(caption.props.children).toMatch(/^Altar das 12h30 · conduziu: /);
+    expect(screen.queryByText(/hoje conduz/)).toBeNull();
+    expect(screen.getByLabelText('Voltar para Dia 10')).toBeTruthy();
   });
 
   test('o botão de voltar do Android sai do modo altar, não da tela', async () => {
@@ -222,13 +286,8 @@ describe('Intercessão do dia', () => {
     }
   });
 
-  test('dia futuro mostra o cadeado e nenhum conteúdo do dia', async () => {
-    mockDay = '40';
-    await render(<IntercessionScreen />);
-    await waitFor(() => expect(screen.getByText('Dia 40')).toBeTruthy());
-
-    expect(screen.getByText(`Abre em ${formatDayDate(40, getCampaign())}.`)).toBeTruthy();
-    expect(screen.getByText('Voltar')).toBeTruthy();
+  /** Nada do dia 40 pode aparecer: nem passos, nem ênfase, nem motivos, nem escala. */
+  function expectNothingOfDay40() {
     expect(screen.queryByTestId('enter-altar-mode')).toBeNull();
     for (const step of STEPS) {
       expect(screen.queryByTestId(`flow-step-${step.step}`)).toBeNull();
@@ -239,6 +298,35 @@ describe('Intercessão do dia', () => {
     expect(screen.queryByText(day40.title)).toBeNull();
     expect(screen.queryByText(/Motivo de exemplo .* do dia 40/)).toBeNull();
     expect(screen.queryByTestId('altar-caption')).toBeNull();
+    expect(screen.queryByLabelText(/Monte do dia/)).toBeNull();
+  }
+
+  test('dia futuro abre a folha do cadeado (A4) e nenhum conteúdo do dia', async () => {
+    mockDay = '40';
+    await render(<IntercessionScreen />);
+    const date = formatDayDate(40, getCampaign());
+    await waitFor(() => expect(screen.getByTestId('locked-day-sheet')).toBeTruthy());
+
+    expect(screen.getByText(`Abre em ${date}.`)).toBeTruthy();
+    expect(screen.getByLabelText(`Dia 40 abre em ${date}.`)).toBeTruthy();
+    // A segunda frase ("Nada foi perdido…") é do LockSheet (R3-12, outro grupo).
+    expect(screen.getByText(/^A intercessão de cada dia abre no dia oficial da igreja\./)).toBeTruthy();
+    expectNothingOfDay40();
+
+    fireEvent.press(screen.getByTestId('locked-day-back'));
+    expect(mockRouter.back).toHaveBeenCalled();
+  });
+
+  test('dia futuro aberto a frio (deep link, sem pilha) vira tela e leva para a casa', async () => {
+    mockDay = '40';
+    mockRouter.canGoBack.mockReturnValue(false);
+    await render(<IntercessionScreen />);
+    await waitFor(() => expect(screen.getByTestId('locked-day-screen')).toBeTruthy());
+    expectNothingOfDay40();
+
+    fireEvent.press(screen.getByTestId('locked-day-home'));
+    expect(mockRouter.replace).toHaveBeenCalledWith('/');
+    expect(mockRouter.back).not.toHaveBeenCalled();
   });
 
   test('dia inválido não quebra a tela', async () => {

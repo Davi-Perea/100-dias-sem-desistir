@@ -1,33 +1,40 @@
 import { View } from 'react-native';
-import Svg, { Circle, G, Line, Rect } from 'react-native-svg';
+import Svg, { Circle, G, Line } from 'react-native-svg';
 
 import { BRAND_YELLOW, useRulerWidth, useTheme } from './theme';
 
 /**
- * A régua dos 100 dias — assinatura do produto, gerada por código.
+ * A régua dos cem dias — assinatura do produto, gerada por código.
  *
- * Geometria do handoff, preservada exatamente:
- *   viewBox `0 0 W 40` · `x(i) = 3 + (i-1) * ((W-6)/99)`
+ * Geometria do TOKENS §5: viewBox `0 0 W 36`, `x(i) = 3 + (i-1) * ((W-6)/99)`.
+ * Traço lido 2,2px em amarelo, altura 16; futuro 1,6px em `borderStrong`, altura
+ * 10; hoje 3px em tinta, altura cheia, raio 2.
  *
- * A informação está na FORMA de cada traço, não só na cor: hoje é o traço mais
- * alto de todos, em aberto ganha um círculo no topo, futuro é curto e baixo.
- * Isso é o que faz a régua sobreviver a daltonismo e a fundo amarelo.
+ * O amarelo mede ~1,4:1 contra a trilha. Isso só é aceitável porque ele nunca
+ * carrega o dado sozinho: a altura e a forma de cada traço diferenciam, e há
+ * sempre rótulo em texto ao lado. Se em algum lugar o amarelo virar o único
+ * sinal, deixa de ser aceitável.
  */
 export type RulerVariant =
-  /** Início e estados: faixa amarela + tinta. */
+  /** Jornada, Você, encerrada: amarelo para o lido, tinta para hoje. */
   | 'default'
-  /** Antes da campanha: tudo cinza, sem faixa. */
+  /**
+   * Depois do dia 100 (E5, D1 encerrado): sem traço de hoje, e todo dia não
+   * lido aparece como "em aberto" (a forma do "em aberto" é a pergunta 14).
+   */
+  | 'finished'
+  /** Antes da campanha (A5): nenhum traço amarelo. */
   | 'inactive'
-  /** Marco (fundo amarelo): traços pretos, sem faixa. */
+  /** Marco (E3, fundo amarelo fixo): lido em tinta sobre trilha de 22% de tinta. */
   | 'onYellow'
-  /** Dia 100 (fundo preto): traços amarelos, sem faixa. */
+  /** Chegada (E4, fundo de tinta fixo). */
   | 'onInk';
 
 type Props = {
   totalDays: number;
   /** Dia oficial da campanha; 0 antes do início. */
   officialDay: number;
-  /** Dias já concluídos. */
+  /** Dias realmente lidos pela pessoa — nunca "de 1 até N". */
   completed: ReadonlySet<number> | number[];
   variant?: RulerVariant;
   /** Largura útil; por padrão acompanha a calha da tela. */
@@ -36,7 +43,8 @@ type Props = {
   accessibilityLabel?: string;
 };
 
-const VIEW_H = 40;
+const VIEW_H = 36;
+const MID = VIEW_H / 2;
 
 export function HundredDayRuler({
   totalDays,
@@ -54,11 +62,15 @@ export function HundredDayRuler({
   const step = (W - 6) / (totalDays - 1);
   const x = (i: number) => 3 + (i - 1) * step;
 
-  const inkTick =
-    variant === 'onInk' ? BRAND_YELLOW : variant === 'inactive' ? colors.borderStrong : colors.text;
-  const futureTick = variant === 'onInk' ? 'rgba(255,209,0,0.30)' : colors.borderStrong;
-  const bandVisible = variant === 'default' && officialDay >= 1;
-  const openFill = variant === 'onInk' ? '#111111' : colors.surface;
+  // Superfícies fixas não seguem o tema: as cores delas também não podem seguir.
+  const readTick = variant === 'onYellow' ? '#111111' : BRAND_YELLOW;
+  const futureTick =
+    variant === 'onYellow' ? 'rgba(17,17,17,0.22)' : variant === 'onInk' ? '#3D3A36' : colors.borderStrong;
+  const todayTick = variant === 'onInk' ? '#FFFFFF' : colors.text;
+  // Hoje é dia de calendário da igreja. O marco é contagem pessoal (sem data),
+  // então nas telas de marco e de chegada não existe "hoje" na régua.
+  const showsToday = variant === 'default';
+  const finished = variant === 'finished';
 
   return (
     <View
@@ -66,41 +78,41 @@ export function HundredDayRuler({
       accessibilityRole="image"
       accessibilityLabel={
         accessibilityLabel ??
-        `Régua dos ${totalDays} dias. ${done.size} concluídos, dia oficial ${officialDay}.`
+        (showsToday
+          ? `Régua dos ${totalDays} dias. ${done.size} lidos, dia oficial ${officialDay}.`
+          : `Régua dos ${totalDays} dias. ${done.size} lidos.`)
       }
     >
       <Svg width={W} height={VIEW_H} viewBox={`0 0 ${W} ${VIEW_H}`}>
-        {bandVisible ? (
-          <Rect x={0} y={5} width={Math.min(W, x(officialDay) + 3)} height={30} rx={2} fill={BRAND_YELLOW} />
-        ) : null}
-
         {Array.from({ length: totalDays }, (_, index) => {
           const day = index + 1;
           const cx = x(day);
-          // "Percorrido" é sempre o que a PESSOA leu, nunca o que o calendário
-          // já passou: a tela de marco celebra a contagem dela, e pintar 1..N
-          // como lidos mentiria para quem entrou atrasado. Antes da campanha
-          // nada está percorrido, então tudo cai no traço de futuro.
-          const isDone = variant === 'inactive' ? false : done.has(day);
-          const isToday = variant === 'default' && day === officialDay && !isDone;
-          const isOpen = variant === 'default' && day < officialDay && !isDone;
+          // "Lido" é sempre o que a PESSOA leu. Antes da campanha nada está lido.
+          const isRead = variant === 'inactive' ? false : done.has(day);
+          const isToday = showsToday && day === officialDay && !isRead;
+          const isOpen = !isRead && (finished || (showsToday && day < officialDay));
 
-          if (isDone) {
-            return <Line key={day} x1={cx} y1={11} x2={cx} y2={29} stroke={inkTick} strokeWidth={2} />;
-          }
           if (isToday) {
-            // O traço mais alto da régua: "hoje" se acha sem depender de cor.
-            return <Line key={day} x1={cx} y1={2} x2={cx} y2={38} stroke={inkTick} strokeWidth={3} />;
+            return (
+              <Line key={day} x1={cx} y1={1.5} x2={cx} y2={VIEW_H - 1.5} stroke={todayTick} strokeWidth={3} strokeLinecap="round" />
+            );
+          }
+          if (isRead) {
+            return <Line key={day} x1={cx} y1={MID - 8} x2={cx} y2={MID + 8} stroke={readTick} strokeWidth={2.2} />;
           }
           if (isOpen) {
+            // O TOKENS não define o "em aberto" (pergunta 14 ao designer). Até lá
+            // ele mantém uma forma própria — traço curto com anel no topo — em
+            // azul, a cor do "em aberto" nos nós da jornada. Sem isso ficaria
+            // idêntico ao futuro, e a régua voltaria a depender só de cor.
             return (
               <G key={day}>
-                <Line x1={cx} y1={17} x2={cx} y2={29} stroke={inkTick} strokeWidth={1.6} />
-                <Circle cx={cx} cy={13.4} r={2.6} fill={openFill} stroke={inkTick} strokeWidth={1.4} />
+                <Line x1={cx} y1={MID - 3} x2={cx} y2={MID + 5} stroke={colors.blue} strokeWidth={1.6} />
+                <Circle cx={cx} cy={MID - 6} r={2.4} fill="none" stroke={colors.blue} strokeWidth={1.4} />
               </G>
             );
           }
-          return <Line key={day} x1={cx} y1={15} x2={cx} y2={25} stroke={futureTick} strokeWidth={1.6} />;
+          return <Line key={day} x1={cx} y1={MID - 5} x2={cx} y2={MID + 5} stroke={futureTick} strokeWidth={1.6} />;
         })}
       </Svg>
     </View>

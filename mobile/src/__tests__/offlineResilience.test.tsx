@@ -2,8 +2,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 
-import TodayScreen from '@/app/(tabs)/index';
-import JourneyScreen from '@/app/(tabs)/jornada';
+// A aba Início deixou de existir: a casa (rota '/') é a Jornada, com o painel de hoje dentro.
+import JourneyHome from '@/app/(tabs)/index';
 import { _setSupabaseClientForTests } from '@/cloud/client';
 import { _setCloudConfigForTests } from '@/cloud/config';
 import { loadDataset } from '@/journey/datasetSource';
@@ -18,7 +18,7 @@ import { createFakeSupabase } from '@/testing/fakeSupabase';
 jest.mock('expo-router', () => ({
   router: { push: jest.fn(), replace: jest.fn(), back: jest.fn() },
   useLocalSearchParams: () => ({}),
-  useSegments: () => [],
+  useSegments: () => ['(tabs)'],
   useFocusEffect: () => {},
   Stack: { Screen: () => null },
   Link: ({ children }: { children: unknown }) => children,
@@ -89,9 +89,9 @@ describe('o núcleo local sobrevive à nuvem quebrada', () => {
     return fake;
   }
 
-  test('Hoje continua carregando e concluindo o dia', async () => {
+  test('o painel de hoje continua carregando e concluindo o dia', async () => {
     breakTheCloud();
-    await render(<TodayScreen />);
+    await render(<JourneyHome />);
 
     await waitFor(() => expect(screen.getByLabelText('Dia 17 de 100')).toBeTruthy());
     expect(screen.getByText(/Salmos 2–3/)).toBeTruthy();
@@ -103,13 +103,14 @@ describe('o núcleo local sobrevive à nuvem quebrada', () => {
 
   test('Jornada continua renderizando o caminho', async () => {
     breakTheCloud();
-    await render(<JourneyScreen />);
+    await render(<JourneyHome />);
     await waitFor(() => expect(screen.getByTestId('journey-day-17')).toBeTruthy());
+    expect(screen.getByTestId('journey-day-18')).toBeTruthy();
   });
 
   test('o progresso segue no aparelho, sem nenhuma escrita na nuvem', async () => {
     const fake = breakTheCloud();
-    await render(<TodayScreen />);
+    await render(<JourneyHome />);
     await waitFor(() => expect(screen.getByTestId('complete-day')).toBeTruthy());
     fireEvent.press(screen.getByTestId('complete-day'));
     await waitFor(async () => expect((await loadCompletions(CAMPAIGN)).days[17]).toBeTruthy());
@@ -122,7 +123,7 @@ describe('o núcleo local sobrevive à nuvem quebrada', () => {
   test('sem nuvem configurada o comportamento é idêntico', async () => {
     _setCloudConfigForTests(null);
     _setSupabaseClientForTests(null);
-    await render(<TodayScreen />);
+    await render(<JourneyHome />);
     await waitFor(() => expect(screen.getByLabelText('Dia 17 de 100')).toBeTruthy());
     fireEvent.press(screen.getByTestId('complete-day'));
     await waitFor(() => expect(screen.getByTestId('day-completed')).toBeTruthy());

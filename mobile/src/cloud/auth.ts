@@ -61,8 +61,16 @@ export async function verifyOtp(rawEmail: string, rawToken: string): Promise<Ses
   const supabase = getSupabase();
   if (!supabase) throw cloudError('not_configured');
 
-  const { data, error } = await supabase.auth.verifyOtp({ email, token, type: 'email' });
-  if (error) throw classifyError(error);
+  // try: um erro que não é AuthError (ex.: do armazenamento da sessão) é relançado
+  // pelo SDK; ele também vira mensagem segura em vez de texto cru na tela.
+  let result: Awaited<ReturnType<typeof supabase.auth.verifyOtp>>;
+  try {
+    result = await supabase.auth.verifyOtp({ email, token, type: 'email' });
+  } catch (thrown) {
+    throw classifyError(thrown, 'auth');
+  }
+  const { data, error } = result;
+  if (error) throw classifyError(error, 'auth');
   if (!data.session) throw cloudError('invalid_or_expired_code');
 
   lastRequestAt.delete(email);

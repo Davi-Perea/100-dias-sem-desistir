@@ -7,10 +7,12 @@ import {
   ALTAR_REMINDER_PREFIX,
   ALTAR_TIME,
   altarReminderPlan,
+  campaignDateTimeForDay,
   localDateTimeForDay,
   MINISTRY_EVE_TIME,
   MINISTRY_REMINDER_PREFIX,
   ministryReminderPlan,
+  reminderWindowDays,
   syncAltarReminders,
   syncMinistryReminders,
 } from '@/reminders/reminders';
@@ -23,18 +25,19 @@ jest.mock('expo-notifications', () => ({
   cancelScheduledNotificationAsync: jest.fn(),
   scheduleNotificationAsync: jest.fn(),
   getAllScheduledNotificationsAsync: jest.fn().mockResolvedValue([]),
+  deleteNotificationChannelAsync: jest.fn().mockResolvedValue(undefined),
   AndroidImportance: { DEFAULT: 3 },
+  AndroidNotificationVisibility: { PRIVATE: 2 },
   SchedulableTriggerInputTypes: { DAILY: 'daily', DATE: 'date', TIME_INTERVAL: 'timeInterval' },
 }));
 
 /**
  * Planos de lembrete (funções puras) sobre o dataset REAL dos 100 Dias.
  *
- * "Agora" é sempre construído com `localDateTimeForDay`, nunca com string ISO
- * fixa, para que o teste não dependa do fuso da máquina. Limite conhecido: o
- * plano do altar escolhe o primeiro dia pelo fuso da CAMPANHA (`rawCampaignDay`)
- * e os horários pelo fuso do APARELHO; para horários de manhã os dois coincidem
- * em qualquer máquina entre UTC-16 e UTC+7 (o Brasil inteiro incluído).
+ * "Agora" é sempre construído com `localDateTimeForDay` (véspera) ou
+ * `campaignDateTimeForDay` (altar), nunca com string ISO fixa, para que o teste
+ * não dependa do fuso da máquina. O altar é um instante absoluto em São Paulo
+ * (DIA-03); a véspera usa o relógio do aparelho.
  */
 const campaign = () => getCampaign();
 
@@ -80,9 +83,10 @@ describe('ministryReminderPlan (véspera do dia do meu ministério)', () => {
       expect(item.when.getTime()).toBeGreaterThan(now.getTime());
     }
 
-    expect(plan[0].body).toContain('Kids');
+    // D-5: a tela de bloqueio não mostra o ministério nem o monte.
+    expect(plan[0].body).not.toContain('Kids');
     expect(plan[0].body).toContain('Dia 30');
-    expect(plan[0].body).toContain('Família');
+    expect(plan[0].body).not.toContain('Família');
     expect(plan[1].body).toContain('Dia 80');
   });
 
@@ -103,41 +107,45 @@ describe('ministryReminderPlan (véspera do dia do meu ministério)', () => {
   });
 });
 
-describe('altarReminderPlan (altar de hoje às 12h, janela rolante)', () => {
-  test('no Dia 13 de manhã: começa hoje, 14 dias (13..26), todos às 12:00 local, nenhum no passado', () => {
-    const now = localDateTimeForDay(13, campaign(), { hour: 10, minute: 0 });
+describe('altarReminderPlan (altar de hoje às 12h de São Paulo, janela rolante)', () => {
+  const window = reminderWindowDays();
+
+  test('no Dia 13 de manhã: começa hoje, uma janela inteira, todos às 12:00 de SP, nenhum no passado', () => {
+    const now = campaignDateTimeForDay(13, campaign(), { hour: 10, minute: 0 });
     const plan = altarReminderPlan(campaign(), now);
 
-    expect(plan).toHaveLength(14);
-    expect(plan.map((p) => p.day)).toEqual(Array.from({ length: 14 }, (_, i) => 13 + i));
+    expect(plan).toHaveLength(window);
+    expect(plan.map((p) => p.day)).toEqual(Array.from({ length: window }, (_, i) => 13 + i));
     expect(plan[0].id).toBe(`${ALTAR_REMINDER_PREFIX}13`);
-    expect(plan[0].title).toContain('Dia 13');
-    expect(plan[0].body).toContain('Diaconia');
-    expect(plan[0].body).toContain('Mídia e Comunicação');
+    expect(plan[0].body).toContain('Dia 13');
+    // D-5: nem quem conduz nem a palavra "altar" na tela de bloqueio.
+    expect(plan[0].body).not.toContain('Diaconia');
+    expect(plan[0].body).not.toContain('Mídia e Comunicação');
 
     for (const item of plan) {
       expect(item.id).toBe(`${ALTAR_REMINDER_PREFIX}${item.day}`);
-      expect(item.when.getHours()).toBe(ALTAR_TIME.hour);
-      expect(item.when.getMinutes()).toBe(ALTAR_TIME.minute);
+      // 12h00 em −03:00 = 15h00 UTC, em qualquer fuso da máquina.
+      expect(item.when.getUTCHours()).toBe(ALTAR_TIME.hour + 3);
+      expect(item.when.getUTCMinutes()).toBe(ALTAR_TIME.minute);
       expect(item.when.getTime()).toBeGreaterThan(now.getTime());
-      expect(item.when.getTime()).toBe(localDateTimeForDay(item.day, campaign(), ALTAR_TIME).getTime());
+      expect(item.when.getTime()).toBe(campaignDateTimeForDay(item.day, campaign(), ALTAR_TIME).getTime());
     }
   });
 
   test('no Dia 13 às 12h30 o altar de hoje já passou: o primeiro aviso é o Dia 14', () => {
-    const now = localDateTimeForDay(13, campaign(), { hour: 12, minute: 30 });
+    const now = campaignDateTimeForDay(13, campaign(), { hour: 12, minute: 30 });
     const plan = altarReminderPlan(campaign(), now);
 
     expect(plan[0].id).toBe(`${ALTAR_REMINDER_PREFIX}14`);
     expect(plan.map((p) => p.id)).not.toContain(`${ALTAR_REMINDER_PREFIX}13`);
-    expect(plan.map((p) => p.day)).toEqual(Array.from({ length: 13 }, (_, i) => 14 + i));
+    expect(plan.map((p) => p.day)).toEqual(Array.from({ length: window }, (_, i) => 14 + i));
     for (const item of plan) {
       expect(item.when.getTime()).toBeGreaterThan(now.getTime());
     }
   });
 
   test('perto do fim a janela para no Dia 100: do Dia 95 restam 6 avisos', () => {
-    const now = localDateTimeForDay(95, campaign(), { hour: 8, minute: 0 });
+    const now = campaignDateTimeForDay(95, campaign(), { hour: 8, minute: 0 });
     const plan = altarReminderPlan(campaign(), now);
 
     expect(plan).toHaveLength(6);
@@ -146,7 +154,7 @@ describe('altarReminderPlan (altar de hoje às 12h, janela rolante)', () => {
   });
 
   test('depois do Dia 100 não há mais altar a lembrar', () => {
-    const now = localDateTimeForDay(100, campaign(), { hour: 13, minute: 0 });
+    const now = campaignDateTimeForDay(100, campaign(), { hour: 13, minute: 0 });
     expect(altarReminderPlan(campaign(), now)).toEqual([]);
   });
 });
@@ -155,9 +163,9 @@ describe('nomes de líderes nunca vazam para as notificações', () => {
   test('nenhum corpo de lembrete (altar ou ministério) contém "Prs.", "Pra." ou "Pr."', () => {
     const bodies: string[] = [];
 
-    // Altar: percorre a campanha inteira em janelas de 14 dias a partir do Dia 1.
-    for (let day = 1; day <= 100; day += 14) {
-      const now = localDateTimeForDay(day, campaign(), { hour: 8, minute: 0 });
+    // Altar: percorre a campanha inteira em janelas a partir do Dia 1.
+    for (let day = 1; day <= 100; day += reminderWindowDays()) {
+      const now = campaignDateTimeForDay(day, campaign(), { hour: 8, minute: 0 });
       for (const item of altarReminderPlan(campaign(), now)) bodies.push(item.title, item.body);
     }
     expect(bodies.length).toBeGreaterThanOrEqual(100);
@@ -274,10 +282,14 @@ describe('o hook de sincronização nunca pede permissão', () => {
   // Guarda de regressão por leitura da fonte: o defeito original era exatamente
   // uma chamada de permissão dentro do hook que roda na abertura do app. Um teste
   // de comportamento não pegaria alguém reintroduzindo isso em outro caminho.
-  test('useReminderSync não chama ensureNotificationPermission e passa requestPermission: false', () => {
+  test('useReminderSync não chama ensureNotificationPermission e toda sincronização passa BACKGROUND', () => {
     const source = readFileSync(join(__dirname, '..', 'reminders', 'useReminderSync.ts'), 'utf8');
     expect(source).not.toMatch(/ensureNotificationPermission|requestPermissionsAsync/);
-    expect(source.match(/requestPermission: false/g) ?? []).toHaveLength(2);
+    expect(source).toMatch(/const BACKGROUND: SyncOptions = \{ requestPermission: false \};/);
+    expect(source.match(/requestPermission: false/g) ?? []).toHaveLength(1);
     expect(source).not.toMatch(/requestPermission: true/);
+    // As três famílias (leitura, ministério, altar) passam a opção de fundo.
+    const calls = source.match(/sync(Daily|Ministry|Altar)Reminders?\([^;]*?BACKGROUND\)/gs) ?? [];
+    expect(calls).toHaveLength(3);
   });
 });

@@ -110,24 +110,26 @@ beforeEach(async () => {
 
 /**
  * O dia abre no dia oficial da igreja. A Jornada já não oferece o toque, mas
- * rota é rota: link direto, histórico e deep link chegam na mesma tela, e uma
- * regra que só existe no botão é decoração.
+ * rota é rota: link direto, histórico e deep link chegam no mesmo cadeado (A4),
+ * e uma regra que só existe no botão é decoração.
  */
 describe('leitor de um dia que ainda não abriu', () => {
-  test('mostra a data em que abre, em vez do texto do dia', async () => {
+  test('mostra o cadeado com a data em que abre, em vez do texto do dia', async () => {
     mockDay = String(FUTURE);
     await render(<ReaderScreen />);
 
-    await waitFor(() => expect(screen.getByText(`Dia ${FUTURE}`)).toBeTruthy());
+    await waitFor(() => expect(screen.getByTestId('locked-day-screen')).toBeTruthy());
     expect(screen.getByText(/Abre em/)).toBeTruthy();
-    expect(screen.getByTestId('reader-locked-back')).toBeTruthy();
+    expect(screen.getByLabelText(new RegExp(`Dia ${FUTURE} abre em`))).toBeTruthy();
+    expect(screen.getByTestId('locked-day-home')).toBeTruthy();
     expect(screen.queryByText(labelOf(FUTURE))).toBeNull();
+    expect(screen.queryByTestId('reader-footer')).toBeNull();
   });
 
   test('não pede a passagem ao provedor de texto bíblico', async () => {
     mockDay = String(FUTURE);
     await render(<ReaderScreen />);
-    await waitFor(() => expect(screen.getByText(`Dia ${FUTURE}`)).toBeTruthy());
+    await waitFor(() => expect(screen.getByTestId('locked-day-screen')).toBeTruthy());
 
     // Com uma tradução licenciada, isso seria uma requisição de conteúdo que
     // não deveria existir — e ela aconteceria antes de qualquer tela aparecer.
@@ -137,23 +139,31 @@ describe('leitor de um dia que ainda não abriu', () => {
   test('o dia de hoje continua abrindo e pedindo a passagem', async () => {
     await render(<ReaderScreen />);
     await waitFor(() => expect(mockGetPassage).toHaveBeenCalled());
-    expect(screen.queryByTestId('reader-locked-back')).toBeNull();
+    expect(screen.queryByTestId('locked-day-screen')).toBeNull();
+    expect(screen.getByTestId('reader-footer')).toBeTruthy();
   });
 });
 
+/**
+ * A reflexão também tranca pela rota (REGRAS 7): antes ela abria o editor de um
+ * dia futuro e só escondia a referência. O guarda continua o mesmo — a
+ * referência daquele dia não aparece — e agora nem o editor aparece.
+ */
 describe('reflexão de um dia que ainda não abriu', () => {
   test('não revela a referência da leitura daquele dia', async () => {
     mockDay = String(FUTURE);
     await render(<ReflectionScreen />);
 
-    await waitFor(() => expect(screen.getByTestId('reflection-save')).toBeTruthy());
+    await waitFor(() => expect(screen.getByTestId('locked-day-screen')).toBeTruthy());
     expect(screen.queryByText(labelOf(FUTURE))).toBeNull();
-    expect(screen.getByText(/salva neste aparelho/)).toBeTruthy();
+    expect(screen.queryByTestId('reflection-input')).toBeNull();
+    expect(screen.queryByTestId('reflection-save')).toBeNull();
   });
 
   test('no dia de hoje a referência aparece', async () => {
     await render(<ReflectionScreen />);
     await waitFor(() => expect(screen.getByTestId('reflection-save')).toBeTruthy());
     expect(screen.getByText(labelOf(TODAY))).toBeTruthy();
+    expect(screen.getByText(/salva neste aparelho/)).toBeTruthy();
   });
 });

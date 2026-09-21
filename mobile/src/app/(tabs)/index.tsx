@@ -1,41 +1,50 @@
 import * as Haptics from 'expo-haptics';
-import { router } from 'expo-router';
-import { useEffect, useState } from 'react';
-import { Platform, View } from 'react-native';
+import { router, useFocusEffect } from 'expo-router';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { FlatList, type LayoutChangeEvent, Platform, useWindowDimensions, View } from 'react-native';
 
 import { track } from '@/analytics/analytics';
-import { formatReference } from '@/bible/references';
-import { useCloudSession } from '@/cloud/useSession';
-import { collectiveNotice, getChurchProgress } from '@/community/communityState';
-import { isFastingKept, setFastingKept, useFasting } from '@/fasting/fastingStore';
+import { getDay } from '@/journey/datasetSource';
 import { milestoneForDay } from '@/journey/milestones';
-import { altarOfDay } from '@/journey/ministries';
-import { formatDayDate, rawCampaignDay } from '@/journey/officialDay';
-import { readingSummary, splitHighlight } from '@/journey/readingSummary';
-import { SPHERE_LABEL } from '@/journey/spheres';
-import { useJourney } from '@/journey/useJourney';
-import { completedDayNumbers, isDayCompleted, setDayCompleted } from '@/progress/completionsStore';
-import { getReflection, useReflections } from '@/reflections/reflectionsStore';
-import { updateSettings, useSettings } from '@/settings/settingsStore';
-import { HundredDayRuler } from '@/ui/HundredDayRuler';
-import { AccountButton, BrandHeader } from '@/ui/Lockup';
-import { SpherePill } from '@/ui/SpherePill';
+import { daysForMinistry } from '@/journey/ministries';
 import {
-  AppText,
-  Button,
-  Cap,
-  Checkbox,
-  DevContentBanner,
-  Highlight,
-  OfflineBanner,
-  ProgressBar,
-  Rule,
-  Screen,
-  ScreenScroll,
-  StateView,
-} from '@/ui/components';
-import { Icon } from '@/ui/icons';
-import { fonts, spacing, useTheme } from '@/ui/theme';
+  isStacked,
+  journeyRowHeight,
+  rowKey,
+  type JourneyRow,
+  type RowContext,
+} from '@/journey/journeyRowHeight';
+import { formatDayDate } from '@/journey/officialDay';
+import { readingSummary } from '@/journey/readingSummary';
+import { entryMessage } from '@/journey/returnGap';
+import { SPHERE_LABEL } from '@/journey/spheres';
+import { useOnline } from '@/net/useOnline';
+import { useJourney, type JourneySnapshot } from '@/journey/useJourney';
+import { completedDayNumbers, isDayCompleted, setDayCompleted } from '@/progress/completionsStore';
+import { reflectionCount, useReflections } from '@/reflections/reflectionsStore';
+import { type Settings, updateSettings, useSettings } from '@/settings/settingsStore';
+import { Button, DevContentBanner, OfflineBanner, Screen, ScreenScroll } from '@/ui/components';
+import { BeforeCampaign } from '@/ui/jornada/BeforeCampaign';
+import { CampaignFinished } from '@/ui/jornada/CampaignFinished';
+import { JourneyHeader } from '@/ui/jornada/JourneyHeader';
+import { openingIndex, openingOffset } from '@/ui/jornada/opening';
+import { type EntryDismissal, entryDismissMark, useEntryDismissal } from '@/ui/jornada/entryDismissal';
+import { DayRow, EarlierDaysRow, GapRow, type RailKind, TodayRow, todayNodeOffset } from '@/ui/jornada/JourneyRows';
+import { buildRows, isEarlierGap, RECENT_PAST_DAYS } from '@/ui/jornada/rows';
+import { TodayPanel } from '@/ui/jornada/TodayPanel';
+import { EntryMessageCard } from '@/ui/jornada/WelcomeBack';
+import { LockSheet } from '@/ui/LockSheet';
+import { TodaySkeleton } from '@/ui/Skeleton';
+import { spacing, useGutter, useReducedMotion } from '@/ui/theme';
+
+/**
+ * A1 · Jornada — a casa do app (rota "/").
+ *
+ * Abre onde a igreja está, nunca no dia 1: dias passados em cima, o painel de
+ * hoje, os dias futuros embaixo. Estados da mesma casa: carregando (F3),
+ * mensagem de entrada com os dias em aberto (no lugar da A2), antes da campanha
+ * (A5), encerrada (E5).
+ */
 
 function haptic(style: 'light' | 'success' = 'light') {
   if (Platform.OS === 'web') return;
@@ -43,140 +52,242 @@ function haptic(style: 'light' | 'success' = 'light') {
   else Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
 }
 
-/** "Dia 17" em 84px com "de 100" ao lado, alinhado pela base. */
-function DayHeadline({ day, total, size = 84 }: { day: number; total: number; size?: number }) {
-  const { colors } = useTheme();
-  return (
-    <View
-      style={{ flexDirection: 'row', alignItems: 'baseline', gap: spacing.sm }}
-      accessible
-      accessibilityRole="header"
-      accessibilityLabel={`Dia ${day} de ${total}`}
-    >
-      <AppText
-        variant="displayXl"
-        style={{ fontSize: size, lineHeight: size * 0.95, letterSpacing: size * -0.045 }}
-      >
-        Dia {day}
-      </AppText>
-      <AppText style={{ fontFamily: fonts.item, fontSize: size * 0.24, color: colors.textMuted }}>
-        de {total}
-      </AppText>
-    </View>
-  );
-}
+/**
+ * Respiro do topo da lista, ACIMA do cabeçalho (que agora rola junto). Entra nos
+ * deslocamentos do `getItemLayout`, somado à altura medida do cabeçalho.
+ */
+const LIST_PAD_TOP = spacing.md;
+const EMPTY_MEASURES: Record<string, number> = {};
 
-export default function StartScreen() {
-  const { colors } = useTheme();
+export default function JourneyHome() {
   const journey = useJourney();
   const settings = useSettings();
-  const session = useCloudSession();
-  const fasting = useFasting(journey.campaign.id);
-  const reflections = useReflections(journey.campaign.id);
-  const [busy, setBusy] = useState(false);
+  // Saber se a mensagem de entrada foi dispensada hoje faz parte do carregamento:
+  // a lista calcula a abertura (e as linhas) uma vez só, na montagem.
+  const dismissal = useEntryDismissal(entryDismissMark(journey.campaign.id, journey.officialDay));
 
-  const accountName = (session.session?.user?.email ?? null)?.split('@')[0] ?? null;
-  const church = getChurchProgress();
+  useFocusEffect(
+    useCallback(() => {
+      track({ name: 'journey_viewed' });
+    }, []),
+  );
 
-  // Marco em tela cheia: uma vez por marco alcançado (handoff, telas 10 e 11).
-  const reachedNow = journey.ready ? milestoneForDay(journey.completedCount) : null;
-  const unseenMilestone =
-    reachedNow && settings && !settings.milestonesSeen.includes(reachedNow.day) ? reachedNow.day : null;
-  useEffect(() => {
-    if (unseenMilestone === null) return;
-    router.push({ pathname: '/marco/[day]', params: { day: String(unseenMilestone) } });
-  }, [unseenMilestone]);
-
-  if (!journey.ready || !settings) {
-    return (
-      <Screen>
-        <StateView kind="loading" />
-      </Screen>
-    );
-  }
-
-  const { officialDay, campaign, todayDay, completions, phase } = journey;
-  const total = campaign.total_days;
-
-  // ---------------------------------------------------------------- e1
-  // Antes da campanha nenhum conteúdo é revelado, nem o do Dia 1.
-  // ---------------------------------------------------------------- e1
-  if (phase === 'before_start') {
-    // Contado no fuso da campanha: às 23h em São Paulo ainda é "hoje" para a igreja,
-    // mesmo que o UTC já tenha virado o dia.
-    const daysToStart = Math.max(0, 1 - rawCampaignDay(new Date(), campaign));
+  if (!journey.ready || !settings || !dismissal.loaded) {
     return (
       <Screen>
         <ScreenScroll>
-          <BrandHeader right={<AccountButton name={accountName} />} />
-          <DevContentBanner state={journey.contentState} />
-
-          <View style={{ gap: spacing.sm }} testID="before-start-card">
-            <AppText variant="display" style={{ fontSize: 52, lineHeight: 52 }}>
-              Faltam <Highlight>{daysToStart === 1 ? '1 dia' : `${daysToStart} dias`}</Highlight>
-            </AppText>
-            <AppText variant="secondary">A igreja começa em {formatDayDate(1, campaign)}.</AppText>
-          </View>
-
-          <HundredDayRuler
-            totalDays={total}
-            officialDay={0}
-            completed={[]}
-            variant="inactive"
-            accessibilityLabel={`A jornada de ${total} dias ainda não começou.`}
-          />
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-            <AppText variant="tick">Dia 1 · {formatDayDate(1, campaign)}</AppText>
-            <AppText variant="tick">
-              Dia {total} · {formatDayDate(total, campaign)}
-            </AppText>
-          </View>
-
-          <View style={{ flexDirection: 'row', gap: spacing.md }}>
-            <Button title="Ajustar lembrete" variant="outline" onPress={() => router.push('/lembrete')} style={{ flex: 1 }} />
-            <Button title="Entrar no grupo" variant="outline" onPress={() => router.push('/(tabs)/juntos')} style={{ flex: 1 }} />
-          </View>
+          <TodaySkeleton />
         </ScreenScroll>
       </Screen>
     );
   }
 
-  const done = isDayCompleted(completions, officialDay);
-  const summary = readingSummary(todayDay);
-  const reflection = getReflection(reflections, officialDay);
-  const preferOwnBible = (settings.lastUsedReadingMode ?? settings.readingMode) === 'own_bible';
-  const isFinished = phase === 'finished';
+  if (journey.phase === 'before_start') {
+    // DIA-04: a contagem vem do MESMO relógio que decide a fase (`useJourney`), no
+    // fuso da campanha — nunca "Faltam 0 dias" com o Dia 1 ainda trancado.
+    return (
+      <BeforeCampaign campaign={journey.campaign} daysToStart={journey.daysToStart} contentState={journey.contentState} />
+    );
+  }
+
+  return <JourneyTrail journey={journey} settings={settings} dismissal={dismissal} />;
+}
+
+function JourneyTrail({
+  journey,
+  settings,
+  dismissal,
+}: {
+  journey: JourneySnapshot;
+  settings: Settings;
+  dismissal: EntryDismissal;
+}) {
+  const online = useOnline();
+  const reflections = useReflections(journey.campaign.id);
+  const { fontScale, height: windowHeight } = useWindowDimensions();
+  const gutter = useGutter();
+  const reduced = useReducedMotion();
+  // TELAS: calha 20 nas telas de lista (24 é a das demais); tablet mantém a sua.
+  const inset = gutter === 24 ? 20 : gutter;
+  const listRef = useRef<FlatList<JourneyRow>>(null);
+
+  const [expanded, setExpanded] = useState(false);
+  // A folha do cadeado guarda o dia mesmo fechando: o conteúdo não pode mudar
+  // (nem virar "Dia 0 abre em .") durante a animação de saída do Modal.
+  const [lockSheet, setLockSheet] = useState<{ day: number; open: boolean } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [saveFailed, setSaveFailed] = useState(false);
+  // Medidas antigas não valem para outro tamanho de fonte: o mapa carrega a
+  // escala em que foi medido e é descartado (sem efeito) quando ela muda.
+  const [measuredState, setMeasuredState] = useState<{ scale: number; map: Record<string, number> }>(() => ({
+    scale: fontScale,
+    map: {},
+  }));
+  const measured = measuredState.scale === fontScale ? measuredState.map : EMPTY_MEASURES;
+  const [todayHeight, setTodayHeight] = useState<number | null>(null);
+  const [welcomeHeight, setWelcomeHeight] = useState<number | null>(null);
+  const [headerHeight, setHeaderHeight] = useState<number | null>(null);
+  const [listHeight, setListHeight] = useState<number | null>(null);
+  const [cap, setCap] = useState<{ y: number; height: number } | null>(null);
+
+  const { campaign, officialDay, phase, completions } = journey;
+  const total = campaign.total_days;
+  const running = phase === 'running';
+  const finished = phase === 'finished';
+  /** Até onde o trilho é cheio. Depois da campanha, a trilha inteira ficou para trás. */
+  const edge = finished ? total + 1 : officialDay;
+
+  const ministry = settings.ministry ?? null;
+  const ministryDays = useMemo(() => daysForMinistry(ministry), [ministry]);
+  const ministrySet = useMemo(() => new Set(ministryDays), [ministryDays]);
+  const openSet = useMemo(() => new Set(journey.pendingDays), [journey.pendingDays]);
+
+  const doneToday = isDayCompleted(completions, officialDay);
   const gap = journey.gapDays;
-  const returningAfterGap = !done && gap !== null && gap >= 3;
-  const openCount = journey.pendingDays.length;
-  const theme = todayDay?.theme
-    ? splitHighlight(todayDay.theme, todayDay.theme_highlight)
-    : null;
-  const keyVerse = todayDay?.key_verse_reference ? formatReference(todayDay.key_verse_reference) : null;
-  const prayerPoints = todayDay?.prayer_points ?? [];
-  const sphereLabel = todayDay?.sphere ? SPHERE_LABEL[todayDay.sphere] : null;
-  // Nomes de pessoas já vêm filtrados pela autorização da igreja. Depois da
-  // campanha `officialDay` fica travado no último dia, então a linha mostra o
-  // altar do Dia 100.
-  const altar = altarOfDay(officialDay);
-  const altarLine = altar
-    ? `${isFinished ? `Conduziu no Dia ${total}` : 'Hoje conduz'}: ${altar.ministry}${
-        altar.leaders_label ? ` · ${altar.leaders_label}` : ''
-      }`
-    : null;
+  // Só para a métrica `return_after_gap` (quem decide é o `useJourney`); a tela
+  // não usa mais a acolhida antiga.
+  const returning = journey.welcomeBack;
 
-  const openIntercession = () =>
-    router.push({ pathname: '/intercessao/[day]', params: { day: String(officialDay) } });
+  // Mensagem de entrada: 2+ dias em aberto antes de hoje, até "Ir para hoje"
+  // dispensá-la no dia (ver `entryMessage` e `useEntryDismissal`).
+  const entry = entryMessage({
+    running,
+    officialDay,
+    pendingDays: journey.pendingDays,
+    completedCount: journey.completedCount,
+  });
+  const showEntry = entry !== null && !dismissal.dismissed;
+  /** Dias em aberto escondidos na linha recolhida do topo. */
+  const earlierOpen = journey.pendingDays.filter((d) => d < edge - RECENT_PAST_DAYS).length;
 
-  const complete = async (mode: 'in_app' | 'own_bible' | 'unknown') => {
+  const rows = useMemo(() => {
+    const base = buildRows(edge, total, expanded, ministryDays);
+    if (!showEntry) return base;
+    // A mensagem fica logo acima dos dias passados: acima da linha recolhida,
+    // ou (com a trilha expandida) acima dos três dias mais recentes.
+    let at = base.findIndex(
+      (row) => isEarlierGap(row) || (row.kind === 'day' && row.day >= edge - RECENT_PAST_DAYS),
+    );
+    if (at < 0) at = 0;
+    return [...base.slice(0, at), { kind: 'welcome' } as JourneyRow, ...base.slice(at)];
+  }, [edge, total, expanded, ministryDays, showEntry]);
+
+  const ctx: RowContext = {
+    todayDay: running ? officialDay : null,
+    openDays: openSet,
+    ministryDays: ministrySet,
+    todayHeight,
+    welcomeHeight,
+  };
+  const declared = (row: JourneyRow) => journeyRowHeight(row, ctx, fontScale);
+  /**
+   * O que a lista declara: a medida real quando ela existe (a quebra de linha de
+   * um rótulo em fonte enorme não é previsível), senão a conta de
+   * `journeyRowHeight` — que é também o `minHeight` renderizado.
+   */
+  const lengths = rows.map((row) => measured[rowKey(row)] ?? declared(row));
+  const offsets: number[] = [];
+  // O cabeçalho (com as faixas e, depois da campanha, o E5) rola junto com a
+  // lista: a altura medida dele entra no deslocamento de toda linha.
+  lengths.reduce((acc, length, index) => {
+    offsets[index] = acc;
+    return acc + length;
+  }, LIST_PAD_TOP + (headerHeight ?? 0));
+
+  const todayIndex = rows.findIndex((row) => row.kind === 'day' && row.day === officialDay);
+  const welcomeIndex = rows.findIndex((row) => row.kind === 'welcome');
+
+  // Abertura (ver `openingOffset`): um pouco acima de hoje, com o painel inteiro.
+  const opening = (viewport: number) =>
+    openingOffset({ running, offsets, lengths, todayIndex, welcomeIndex, viewport });
+  // Antes de medir a lista, vale a janela estimada (tela menos barra de abas e margens).
+  // Só a PRIMEIRA conta vale: `initialScrollIndex` é da montagem, e mudá-lo depois
+  // (quando a lista é medida) faria a lista virtual recalcular a janela à toa.
+  const [initialIndex] = useState(() => openingIndex(offsets, opening(listHeight ?? windowHeight * 0.75)));
+
+  // A abertura usa alturas estimadas; quando o painel, o cabeçalho e a própria
+  // lista forem medidos, a lista corrige UMA vez para o deslocamento exato.
+  const corrected = useRef(false);
+  const exactOffset =
+    todayHeight !== null && headerHeight !== null && listHeight !== null ? opening(listHeight) : null;
+  useEffect(() => {
+    if (corrected.current || exactOffset === null) return;
+    corrected.current = true;
+    const id = requestAnimationFrame(() => listRef.current?.scrollToOffset({ offset: exactOffset, animated: false }));
+    return () => cancelAnimationFrame(id);
+  }, [exactOffset]);
+
+  // E5 · "Ver a jornada inteira": primeiro expande (sem reticências), depois rola
+  // até o dia 1 — a rolagem espera a lista nova existir.
+  const scrollToStart = useRef(false);
+  useEffect(() => {
+    if (!scrollToStart.current || !expanded) return;
+    scrollToStart.current = false;
+    const id = requestAnimationFrame(() => listRef.current?.scrollToIndex({ index: 0, animated: !reduced }));
+    return () => cancelAnimationFrame(id);
+  }, [expanded, reduced]);
+  const seeWholeJourney = () => {
+    if (expanded) {
+      listRef.current?.scrollToIndex({ index: 0, animated: !reduced });
+      return;
+    }
+    scrollToStart.current = true;
+    setExpanded(true);
+  };
+
+  // "Ir para hoje" dispensa a mensagem até amanhã e, com as linhas já sem ela,
+  // leva ao painel de hoje (a mesma abertura de quem não tem dias em aberto).
+  const goToday = useRef(false);
+  const todayOpening = showEntry ? null : opening(listHeight ?? windowHeight * 0.75);
+  useEffect(() => {
+    if (!goToday.current || todayOpening === null) return;
+    goToday.current = false;
+    const id = requestAnimationFrame(() =>
+      listRef.current?.scrollToOffset({ offset: todayOpening, animated: !reduced }),
+    );
+    return () => cancelAnimationFrame(id);
+  }, [todayOpening, reduced]);
+  const dismissEntry = () => {
+    goToday.current = true;
+    dismissal.dismiss();
+  };
+
+  const remember = (key: string, expected: number) => (event: LayoutChangeEvent) => {
+    const height = event.nativeEvent.layout.height;
+    if (Math.abs(height - expected) < 0.5) return;
+    setMeasuredState((current) => {
+      const map = current.scale === fontScale ? current.map : EMPTY_MEASURES;
+      return map[key] === height && current.scale === fontScale
+        ? current
+        : { scale: fontScale, map: { ...map, [key]: height } };
+    });
+  };
+
+  /** Guarda uma altura medida só quando ela muda de fato (evita laço de re-render). */
+  const settle =
+    (setter: (update: (current: number | null) => number | null) => void) => (event: LayoutChangeEvent) => {
+      const height = event.nativeEvent.layout.height;
+      setter((current) => (current !== null && Math.abs(current - height) < 0.5 ? current : height));
+    };
+
+  // ------------------------------------------------------------ ações do dia
+  const summary = readingSummary(journey.todayDay);
+  const preferOwnBible = (settings.lastUsedReadingMode ?? settings.readingMode) === 'own_bible';
+
+  /** "Concluir leitura" — o único gesto que conclui o dia no painel (invariante P-09). */
+  const complete = async () => {
     setBusy(true);
+    setSaveFailed(false);
     try {
       await setDayCompleted(campaign.id, officialDay, true);
       const reached = milestoneForDay(journey.completedCount + 1);
       haptic(reached ? 'success' : 'light');
-      track({ name: 'reading_completed', dayNumber: officialDay, mode });
+      track({ name: 'reading_completed', dayNumber: officialDay, mode: preferOwnBible ? 'own_bible' : 'in_app' });
       if (reached) track({ name: 'milestone_reached', dayNumber: reached.day });
-      if (returningAfterGap && gap) track({ name: 'return_after_gap', gapDays: gap });
+      if (returning && gap) track({ name: 'return_after_gap', gapDays: gap });
+    } catch {
+      // PER-02: o store não mudou nada; a pessoa vê que não salvou e tenta de novo.
+      setSaveFailed(true);
     } finally {
       setBusy(false);
     }
@@ -184,258 +295,218 @@ export default function StartScreen() {
 
   const undo = async () => {
     setBusy(true);
+    setSaveFailed(false);
     try {
       await setDayCompleted(campaign.id, officialDay, false);
       haptic('light');
+    } catch {
+      setSaveFailed(true);
     } finally {
       setBusy(false);
     }
   };
 
   const openReader = async () => {
-    await updateSettings((s) => ({ ...s, lastUsedReadingMode: 'in_app' }));
+    // Preferência de conveniência: se a gravação falhar, o leitor abre do mesmo jeito.
+    await updateSettings((s) => ({ ...s, lastUsedReadingMode: 'in_app' })).catch(() => undefined);
     track({ name: 'reading_started', dayNumber: officialDay, mode: 'in_app' });
     router.push({ pathname: '/reader/[day]', params: { day: String(officialDay) } });
   };
 
-  /**
-   * Handoff: escolher a própria Bíblia NÃO conclui o dia. Ela troca a ação
-   * principal do Início para "Concluir leitura", que a pessoa toca quando
-   * terminar de ler. Marcar por ela seria decidir no lugar dela.
-   */
+  /** Escolher a própria Bíblia grava o modo e NÃO conclui o dia (invariante P-09, decisão D-1). */
   const readOwnBible = async () => {
-    await updateSettings((s) => ({ ...s, lastUsedReadingMode: 'own_bible' }));
+    setSaveFailed(false);
+    try {
+      await updateSettings((s) => ({ ...s, lastUsedReadingMode: 'own_bible' }));
+    } catch {
+      // Aqui gravar o modo é o gesto inteiro: se não gravou, a pessoa precisa saber.
+      setSaveFailed(true);
+      return;
+    }
     track({ name: 'reading_started', dayNumber: officialDay, mode: 'own_bible' });
   };
 
-  const statusLine = [
-    `${journey.completedCount} ${journey.completedCount === 1 ? 'concluído' : 'concluídos'}`,
-    openCount > 0 ? `${openCount} em aberto` : null,
-  ]
-    .filter(Boolean)
-    .join(' · ');
+  const openDay = (day: number) => router.push({ pathname: '/dia/[day]', params: { day: String(day) } });
+
+  // ----------------------------------------------------------------- linhas
+  const stacked = isStacked(fontScale);
+  const nodeOffset = cap ? todayNodeOffset(cap.y, cap.height) : undefined;
+
+  const renderRow = ({ item }: { item: JourneyRow }) => {
+    if (item.kind === 'welcome') {
+      if (!entry) return null;
+      return (
+        <EntryMessageCard
+          message={entry}
+          onStart={() => openDay(entry.firstOpen)}
+          onGoToday={dismissEntry}
+          onLayout={settle(setWelcomeHeight)}
+        />
+      );
+    }
+
+    if (item.kind === 'gap' && isEarlierGap(item)) {
+      const minHeight = declared(item);
+      return (
+        <EarlierDaysRow
+          to={item.to}
+          openCount={earlierOpen}
+          minHeight={minHeight}
+          onPress={() => setExpanded(true)}
+          onLayout={remember(rowKey(item), minHeight)}
+        />
+      );
+    }
+
+    if (item.kind === 'gap') {
+      const minHeight = declared(item);
+      return (
+        <GapRow
+          from={item.from}
+          to={item.to}
+          rail={item.to < edge ? 'solid' : 'dotted'}
+          minHeight={minHeight}
+          onPress={() => setExpanded(true)}
+          onLayout={remember(rowKey(item), minHeight)}
+        />
+      );
+    }
+
+    const day = item.day;
+    const top: RailKind = day === 1 ? 'none' : day <= edge ? 'solid' : 'dotted';
+    const bottom: RailKind = day === total ? 'none' : day < edge ? 'solid' : 'dotted';
+
+    if (running && day === officialDay) {
+      return (
+        <TodayRow day={day} top={top} bottom={bottom} nodeOffset={nodeOffset} onLayout={settle(setTodayHeight)}>
+          <TodayPanel
+            day={day}
+            total={total}
+            dayData={journey.todayDay}
+            summary={summary}
+            done={doneToday}
+            preferOwnBible={preferOwnBible}
+            busy={busy}
+            onRead={openReader}
+            onOwnBible={readOwnBible}
+            onComplete={complete}
+            onUndo={undo}
+            onOpenDay={() => openDay(day)}
+            saveFailed={saveFailed}
+            onCapLayout={(event) => {
+              const { y, height } = event.nativeEvent.layout;
+              setCap((current) =>
+                current && Math.abs(current.y - y) < 0.5 && Math.abs(current.height - height) < 0.5
+                  ? current
+                  : { y, height },
+              );
+            }}
+          />
+        </TodayRow>
+      );
+    }
+
+    const state = journey.dayState(day);
+    const kind = state === 'completed' ? 'done' : state === 'pending' ? 'open' : 'future';
+    const unlocked = journey.isDayUnlocked(day);
+    // Dia futuro não revela nada do dia: nem o monte (REGRAS 7).
+    const sphere = kind === 'future' ? null : (getDay(day)?.sphere ?? null);
+    const status = kind === 'done' ? 'Concluído' : kind === 'open' ? 'Em aberto' : 'Em breve';
+    // A escala futura aparece por decisão consciente — ver o PROVISÓRIO de `MinistryNote`.
+    const isMinistryDay = ministrySet.has(day);
+    const minHeight = declared(item);
+    const spoken = [
+      sphere ? `Dia ${day}, ${SPHERE_LABEL[sphere]}.` : `Dia ${day}.`,
+      `${status}.`,
+      isMinistryDay ? 'Seu ministério conduz o altar.' : null,
+    ]
+      .filter(Boolean)
+      .join(' ');
+
+    return (
+      <DayRow
+        day={day}
+        kind={kind}
+        label={sphere ? `Dia ${day} · ${SPHERE_LABEL[sphere]}` : `Dia ${day}`}
+        status={status}
+        top={top}
+        bottom={bottom}
+        minHeight={minHeight}
+        stacked={stacked}
+        ministry={isMinistryDay}
+        accessibilityLabel={spoken}
+        accessibilityHint={unlocked ? 'Abre o dia completo' : 'Este dia ainda não abriu'}
+        onPress={() => (unlocked ? openDay(day) : setLockSheet({ day, open: true }))}
+        onLayout={remember(rowKey(item), minHeight)}
+      />
+    );
+  };
 
   return (
     <Screen>
-      <ScreenScroll gap={spacing.xl}>
-        <BrandHeader right={<AccountButton name={accountName} />} />
-        <DevContentBanner state={journey.contentState} />
-        {session.degraded ? <OfflineBanner /> : null}
-
-        {/* ------------------------------------------------------------- e2 */}
-        {returningAfterGap ? (
-          <View style={{ gap: spacing.xs }} testID="return-module">
-            <AppText variant="blockTitleLg">
-              <Highlight>Que bom ter você</Highlight> de volta.
-            </AppText>
-            <AppText variant="secondary">
-              {openCount === 1
-                ? 'Um dia ficou para trás e continua aberto.'
-                : `${openCount} dias ficaram para trás e continuam abertos.`}{' '}
-              Você pode retomar por onde quiser.
-            </AppText>
-          </View>
-        ) : null}
-
-        {/* --------------------------------------------- cabeça: dia + régua */}
-        <View style={{ gap: spacing.lg }}>
-          <DayHeadline day={officialDay} total={total} />
-          <HundredDayRuler totalDays={total} officialDay={officialDay} completed={completedDayNumbers(completions)} />
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-            <AppText variant="tick">{statusLine}</AppText>
-            <AppText variant="tick" testID={isFinished ? 'after-campaign-card' : 'church-day'}>
-              {isFinished ? `Jornada encerrada · ${total} dias` : `Igreja no Dia ${officialDay}`}
-            </AppText>
-          </View>
-        </View>
-
-        <Rule />
-
-        {/* ------------------------------------------------- tema e leitura */}
-        <View style={{ gap: spacing.md }}>
-          <Cap>{isFinished ? `Tema do dia ${total}` : 'Tema de hoje'}</Cap>
-          {todayDay?.sphere ? <SpherePill sphere={todayDay.sphere} testID="sphere-pill" /> : null}
-          {theme ? (
-            <AppText variant="blockTitle">
-              {theme.before}
-              {theme.match ? <Highlight>{theme.match}</Highlight> : null}
-              {theme.after}
-            </AppText>
-          ) : (
-            <AppText variant="blockTitle">{todayDay?.title ?? `Dia ${officialDay}`}</AppText>
-          )}
-
-          {summary ? (
-            <View style={{ gap: 2 }}>
-              <AppText style={{ fontFamily: fonts.title, fontSize: 22, lineHeight: 27, color: colors.text }}>
-                {summary.label}
-              </AppText>
-              <AppText variant="caption">{summary.detail}</AppText>
-            </View>
-          ) : (
-            <AppText variant="caption">Nenhuma leitura definida para este dia.</AppText>
-          )}
-
-          {keyVerse ? (
-            <View style={{ gap: spacing.xs }}>
-              <Cap>Versículo-base</Cap>
-              <AppText variant="action" testID="key-verse">
-                {keyVerse}
-              </AppText>
-            </View>
-          ) : null}
-
-          {/* Lista simples, não cartão: os motivos são texto da igreja, um por linha. */}
-          {prayerPoints.length > 0 ? (
-            <View style={{ gap: spacing.xs }} accessibilityRole="list" testID="prayer-points">
-              <Cap>Motivos de oração</Cap>
-              {prayerPoints.map((point, index) => (
-                <View
-                  key={`${index}-${point}`}
-                  style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm }}
-                >
-                  <View
-                    aria-hidden
-                    style={{ width: 6, height: 6, borderRadius: 3, marginTop: 7, backgroundColor: colors.text }}
-                  />
-                  <AppText variant="item" style={{ flex: 1 }}>
-                    {point}
-                  </AppText>
-                </View>
-              ))}
-            </View>
-          ) : null}
-        </View>
-
-        {/* ------------------------------------------------- 02 contra 03 */}
-        {done ? (
-          <View style={{ gap: spacing.lg }} testID="day-completed">
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
-              <View
-                style={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: 20,
-                  backgroundColor: colors.markSurface,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <Icon name="check" size={20} color={colors.onMark} strokeWidth={2.6} />
-              </View>
-              <AppText variant="blockTitle" style={{ flex: 1, fontSize: 24, lineHeight: 28 }}>
-                <Highlight>Leitura de hoje</Highlight> concluída
-              </AppText>
-            </View>
-
-            <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: spacing.xs }}>
-              <AppText variant="caption">
-                {summary ? `${summary.label} · ` : ''}
-                {preferOwnBible ? 'lido na sua Bíblia' : 'lido aqui no app'} ·{' '}
-              </AppText>
-              <Button title="Desfazer" variant="underline" onPress={undo} testID="undo-complete" />
-            </View>
-
-            <View style={{ gap: spacing.sm }}>
-              <Cap>Minha reflexão · só você vê</Cap>
-              <Button
-                title={reflection ? 'Editar minha reflexão' : 'Escrever minha reflexão'}
-                variant="outline"
-                onPress={() => router.push({ pathname: '/reflexao/[day]', params: { day: String(officialDay) } })}
-                testID="reflection-card"
+      <FlatList
+        ref={listRef}
+        testID="journey-list"
+        data={rows}
+        keyExtractor={rowKey}
+        renderItem={renderRow}
+        extraData={[busy, doneToday, preferOwnBible, stacked, nodeOffset, earlierOpen, entry?.openCount, entry?.variant]}
+        contentContainerStyle={{ paddingHorizontal: inset, paddingTop: LIST_PAD_TOP, paddingBottom: spacing.xxl }}
+        getItemLayout={(_, index) => ({ length: lengths[index] ?? 0, offset: offsets[index] ?? 0, index })}
+        onLayout={settle(setListHeight)}
+        // Abertura a frio: um pouco acima de hoje (ou na mensagem de entrada).
+        initialScrollIndex={initialIndex}
+        onScrollToIndexFailed={({ index }) =>
+          listRef.current?.scrollToOffset({ offset: offsets[index] ?? 0, animated: false })
+        }
+        initialNumToRender={14}
+        windowSize={9}
+        // CORREÇÃO TÉCNICA (REGRAS 26/27 — nenhuma tela sem rolagem): o cabeçalho, a
+        // faixa C-07 e a faixa de rede ROLAM com a lista. Presos fora dela, em fonte
+        // grande somavam mais que a tela e a lista (com o painel de hoje dentro)
+        // ficava com altura zero.
+        ListHeaderComponent={
+          <View onLayout={settle(setHeaderHeight)} style={{ gap: spacing.md, paddingBottom: spacing.lg }}>
+            <JourneyHeader />
+            {/* PROVISÓRIO (pergunta 5 ao designer): a faixa de conteúdo não autorizado
+                (invariante C-07) não tem lugar no desenho; fica compacta, logo abaixo
+                do cabeçalho, enquanto a igreja não autorizar. */}
+            <DevContentBanner state={journey.contentState} compact />
+            {/* F4 · a faixa depende da rede REAL do aparelho (expo-network), não do
+                estado da nuvem: quem usa sem conta também a vê, e uma recusa do
+                servidor com a rede no ar não vira "Sem internet".
+                PROVISÓRIO (LACUNAS B17/B18/B34): a segunda frase do F4 ("A comunidade
+                volta… fica na fila…") foi omitida de propósito — a fila de envio não
+                existe, e a frase seria promessa falsa. */}
+            {online ? null : <OfflineBanner />}
+            {finished ? (
+              <CampaignFinished
+                total={total}
+                readDays={completedDayNumbers(completions)}
+                reflectionCount={reflectionCount(reflections)}
+                onSeeJourney={seeWholeJourney}
               />
-            </View>
+            ) : null}
+          </View>
+        }
+        ListFooterComponent={
+          expanded ? <Button title="Comprimir a linha" variant="underline" onPress={() => setExpanded(false)} /> : null
+        }
+      />
 
-            <Button
-              title="Intercessão do dia"
-              variant="outline"
-              onPress={openIntercession}
-              testID="open-intercession"
-            />
-          </View>
-        ) : (
-          <View style={{ gap: spacing.sm }} testID="day-open">
-            <Button
-              title={preferOwnBible ? 'Concluir leitura' : 'Ler agora'}
-              onPress={preferOwnBible ? () => complete('own_bible') : openReader}
-              loading={busy}
-              testID="complete-day"
-            />
-            <Button
-              title={preferOwnBible ? 'Ler aqui no app' : 'Vou ler na minha Bíblia'}
-              variant="underline"
-              onPress={preferOwnBible ? openReader : readOwnBible}
-              disabled={busy}
-            />
-            <Button
-              title="Intercessão do dia"
-              variant="outline"
-              onPress={openIntercession}
-              testID="open-intercession"
-            />
-          </View>
-        )}
-
-        {/* ----------------------------------------------------- meu jejum */}
-        {settings.fastingEnabled ? (
-          <View testID="fasting-card">
-            <Rule />
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingTop: spacing.md }}>
-              <View style={{ flex: 1, gap: 2 }}>
-                <AppText variant="item">Meu jejum</AppText>
-                <AppText variant="caption">Registro privado. Fica só neste aparelho.</AppText>
-              </View>
-              <Checkbox
-                checked={isFastingKept(fasting, officialDay)}
-                onToggle={() => {
-                  setFastingKept(campaign.id, officialDay, !isFastingKept(fasting, officialDay));
-                  haptic('light');
-                }}
-                label="Cumpri meu propósito hoje"
-                testID="fasting-toggle"
-              />
-            </View>
-          </View>
-        ) : null}
-
-        {/* ------------------------------------------------ altar das 12h30 */}
-        {altar && altarLine ? (
-          <View>
-            <Rule />
-            <View style={{ paddingTop: spacing.md, gap: spacing.xs }} testID="altar-today">
-              <Cap>Altar das 12h30</Cap>
-              <AppText variant="item">{altarLine}</AppText>
-              {sphereLabel ? <AppText variant="caption">Monte do dia · {sphereLabel}</AppText> : null}
-            </View>
-          </View>
-        ) : null}
-
-        {/* -------------------------------------------------- linha coletiva */}
-        <View>
-          <Rule />
-          <View style={{ paddingTop: spacing.md, gap: spacing.sm }} testID="church-progress">
-            {church.status === 'available' ? (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
-                <AppText variant="item" style={{ flex: 1 }}>
-                  {church.data.readersToday.toLocaleString('pt-BR')} pessoas já leram hoje
-                </AppText>
-                <View style={{ width: 56 }}>
-                  <ProgressBar
-                    value={church.data.ratio}
-                    height={8}
-                    label={`${Math.round(church.data.ratio * 100)}% da igreja já leu hoje`}
-                  />
-                </View>
-              </View>
-            ) : (
-              <>
-                <AppText variant="item">Progresso da igreja</AppText>
-                <AppText variant="caption">{collectiveNotice(church)}</AppText>
-              </>
-            )}
-          </View>
-        </View>
-      </ScreenScroll>
+      {/* A4 · o dia futuro abre a folha do cadeado, sem revelar nada daquele dia.
+          PROVISÓRIO (decisão do engenheiro, 2026-09-21: no RN 0.86 o filter
+          grayscale/saturate só é aplicado no Android — o iOS aplica só brightness e
+          drop-shadow): a "jornada dessaturada" atrás da folha não é feita; fica o
+          véu do Sheet, igual nas duas plataformas. */}
+      {lockSheet ? (
+        <LockSheet
+          visible={lockSheet.open}
+          onClose={() => setLockSheet((current) => (current ? { ...current, open: false } : current))}
+          dayNumber={lockSheet.day}
+          dateLabel={formatDayDate(lockSheet.day, campaign)}
+        />
+      ) : null}
     </Screen>
   );
 }

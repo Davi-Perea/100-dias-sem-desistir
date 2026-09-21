@@ -1,36 +1,50 @@
 import { Tabs } from 'expo-router';
-import { useState } from 'react';
+import { type ComponentProps, useState } from 'react';
 
+import { COMMUNITY_ENABLED } from '@/config/features';
+import { useMilestoneTrigger } from '@/journey/useMilestoneTrigger';
 import { GlassTabBar } from '@/ui/TabBar';
-import { TAB_BAR_HEIGHT, useTheme } from '@/ui/theme';
+import { TABBAR_MIN_HEIGHT, useTheme } from '@/ui/theme';
 
 /**
- * Quatro destinos do handoff: Início · Jornada · Juntos · Você.
- * O leitor é rota contextual, não aba.
+ * Três destinos (TELAS): Jornada (casa) · Comunidade · Você. Não existe mais a
+ * aba "Início": ela e a Jornada mostravam o mesmo dia de dois jeitos e viraram
+ * uma só, a casa em "/". O leitor, o dia e a intercessão são rotas contextuais,
+ * sem barra.
  *
- * Cada tela desenha o próprio cabeçalho (lockup da marca), por isso não há
- * header de navegação aqui.
+ * A Comunidade ainda mora em `juntos.tsx` (a rota não muda de nome para não
+ * quebrar quem já navega para ela).
+ * PROVISÓRIO até o grupo C (feed) existir: o conteúdo dela é o do Juntos de hoje.
+ *
+ * PROVISÓRIO (decisão do engenheiro, 2026-09-21: sem servidor na V1, uma aba
+ * "em breve" é rejeição na Apple, guideline 2.1): com `COMMUNITY_ENABLED`
+ * desligado a aba sai da barra (`href: null`), que fica Jornada · Você. A rota
+ * continua registrada para o trabalho futuro.
+ *
+ * Cada tela desenha o próprio cabeçalho, por isso não há header de navegação.
  */
 export default function TabsLayout() {
   const { colors } = useTheme();
+  // O marco em tela cheia era disparado pela aba Início, que deixou de existir.
+  useMilestoneTrigger();
   /**
    * A barra é medida, não suposta. O token é só o piso: em fonte grande os
    * rótulos das abas quebram e a barra cresce, e a constante ainda ignorava a
    * faixa do indicador de home — o fim da Jornada ficava atrás do vidro.
    */
-  const [barHeight, setBarHeight] = useState(TAB_BAR_HEIGHT);
+  // Até a primeira medição: o piso da barra mais os 26 do fundo.
+  const [barHeight, setBarHeight] = useState(TABBAR_MIN_HEIGHT + 26);
   return (
     <Tabs
-      tabBar={(props) => <GlassTabBar {...props} onHeight={setBarHeight} />}
+      tabBar={(props) => <GlassTabBar {...(props as ComponentProps<typeof GlassTabBar>)} onHeight={setBarHeight} />}
       screenOptions={{
         headerShown: false,
         // A tab bar flutua sobre o conteúdo; a cena reserva a altura embaixo.
         sceneStyle: { backgroundColor: colors.background, paddingBottom: barHeight },
       }}
     >
-      <Tabs.Screen name="index" options={{ title: 'Início' }} />
-      <Tabs.Screen name="jornada" options={{ title: 'Jornada' }} />
-      <Tabs.Screen name="juntos" options={{ title: 'Juntos' }} />
+      <Tabs.Screen name="index" options={{ title: 'Jornada' }} />
+      <Tabs.Screen name="juntos" options={{ title: 'Comunidade', href: COMMUNITY_ENABLED ? undefined : null }} />
       <Tabs.Screen name="voce" options={{ title: 'Você' }} />
     </Tabs>
   );

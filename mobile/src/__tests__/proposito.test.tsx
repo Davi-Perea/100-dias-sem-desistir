@@ -3,7 +3,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react-nativ
 
 import TogetherScreen from '@/app/(tabs)/juntos';
 import PropositoScreen from '@/app/proposito';
-import { getCampaign, loadDataset } from '@/journey/datasetSource';
+import { BUNDLED_CONTENT, getCampaign, loadDataset } from '@/journey/datasetSource';
 import { devDataset } from '@/journey/fixtures/devCampaign';
 import { calendarDateInCampaignTz, formatDayDate } from '@/journey/officialDay';
 import { PROPOSITO, flowSteps, publicSections } from '@/journey/proposito';
@@ -81,10 +81,21 @@ describe('página Sobre o propósito', () => {
     expect(screen.queryByText(/Pedimos a cada líder/)).toBeNull();
   });
 
-  test('título, introdução e fonte vêm verbatim do texto da igreja', async () => {
+  test('título, subtítulo, introdução e fonte vêm verbatim do texto da igreja', async () => {
     await render(<PropositoScreen />);
 
+    // D5: título do app e subtítulo da campanha REAL tal como está no dado,
+    // com os separadores originais; o leitor de tela ouve só as palavras.
+    expect(screen.getByText('Sobre o propósito')).toBeTruthy();
+    const subtitle = BUNDLED_CONTENT.campaign.subtitle as string;
+    expect(subtitle).toBe('Palavra • Consagração • Adoração • Intercessão');
+    const subtitleNode = screen.getByTestId('proposito-subtitle');
+    expect(subtitleNode.props.children).toBe(subtitle);
+    expect(subtitleNode.props.accessibilityLabel).toBe('Palavra, Consagração, Adoração, Intercessão');
+    // O subtítulo do PRÓPRIO documento da orientação continua na página, como veio.
     expect(screen.getByText(PROPOSITO.subtitle)).toBeTruthy();
+    // O título do documento é dirigido aos líderes e não entra na página.
+    expect(screen.queryByText(PROPOSITO.title)).toBeNull();
     for (const paragraph of PROPOSITO.intro) {
       expect(screen.getByText(paragraph)).toBeTruthy();
     }
@@ -107,6 +118,32 @@ describe('página Sobre o propósito', () => {
       expect(screen.getByText(step.description)).toBeTruthy();
       expect(screen.getByLabelText(`Passo ${step.step}`)).toBeTruthy();
     }
+  });
+
+  test('a citação de Levítico 6:13 é bloco identificado como citação, com a referência do dado (C-02)', async () => {
+    await render(<PropositoScreen />);
+
+    const quote = PROPOSITO.sections
+      .flatMap((section) => section.blocks)
+      .find((block) => block.kind === 'scripture');
+    expect(quote?.reference).toBe('Levítico 6:13');
+    const node = screen.getByTestId('proposito-scripture');
+    expect(node.props.accessibilityLabel).toMatch(/^Citação bíblica: /);
+    expect(node.props.accessibilityLabel).toContain(quote?.quote as string);
+    expect(screen.getByText(quote?.quote as string)).toBeTruthy();
+    // A palavra que identifica a citação continua na atribuição, com a referência do dado.
+    expect(screen.getByText('Levítico 6:13 · citação · tradução a informar')).toBeTruthy();
+    // É a única citação exibida: a página não vira parágrafo de tradução bíblica.
+    expect(screen.getAllByTestId('proposito-scripture')).toHaveLength(1);
+  });
+
+  test('os cinco passos do altar entram com o cap, no lugar da orientação, e a faixa de aviso fica', async () => {
+    await render(<PropositoScreen />);
+    expect(screen.getAllByText('Os cinco passos do altar')).toHaveLength(1);
+    for (const step of flowSteps()) expect(screen.getByTestId(`proposito-step-${step.step}`)).toBeTruthy();
+    // C-07: sem autorização da igreja a faixa é obrigatória.
+    expect(screen.getByTestId('content-banner')).toBeTruthy();
+    expect(screen.queryByText(/pending_authorization/)).toBeNull();
   });
 
   test('não traz a saudação do documento aos líderes', async () => {

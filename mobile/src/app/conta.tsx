@@ -1,4 +1,4 @@
-import { router, Stack, useLocalSearchParams } from 'expo-router';
+import { Stack, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -8,24 +8,42 @@ import {
   OTP_LENGTH,
   requestOtp,
   secondsUntilResendAllowed,
+  signOut,
   verifyOtp,
 } from '@/cloud/auth';
 import { isCloudConfigured } from '@/cloud/config';
 import { CloudError } from '@/cloud/errors';
-import { AppText, Button, Card, Screen, StateView } from '@/ui/components';
-import { radius, spacing, useTheme } from '@/ui/theme';
+import { useCloudSession } from '@/cloud/useSession';
+import { BackBar, goBackOrHome } from '@/ui/BackBar';
+import { AppText, Block, Button, Cap, Screen, StateView, useFace } from '@/ui/components';
+import { faces, radius, spacing, useGutter, useTheme } from '@/ui/theme';
 
 type Step = 'email' | 'code';
 
 /**
  * Conta por e-mail + código (spec §3). Esta tela só aparece quando o usuário
  * pede algo que exige nuvem (§4) — nunca na abertura do app.
+ *
+ * PROVISÓRIO (pergunta 12 ao designer): "Conta e privacidade" não foi desenhada.
+ * Enquanto ela não existir, o título diz o que a tela faz ("Criar ou entrar na
+ * conta" / "Confirmar código", como antes) e não promete o que falta. Com
+ * sessão, a tela mostra o e-mail conectado e "Sair". Exclusão de conta e
+ * exportação dos dados ainda não existem: a tela diz isso sem botão morto.
+ * É bloqueio de loja (LACUNAS B14), não lacuna visual — por isso a nuvem fica
+ * desligada à força em build de release até a exclusão existir (decisão D-6).
+ *
+ * CORREÇÃO TÉCNICA: barra própria em vez do cabeçalho nativo (o título nativo
+ * não cresce com a fonte do sistema); campos com a face do app, borda de 1,5px
+ * em controlBorder (3,59:1) e sem teto de escala de fonte.
  */
 export default function AccountScreen() {
   const { reason } = useLocalSearchParams<{ reason?: string }>();
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
+  const face = useFace();
+  const gutter = useGutter();
   const configured = isCloudConfigured();
+  const cloud = useCloudSession();
 
   const [step, setStep] = useState<Step>('email');
   const [email, setEmail] = useState('');
@@ -43,16 +61,33 @@ export default function AccountScreen() {
   if (!configured) {
     return (
       <Screen>
-        <Stack.Screen options={{ title: 'Conta' }} />
+        <Stack.Screen options={{ headerShown: false }} />
+        {/* Um só "Voltar": o da barra. */}
+        <View style={{ paddingHorizontal: gutter, paddingTop: spacing.md }}>
+          <BackBar />
+        </View>
         <StateView
           kind="empty"
           title="Conta indisponível nesta versão"
-          message="Esta build não está conectada ao servidor. Sua jornada pessoal continua funcionando por completo."
-          action={<Button title="Voltar" variant="underline" onPress={() => router.back()} />}
+          message="Esta versão do app ainda não tem conta. Sua jornada pessoal continua funcionando por completo neste aparelho."
         />
       </Screen>
     );
   }
+
+  const signedInEmail = cloud.session?.user?.email ?? null;
+
+  const leave = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await signOut();
+    } catch (err) {
+      setError(err instanceof CloudError ? err.message : 'Não foi possível sair da conta.');
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const send = async () => {
     setBusy(true);
@@ -74,7 +109,7 @@ export default function AccountScreen() {
     try {
       await verifyOtp(email, code);
       // Volta exatamente para onde o usuário estava (spec §4).
-      router.back();
+      goBackOrHome();
     } catch (err) {
       setError(err instanceof CloudError ? err.message : 'Não foi possível confirmar o código.');
       setCode('');
@@ -85,42 +120,67 @@ export default function AccountScreen() {
 
   return (
     <Screen>
-      <Stack.Screen options={{ title: step === 'email' ? 'Criar ou entrar na conta' : 'Confirmar código' }} />
+      <Stack.Screen options={{ headerShown: false }} />
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
         style={{ flex: 1 }}>
         <ScrollView
-          contentInsetAdjustmentBehavior="automatic"
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={{
-            padding: spacing.lg,
+            paddingHorizontal: gutter,
+            paddingTop: spacing.md,
             paddingBottom: insets.bottom + spacing.xxl,
             gap: spacing.lg,
           }}>
-          {step === 'email' ? (
+          <View style={{ gap: spacing.md }}>
+            <BackBar />
+            <AppText variant="screenTitle" accessibilityRole="header">
+              {signedInEmail ? 'Sua conta' : step === 'email' ? 'Criar ou entrar na conta' : 'Confirmar código'}
+            </AppText>
+          </View>
+          {signedInEmail ? (
+            <>
+              <View style={{ gap: spacing.sm }} testID="account-signed-in">
+                <AppText variant="bodySm">Conectado como {signedInEmail}.</AppText>
+                <AppText variant="caption">
+                  Excluir a conta e exportar os dados ainda não estão disponíveis nesta versão.
+                </AppText>
+              </View>
+
+              {error ? (
+                <AppText variant="rowLabel" accessibilityLiveRegion="polite" style={{ color: colors.danger }} testID="auth-error">
+                  {error}
+                </AppText>
+              ) : null}
+
+              <Button title="Sair desta conta" variant="outline" loading={busy} onPress={leave} testID="sign-out" />
+            </>
+          ) : step === 'email' ? (
             <>
               <View style={{ gap: spacing.sm }}>
-                <AppText variant="blockTitle">Sua conta</AppText>
-                <AppText variant="secondary">
+                <AppText variant="blockTitle" accessibilityRole="header">Sua conta</AppText>
+                <AppText variant="bodySm">
                   {reason === 'group'
                     ? 'Para entrar em um grupo, precisamos identificar você. Nada da sua jornada pessoal muda.'
                     : 'Usamos a conta apenas para o que depende do servidor.'}
                 </AppText>
               </View>
 
-              <Card tone="muted">
+              <Block tone="muted">
                 <View style={{ gap: spacing.xs }}>
-                  <AppText variant="cap">Continua sem conta</AppText>
-                  <AppText variant="muted">
+                  <Cap>Continua sem conta</Cap>
+                  <AppText variant="caption">
                     Leitura, progresso, jejum, reflexão privada e lembrete seguem funcionando neste aparelho,
                     inclusive sem internet.
                   </AppText>
                 </View>
-              </Card>
+              </Block>
 
               <View style={{ gap: spacing.sm }}>
-                <AppText variant="cap">Seu e-mail</AppText>
+                {/* Rótulo do campo, não seção: sem papel de cabeçalho (o campo já se anuncia). */}
+                <AppText variant="cap" aria-hidden>
+                  Seu e-mail
+                </AppText>
                 <TextInput
                   value={email}
                   onChangeText={(value) => {
@@ -135,31 +195,31 @@ export default function AccountScreen() {
                   placeholder="voce@exemplo.com"
                   placeholderTextColor={colors.textMuted}
                   accessibilityLabel="Seu endereço de e-mail"
-                  maxFontSizeMultiplier={1.8}
                   testID="email-input"
                   style={{
-                    minHeight: 52,
-                    borderWidth: 1,
+                    minHeight: 56,
+                    paddingVertical: spacing.md,
+                    borderWidth: 1.5,
                     borderColor: colors.controlBorder,
                     backgroundColor: colors.surface,
                     borderRadius: radius.button,
                     paddingHorizontal: spacing.lg,
+                    fontFamily: face(faces.sg500),
                     fontSize: 16,
                     color: colors.text,
                   }}
                 />
-                <AppText variant="muted">Enviamos um código de {OTP_LENGTH} dígitos. Sem senha.</AppText>
+                <AppText variant="caption">Enviamos um código de {OTP_LENGTH} dígitos. Sem senha.</AppText>
               </View>
 
               {error ? (
-                <AppText accessibilityLiveRegion="polite" style={{ color: colors.danger }} testID="auth-error">
+                <AppText variant="rowLabel" accessibilityLiveRegion="polite" style={{ color: colors.danger }} testID="auth-error">
                   {error}
                 </AppText>
               ) : null}
 
               <Button
                 title="Enviar código"
-               
                 loading={busy}
                 disabled={!isValidEmail(email)}
                 onPress={send}
@@ -169,8 +229,8 @@ export default function AccountScreen() {
           ) : (
             <>
               <View style={{ gap: spacing.sm }}>
-                <AppText variant="blockTitle">Digite o código</AppText>
-                <AppText variant="secondary">Enviamos um código de {OTP_LENGTH} dígitos para {email}.</AppText>
+                <AppText variant="blockTitle" accessibilityRole="header">Digite o código</AppText>
+                <AppText variant="bodySm">Enviamos um código de {OTP_LENGTH} dígitos para {email}.</AppText>
               </View>
 
               <TextInput
@@ -185,15 +245,16 @@ export default function AccountScreen() {
                 placeholder="000000"
                 placeholderTextColor={colors.textMuted}
                 accessibilityLabel={`Código de ${OTP_LENGTH} dígitos`}
-                maxFontSizeMultiplier={1.6}
                 testID="code-input"
                 style={{
                   minHeight: 60,
-                  borderWidth: 1,
+                  paddingVertical: spacing.md,
+                  borderWidth: 1.5,
                   borderColor: colors.controlBorder,
                   backgroundColor: colors.surface,
                   borderRadius: radius.button,
                   paddingHorizontal: spacing.lg,
+                  fontFamily: face(faces.sg700),
                   fontSize: 28,
                   letterSpacing: 8,
                   textAlign: 'center',
@@ -202,14 +263,13 @@ export default function AccountScreen() {
               />
 
               {error ? (
-                <AppText accessibilityLiveRegion="polite" style={{ color: colors.danger }} testID="auth-error">
+                <AppText variant="rowLabel" accessibilityLiveRegion="polite" style={{ color: colors.danger }} testID="auth-error">
                   {error}
                 </AppText>
               ) : null}
 
               <Button
                 title="Confirmar"
-               
                 loading={busy}
                 disabled={code.length !== OTP_LENGTH}
                 onPress={confirm}

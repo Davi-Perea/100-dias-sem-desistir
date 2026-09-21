@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 
-import { BRAND_YELLOW, palettes, type Palette } from '@/ui/theme';
+import { BRAND_YELLOW, fixedPalette, palettes, type Palette } from '@/ui/theme';
 
 /**
  * Regressão de contraste WCAG 2.1 nos dois temas.
@@ -49,8 +49,25 @@ const TEXT_PAIRS: Pair[] = [
   // Escrever o fundo como `text` dava amarelo sobre branco no tema escuro.
   { fg: 'onMark', bg: 'markSurface', min: 4.5, label: 'conteúdo da marca invertida' },
   { fg: 'danger', bg: 'background', min: 4.5, label: 'texto de erro' },
+  // "Não foi possível salvar" dentro do painel quente de hoje (PER-02).
+  { fg: 'danger', bg: 'surfaceWarm', min: 4.5, label: 'texto de erro sobre off-white' },
   { fg: 'onDanger', bg: 'danger', min: 4.5, label: 'texto do botão destrutivo' },
   { fg: 'devBanner', bg: 'devBannerSurface', min: 4.5, label: 'aviso de conteúdo DEV' },
+  // --- redesenho "100 dias sem desistir" -------------------------------------
+  { fg: 'warning', bg: 'warningSurface', min: 4.5, label: 'faixa de aviso de conteúdo (C-07)' },
+  // Caixa "TEXTO AINDA NÃO LIBERADO" do leitor (B1): aviso sobre off-white quente.
+  { fg: 'warning', bg: 'surfaceWarm', min: 4.5, label: 'aviso do texto não liberado (B1)' },
+  { fg: 'onAlert', bg: 'alertSurface', min: 4.5, label: 'texto da faixa sem internet' },
+  { fg: 'onAccentMuted', bg: 'accent', min: 4.5, label: 'secundário sobre amarelo' },
+  // O azul é a comunidade e, diferente do amarelo, pode ser texto.
+  { fg: 'blue', bg: 'background', min: 4.5, label: 'azul como texto sobre a página' },
+  { fg: 'blue', bg: 'surface', min: 4.5, label: 'azul como texto sobre card' },
+  { fg: 'blue', bg: 'surfaceWarm', min: 4.5, label: 'azul sobre off-white (cap "HOJE")' },
+  { fg: 'blue', bg: 'surfaceMuted', min: 4.5, label: 'azul sobre card mudo' },
+  { fg: 'blue', bg: 'blueSoft', min: 4.5, label: '"Em aberto" na linha azul da Jornada' },
+  { fg: 'onBlue', bg: 'blue', min: 4.5, label: 'rótulo do botão azul' },
+  { fg: 'onBlueSoft', bg: 'blueSoft', min: 4.5, label: 'texto na faixa azul pálida' },
+  { fg: 'text', bg: 'blueSoft', min: 4.5, label: 'tinta na faixa azul pálida' },
 ];
 
 const NON_TEXT_PAIRS: Pair[] = [
@@ -67,6 +84,12 @@ const NON_TEXT_PAIRS: Pair[] = [
   { fg: 'markSurface', bg: 'background', min: 3, label: 'marca invertida sobre a página' },
   { fg: 'markSurface', bg: 'surface', min: 3, label: 'marca invertida sobre card' },
   { fg: 'markSurface', bg: 'surfaceWarm', min: 3, label: 'marca invertida sobre off-white' },
+  // Nós da jornada: forma E contraste. O anel azul do "em aberto" e o ponto
+  // cheio do "lido" são os que carregam estado.
+  { fg: 'blue', bg: 'background', min: 3, label: 'anel do dia em aberto' },
+  { fg: 'blue', bg: 'blueSoft', min: 3, label: 'anel do dia em aberto na linha azul' },
+  { fg: 'text', bg: 'surfaceWarm', min: 3, label: 'nó de dia lido' },
+  { fg: 'alertSurface', bg: 'background', min: 3, label: 'faixa sem internet contra a página' },
 ];
 
 describe.each([
@@ -96,7 +119,137 @@ describe.each([
   });
 });
 
+/**
+ * Superfícies fixas (F1, E3 amarelas; C4, E2, E4 de tinta) não mudam com o tema,
+ * e o conteúdo delas também não pode mudar. O TELAS.md escrevia ali tokens
+ * temáticos; estes testes medem as paletas fixas que substituem esses tokens,
+ * e registram o defeito que elas evitam, para ninguém "simplificar" de volta.
+ */
+describe('superfícies fixas', () => {
+  const ink = fixedPalette('ink');
+  const yellow = fixedPalette('yellow');
+
+  test.each([
+    ['texto principal', ink.text],
+    ['texto secundário ("Apocalipse 21:5")', ink.textSecondary],
+    ['legenda', ink.textMuted],
+    ['amarelo como texto ("Passo 3 de 5" no modo altar)', ink.accent],
+  ])('sobre tinta, %s passa 4,5:1', (_label, fg) => {
+    expect(contrastRatio(fg, ink.background)).toBeGreaterThanOrEqual(4.5);
+  });
+
+  test.each([
+    ['texto principal', yellow.text],
+    ['texto secundário (frase do marco)', yellow.textSecondary],
+    ['secundário sobre amarelo', yellow.onAccentMuted],
+  ])('sobre amarelo, %s passa 4,5:1', (_label, fg) => {
+    expect(contrastRatio(fg, yellow.background)).toBeGreaterThanOrEqual(4.5);
+  });
+
+  test('a faixa C-07 com tone fixo (E2/E3/E4) é legível nas duas superfícies', () => {
+    for (const fixed of [ink, yellow]) {
+      expect(contrastRatio(fixed.warning, fixed.warningSurface)).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
+  test('o botão primário continua legível nas duas superfícies fixas', () => {
+    // Primário = fundo `text`, rótulo `surface` da paleta da superfície.
+    expect(contrastRatio(yellow.surface, yellow.text)).toBeGreaterThanOrEqual(4.5);
+    expect(contrastRatio(ink.surface, ink.text)).toBeGreaterThanOrEqual(4.5);
+    // E o botão em si se destaca do fundo amarelo.
+    expect(contrastRatio(yellow.text, yellow.background)).toBeGreaterThanOrEqual(3);
+  });
+
+  test('"Marco guardado" (E3) é texto em cor plena sobre o amarelo: 12,92:1, nunca 0,45 de opacidade', () => {
+    // O sublinhado com tone="yellow" usa `text` da paleta amarela. O botão fica
+    // ativo depois do toque; desabilitado a 0,45 dava 2,82:1 (R3-5).
+    expect(contrastRatio(yellow.text, yellow.background)).toBeCloseTo(12.92, 1);
+    expect(
+      Math.round(contrastRatio(composite(yellow.text, yellow.background, 0.45), yellow.background) * 100) / 100,
+    ).toBeLessThan(3);
+  });
+
+  test('"‹" inativo do passo 1 no modo altar (E2): 1,67:1 declarado, controle inativo isento', () => {
+    // Cor plana `borderStrong` do escuro, sem opacidade (ALTAR_PREVIOUS_INACTIVE).
+    expect(Math.round(contrastRatio(ink.borderStrong, ink.background) * 100) / 100).toBeCloseTo(1.67, 1);
+    // Ativo, a borda branca passa bem do limite de controle.
+    expect(contrastRatio(ink.text, ink.background)).toBeGreaterThanOrEqual(3);
+  });
+
+  test('o defeito que as paletas fixas evitam: token temático sobre superfície fixa some', () => {
+    // O `textSecondary` do tema claro sobre tinta, e o do escuro sobre amarelo.
+    expect(contrastRatio(palettes.light.textSecondary, '#111111')).toBeLessThan(2);
+    expect(contrastRatio(palettes.dark.textSecondary, BRAND_YELLOW)).toBeLessThan(1.5);
+  });
+});
+
+/** Mistura `fg` sobre `bg` com opacidade `alpha` — o que a tela mostra de fato. */
+function composite(fg: string, bg: string, alpha: number): string {
+  const channel = (hex: string, i: number) => parseInt(hex.replace('#', '').slice(i * 2, i * 2 + 2), 16);
+  const mixed = [0, 1, 2].map((i) => Math.round(alpha * channel(fg, i) + (1 - alpha) * channel(bg, i)));
+  return `#${mixed.map((v) => v.toString(16).padStart(2, '0')).join('')}`;
+}
+
+/**
+ * O TOKENS §5 exige: "se usar opacidade para desabilitado, declare o contraste
+ * resultante, porque auditoria de token não enxerga opacidade". A opacidade vale
+ * para o botão inteiro — fundo e rótulo misturam-se com a página. Controle
+ * inativo é isento da WCAG 1.4.3; os números ficam registrados aqui para a
+ * decisão continuar à vista, e mudam se alguém mexer na opacidade ou nas cores.
+ */
+describe('botão desabilitado a 0,45 — contraste declarado', () => {
+  const ALPHA = 0.45;
+  const measure = (label: string, fill: string, page: string) =>
+    Math.round(contrastRatio(composite(label, page, ALPHA), composite(fill, page, ALPHA)) * 100) / 100;
+
+  test('primário no claro: 3,03:1', () => {
+    const p = palettes.light;
+    expect(measure(p.surface, p.text, p.background)).toBeCloseTo(3.03, 1);
+  });
+
+  test('primário no escuro: 4,38:1', () => {
+    const p = palettes.dark;
+    expect(measure(p.surface, p.text, p.background)).toBeCloseTo(4.38, 1);
+  });
+
+  test('contornado e sublinhado no claro (rótulo sobre a página): 3,03:1', () => {
+    const p = palettes.light;
+    expect(Math.round(contrastRatio(composite(p.text, p.background, ALPHA), p.background) * 100) / 100).toBeCloseTo(
+      3.03,
+      1,
+    );
+  });
+});
+
 describe('regras do sistema visual', () => {
+  /**
+   * Em React Native o peso vem da face nomeada. `fontWeight` junto de uma face
+   * faz o Android sintetizar negrito sobre uma face que já é negra — e com o
+   * "Texto em Negrito" do iOS a face seria promovida E ganharia o peso.
+   */
+  test('nenhum estilo do aplicativo declara fontWeight', () => {
+    const src = join(__dirname, '..');
+    const offenders: string[] = [];
+    const walk = (dir: string) => {
+      for (const entry of readdirSync(dir, { withFileTypes: true })) {
+        const full = join(dir, entry.name);
+        if (entry.isDirectory()) {
+          if (entry.name === '__tests__') continue;
+          walk(full);
+          continue;
+        }
+        if (!/\.tsx?$/.test(entry.name)) continue;
+        readFileSync(full, 'utf8')
+          .split('\n')
+          .forEach((line, index) => {
+            if (/\bfontWeight\s*:/.test(line)) offenders.push(`${relative(src, full).replace(/\\/g, '/')}:${index + 1}`);
+          });
+      }
+    };
+    walk(src);
+    expect(offenders).toEqual([]);
+  });
+
   test('o token de acento é exatamente o amarelo da marca nos dois temas', () => {
     expect(palettes.light.accent).toBe(BRAND_YELLOW);
     expect(palettes.dark.accent).toBe(BRAND_YELLOW);

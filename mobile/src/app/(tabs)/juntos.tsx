@@ -6,19 +6,16 @@ import { CloudError } from '@/cloud/errors';
 import { joinGroup, listActiveGroups } from '@/cloud/groups';
 import type { Group } from '@/cloud/types';
 import { useCloudSession } from '@/cloud/useSession';
-import { collectiveNotice, getChurchProgress } from '@/community/communityState';
 import { getDay } from '@/journey/datasetSource';
 import { altarOfDay } from '@/journey/ministries';
 import { formatDayDate } from '@/journey/officialDay';
 import { useJourney, type JourneySnapshot } from '@/journey/useJourney';
-import { Dove } from '@/ui/brand';
 import {
   AppText,
   Block,
   Button,
   Cap,
   DevContentBanner,
-  ProgressBar,
   Rule,
   Screen,
   ScreenScroll,
@@ -26,15 +23,22 @@ import {
 } from '@/ui/components';
 import { Icon } from '@/ui/icons';
 import { SpherePill } from '@/ui/SpherePill';
-import { BRAND_YELLOW, MIN_TOUCH, fonts, spacing, useTheme } from '@/ui/theme';
+import { MIN_TOUCH, spacing, useTheme } from '@/ui/theme';
 
 /**
- * Altar das 12h30 do dia oficial: quem conduz e por qual monte a igreja intercede.
- *
- * O nome do ministério vem da escala; nomes de pessoas só chegam aqui se
- * `altarOfDay` os liberou (autorização da igreja). Antes da campanha o bloco
- * aponta para o Dia 1 sem abrir leitura nenhuma: ministério e monte são dados
- * da escala, não conteúdo do dia.
+ * Comunidade (aba). PROVISÓRIO até o grupo C (feed) existir: o feed, a
+ * publicação, o Amém e os comentários (C1–C6) não têm servidor ainda. Até lá a
+ * aba mostra o que o Juntos já mostrava e que não depende de servidor — o altar
+ * das 12h30 e a orientação da igreja —, mais o estado de conta e de grupo, com
+ * os componentes novos. Blocos sem fonte (recado fixado, insights, número da
+ * igreja) saíram: mostrar lugar de dado que não existe não é estado honesto.
+ */
+
+/**
+ * Altar das 12h30 do dia oficial: quem conduz e por qual monte a igreja
+ * intercede. Nomes de pessoas só chegam aqui se `altarOfDay` os liberou
+ * (autorização da igreja). Antes da campanha o bloco aponta para o Dia 1 sem
+ * abrir leitura nenhuma: ministério e monte são dados da escala.
  */
 function AltarToday({ journey }: { journey: JourneySnapshot }) {
   const beforeStart = journey.phase === 'before_start';
@@ -50,41 +54,58 @@ function AltarToday({ journey }: { journey: JourneySnapshot }) {
         : `Dia ${dayNumber} conduz`;
 
   return (
-    <View testID="altar-today">
-      <Block>
-        <View style={{ gap: spacing.md }}>
-          <Cap>Altar das 12h30</Cap>
-          {beforeStart ? <AppText variant="action">O altar começa em {date}</AppText> : null}
-          {altar ? (
-            <AppText variant={beforeStart ? 'item' : 'action'}>
-              {`${leads}: ${altar.ministry}${altar.leaders_label ? ` · ${altar.leaders_label}` : ''}`}
-            </AppText>
-          ) : (
-            <AppText variant="secondary">A escala deste dia ainda não foi informada.</AppText>
-          )}
-          {sphere ? <SpherePill sphere={sphere} /> : null}
-          {beforeStart ? null : <AppText variant="caption">{`Dia ${dayNumber} · ${date}`}</AppText>}
-        </View>
-      </Block>
-    </View>
+    <Block tone="warm" testID="altar-today">
+      <View style={{ gap: spacing.md }}>
+        <Cap>Altar das 12h30</Cap>
+        {beforeStart ? <AppText variant="action">{`O altar começa em ${date}`}</AppText> : null}
+        {altar ? (
+          <AppText variant={beforeStart ? 'item' : 'action'}>
+            {`${leads}: ${altar.ministry}${altar.leaders_label ? ` · ${altar.leaders_label}` : ''}`}
+          </AppText>
+        ) : (
+          <AppText variant="bodySm">A escala deste dia ainda não foi informada.</AppText>
+        )}
+        {sphere ? <SpherePill sphere={sphere} /> : null}
+        {beforeStart ? null : (
+          <AppText variant="caption" accessibilityLabel={`Dia ${dayNumber}, ${date}`}>
+            {`Dia ${dayNumber} · ${date}`}
+          </AppText>
+        )}
+      </View>
+    </Block>
   );
 }
 
-/** Linha para a orientação da igreja, no mesmo padrão da linha do grupo. */
-function PropositoRow() {
+/** Linha de piso 56 com rótulo, legenda e chevron (padrão das linhas de D1). */
+function LinkRow({
+  label,
+  caption,
+  onPress,
+  accessibilityLabel,
+  accessibilityHint,
+  testID,
+}: {
+  label: string;
+  caption: string;
+  onPress: () => void;
+  accessibilityLabel?: string;
+  accessibilityHint?: string;
+  testID?: string;
+}) {
   const { colors } = useTheme();
   return (
     <View>
       <Rule />
       <Pressable
-        onPress={() => router.push('/proposito')}
+        onPress={onPress}
         accessibilityRole="button"
-        accessibilityLabel="Sobre o propósito"
-        accessibilityHint="Abre a orientação da igreja sobre os 100 dias"
-        testID="open-proposito"
+        accessibilityLabel={accessibilityLabel ?? label}
+        accessibilityHint={accessibilityHint}
+        testID={testID}
         style={({ pressed }) => [
           {
             minHeight: Math.max(56, MIN_TOUCH),
+            paddingVertical: spacing.sm,
             flexDirection: 'row',
             alignItems: 'center',
             gap: spacing.md,
@@ -93,8 +114,8 @@ function PropositoRow() {
         ]}
       >
         <View style={{ flex: 1, gap: 2 }}>
-          <AppText variant="item">Sobre o propósito</AppText>
-          <AppText variant="caption">Orientação da igreja para os 100 dias</AppText>
+          <AppText variant="rowLabel">{label}</AppText>
+          <AppText variant="caption">{caption}</AppText>
         </View>
         <Icon name="chevron-right" size={18} color={colors.textMuted} />
       </Pressable>
@@ -103,27 +124,13 @@ function PropositoRow() {
   );
 }
 
-/**
- * Juntos (tela 06).
- *
- * O handoff mostra números concretos da igreja, um recado fixado da liderança e
- * insights com reação "Amém". Nada disso tem fonte ainda: a Execution 02
- * construiu identidade, grupos e papéis, e deixou feed, insights e progresso
- * coletivo explicitamente fora de escopo.
- *
- * A estrutura da tela é a do handoff. O que muda é que cada bloco sem fonte diz
- * que o dado ainda não está disponível, em vez de exibir o número do protótipo.
- * Mostrar "1.812 pessoas já leram hoje" sem ter contado ninguém seria inventar.
- */
-export default function TogetherScreen() {
+export default function CommunityScreen() {
   const { colors } = useTheme();
   const journey = useJourney();
   const session = useCloudSession();
   const [groups, setGroups] = useState<Group[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
-
-  const church = getChurchProgress();
 
   const loadGroups = useCallback(async () => {
     if (!session.signedIn || session.membership) return;
@@ -144,50 +151,66 @@ export default function TogetherScreen() {
 
   if (session.loading) {
     return (
-      <Screen tone="warm">
+      <Screen>
         <StateView kind="loading" />
       </Screen>
     );
   }
 
-  // O altar das 12h30 e a orientação da igreja valem para todo mundo, com ou
-  // sem conta: são a parte coletiva que não depende de servidor.
+  // O altar e a orientação da igreja valem para todo mundo, com ou sem conta.
   const header = (
     <>
       <View style={{ gap: 2 }}>
-        <AppText variant="screenTitle">Juntos</AppText>
-        <AppText variant="caption">
-          {journey.campaign.title} · Dia {journey.officialDay}
+        <AppText variant="screenTitle" accessibilityRole="header">
+          Comunidade
+        </AppText>
+        <AppText variant="caption" accessibilityLabel={`${journey.campaign.title}, Dia ${journey.officialDay}`}>
+          {`${journey.campaign.title} · Dia ${journey.officialDay}`}
         </AppText>
       </View>
+      {/* PROVISÓRIO (pergunta 5 ao designer): faixa de conteúdo não autorizado
+          (invariante C-07), compacta, logo abaixo do cabeçalho. */}
       <DevContentBanner state={journey.contentState} compact />
       <AltarToday journey={journey} />
-      <PropositoRow />
+      <LinkRow
+        label="Sobre o propósito"
+        caption="Orientação da igreja para os 100 dias"
+        onPress={() => router.push('/proposito')}
+        accessibilityHint="Abre a orientação da igreja sobre os 100 dias"
+        testID="open-proposito"
+      />
     </>
   );
 
-  // ------------------------------------------------- sem conta / sem nuvem
-  if (!session.configured || !session.signedIn) {
+  // ------------------------------------------------------------- sem nuvem
+  // PROVISÓRIO (decisão do engenheiro, 2026-09-21: guideline 2.1 da Apple): sem
+  // nuvem (toda build de release, D-6) a tela mostra só o que funciona — o altar
+  // e a orientação da igreja. Antes ela dizia "ainda não está ligada ao
+  // servidor", e um recado de indisponível alcançável é motivo de rejeição.
+  if (!session.configured) {
     return (
-      <Screen tone="warm">
+      <Screen>
+        <ScreenScroll>{header}</ScreenScroll>
+      </Screen>
+    );
+  }
+
+  // ------------------------------------------------------------- sem conta
+  if (!session.signedIn) {
+    return (
+      <Screen>
         <ScreenScroll>
           {header}
-          <Block>
+          <Block tone="warm">
             <View style={{ gap: spacing.md }}>
-              <AppText variant="blockTitle" style={{ fontSize: 24, lineHeight: 28 }}>
+              <AppText variant="blockTitle" accessibilityRole="header">
                 A parte coletiva pede uma conta
               </AppText>
-              <AppText variant="secondary">
+              <AppText variant="bodySm">
                 Sua leitura, seu progresso, seu jejum e suas reflexões continuam funcionando sem conta e ficam
                 neste aparelho. A conta serve só para participar do grupo.
               </AppText>
-              {session.configured ? (
-                <Button title="Entrar com meu e-mail" onPress={() => router.push('/conta')} testID="join-cta" />
-              ) : (
-                <AppText variant="caption">
-                  Esta versão do aplicativo ainda não está ligada ao servidor da igreja.
-                </AppText>
-              )}
+              <Button title="Entrar com meu e-mail" onPress={() => router.push('/conta')} testID="join-cta" />
             </View>
           </Block>
         </ScreenScroll>
@@ -198,18 +221,22 @@ export default function TogetherScreen() {
   // ------------------------------------------------- com conta, sem grupo
   if (!session.membership) {
     return (
-      <Screen tone="warm">
+      <Screen>
         <ScreenScroll>
           {header}
-          {error ? <AppText style={{ color: colors.danger }}>{error}</AppText> : null}
+          {error ? (
+            <AppText variant="rowLabel" style={{ color: colors.danger }}>
+              {error}
+            </AppText>
+          ) : null}
           <Cap>Escolha seu grupo</Cap>
           {groups === null ? (
             <StateView kind="loading" />
           ) : groups.length === 0 ? (
-            <AppText variant="secondary">Nenhum grupo disponível no momento.</AppText>
+            <AppText variant="bodySm">Nenhum grupo disponível no momento.</AppText>
           ) : (
             groups.map((group) => (
-              <Block key={group.id}>
+              <Block key={group.id} tone="warm">
                 <View style={{ gap: spacing.md }}>
                   <AppText variant="action">{group.name}</AppText>
                   {group.description ? <AppText variant="caption">{group.description}</AppText> : null}
@@ -241,90 +268,17 @@ export default function TogetherScreen() {
 
   // ------------------------------------------------------- com conta e grupo
   const group = session.membership.group;
-
   return (
-    <Screen tone="warm">
-      <ScreenScroll gap={spacing.xl}>
+    <Screen>
+      <ScreenScroll>
         {header}
-
-        {/* --------------------------------------------- número coletivo */}
-        <View style={{ gap: spacing.sm }} testID="church-collective">
-          {church.status === 'available' ? (
-            <>
-              <AppText style={{ fontFamily: fonts.display, fontSize: 52, lineHeight: 52, color: colors.text }}>
-                {church.data.readersToday.toLocaleString('pt-BR')}
-              </AppText>
-              <AppText variant="secondary">pessoas já leram hoje</AppText>
-              <ProgressBar
-                value={church.data.ratio}
-                label={`${Math.round(church.data.ratio * 100)}% da igreja já leu hoje`}
-              />
-              <AppText variant="caption">{Math.round(church.data.ratio * 100)}% da igreja</AppText>
-            </>
-          ) : (
-            <>
-              <AppText variant="blockTitle" style={{ fontSize: 24, lineHeight: 28 }}>
-                Progresso da igreja
-              </AppText>
-              <AppText variant="secondary">{collectiveNotice(church)}</AppText>
-            </>
-          )}
-        </View>
-
-        {/* ------------------------------------------------ recado fixado */}
-        <Block tone="ink" testID="pinned-message">
-          <View style={{ gap: spacing.md }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
-              <Dove width={22} tone="white" role="signature" />
-              <AppText variant="cap" style={{ color: BRAND_YELLOW }}>
-                Recado da liderança
-              </AppText>
-            </View>
-            <AppText style={{ fontFamily: fonts.read, fontSize: 17, lineHeight: 25.5, color: '#FFFFFF' }}>
-              Ainda não há recado publicado. Quando a liderança do seu grupo publicar, ele aparece aqui.
-            </AppText>
-          </View>
-        </Block>
-
-        {/* -------------------------------------------------- linha do grupo */}
-        <View>
-          <Rule />
-          <Pressable
-            onPress={() => router.push({ pathname: '/grupo/[id]', params: { id: group.id } })}
-            accessibilityRole="button"
-            accessibilityLabel={`Abrir o grupo ${group.name}`}
-            testID="group-row"
-            style={({ pressed }) => [
-              {
-                minHeight: Math.max(56, MIN_TOUCH),
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: spacing.md,
-              },
-              pressed && { opacity: 0.72 },
-            ]}
-          >
-            <View style={{ flex: 1, gap: 2 }}>
-              <AppText variant="item">{group.name}</AppText>
-              <AppText variant="caption">
-                {session.role === 'leader' || session.role === 'admin' ? 'Você lidera este grupo' : 'Seu grupo'}
-              </AppText>
-            </View>
-            <Icon name="chevron-right" size={18} color={colors.textMuted} />
-          </Pressable>
-          <Rule />
-        </View>
-
-        {/* ----------------------------------------------------- insights */}
-        <View style={{ gap: spacing.md }} testID="insights-section">
-          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <Cap style={{ flex: 1 }}>Insights de hoje</Cap>
-          </View>
-          <AppText variant="secondary">
-            Os insights da igreja ainda não estão disponíveis nesta versão. Sua reflexão continua privada de
-            qualquer forma.
-          </AppText>
-        </View>
+        <LinkRow
+          label={group.name}
+          caption={session.role === 'leader' || session.role === 'admin' ? 'Você lidera este grupo' : 'Seu grupo'}
+          onPress={() => router.push({ pathname: '/grupo/[id]', params: { id: group.id } })}
+          accessibilityLabel={`Abrir o grupo ${group.name}`}
+          testID="group-row"
+        />
       </ScreenScroll>
     </Screen>
   );

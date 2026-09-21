@@ -1,6 +1,10 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useCallback, useEffect, useState } from 'react';
 
+import { isDevBuild } from '@/journey/devBuild';
+import { createWriteQueue } from '@/progress/writeQueue';
+import { READER_FONT_DEFAULT, normalizeReaderFontSize } from '@/reader/readerFontSize';
+
 /** Preferências e estado de onboarding. LOCAL-ONLY (spec §21). */
 
 export type ReadingMode = 'in_app' | 'own_bible' | 'both';
@@ -21,14 +25,24 @@ export type Settings = {
    */
   milestonesSeen: number[];
   /**
+   * Marcos que a pessoa guardou com "Guardar este marco" (E3). Distinto de
+   * "visto", que é gravado na abertura: sem isso, reabrir a tela voltava o
+   * rótulo para "Guardar este marco". Só neste aparelho; apagado com o resto.
+   */
+  milestonesKept: number[];
+  /**
    * Ministério da pessoa, escolhido localmente entre os da escala. Serve para
    * destacar os dias do ministério e avisar na véspera. Não vai para servidor.
    */
   ministry: string | null;
   /** Aviso local diário às 12h com quem conduz o altar de hoje. Opt-in. */
   altarReminder: boolean;
-  /** Ferramentas de desenvolvimento; nunca visíveis em produção. */
-  dev: { slowLoad: boolean; failLoad: boolean; dayOverride: number | null };
+  /**
+   * Ferramentas de desenvolvimento. Em build de release são descartadas na carga
+   * e na gravação, e o useJourney as ignora (DIA-01/PER-01): nada de DEV vale na loja.
+   * R4-15: "Carregamento lento" e "Falha ao carregar" saíram — nada os lia.
+   */
+  dev: { dayOverride: number | null };
 };
 
 export const SETTINGS_KEY = 'settings:v2';
@@ -39,46 +53,105 @@ export const DEFAULT_SETTINGS: Settings = {
   lastUsedReadingMode: null,
   fastingEnabled: false,
   reminder: { slot: 'none', hour: 7, minute: 0 },
-  readerFontSize: 18,
+  readerFontSize: READER_FONT_DEFAULT,
   analyticsEnabled: false,
   milestonesSeen: [],
+  milestonesKept: [],
   ministry: null,
   altarReminder: false,
-  dev: { slowLoad: false, failLoad: false, dayOverride: null },
+  dev: { dayOverride: null },
 };
 
 let cache: Settings | null = null;
 const listeners = new Set<() => void>();
 const emit = () => listeners.forEach((l) => l());
+const enqueue = createWriteQueue();
 
-function merge(raw: unknown): Settings {
-  const r = (raw ?? {}) as Partial<Settings>;
+const READING_MODES: readonly ReadingMode[] = ['in_app', 'own_bible', 'both'];
+const REMINDER_SLOTS: readonly ReminderSlot[] = ['morning', 'afternoon', 'evening', 'custom', 'none'];
+
+const oneOf = <T extends string>(options: readonly T[], value: unknown, fallback: T | null): T | null =>
+  typeof value === 'string' && (options as readonly string[]).includes(value) ? (value as T) : fallback;
+const bool = (value: unknown, fallback: boolean) => (typeof value === 'boolean' ? value : fallback);
+const intIn = (value: unknown, min: number, max: number, fallback: number) =>
+  typeof value === 'number' && Number.isInteger(value) && value >= min && value <= max ? value : fallback;
+
+/**
+ * Normalização ÚNICA das preferências (PER-05): roda na carga e em toda gravação,
+ * então nenhuma tela precisa corrigir valor salvo por conta própria. Campo
+ * ausente, de tipo errado ou fora da faixa volta ao padrão; campos que esta
+ * versão não conhece passam intactos.
+ */
+export function normalizeSettings(raw: unknown): Settings {
+  const r = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
+  const d = DEFAULT_SETTINGS;
+  const reminder = (r.reminder && typeof r.reminder === 'object' ? r.reminder : {}) as Record<string, unknown>;
+  const dev = (r.dev && typeof r.dev === 'object' ? r.dev : {}) as Record<string, unknown>;
+  const override = dev.dayOverride;
   return {
-    ...DEFAULT_SETTINGS,
-    ...r,
-    reminder: { ...DEFAULT_SETTINGS.reminder, ...(r.reminder ?? {}) },
-    milestonesSeen: Array.isArray(r.milestonesSeen) ? r.milestonesSeen.filter((d) => typeof d === 'number') : [],
-    dev: { ...DEFAULT_SETTINGS.dev, ...(r.dev ?? {}) },
+    ...(r as Partial<Settings>),
+    onboardingCompleted: bool(r.onboardingCompleted, d.onboardingCompleted),
+    readingMode: oneOf(READING_MODES, r.readingMode, null),
+    lastUsedReadingMode: oneOf(READING_MODES, r.lastUsedReadingMode, null),
+    fastingEnabled: bool(r.fastingEnabled, d.fastingEnabled),
+    reminder: {
+      slot: oneOf(REMINDER_SLOTS, reminder.slot, d.reminder.slot) ?? d.reminder.slot,
+      hour: intIn(reminder.hour, 0, 23, d.reminder.hour),
+      minute: intIn(reminder.minute, 0, 59, d.reminder.minute),
+    },
+    // Escala do B3: 18 era o padrão antigo e vira 19 aqui, para toda tela
+    // (Aparência, leitor, D1) ver o mesmo valor.
+    readerFontSize: normalizeReaderFontSize(r.readerFontSize as number | undefined),
+    analyticsEnabled: bool(r.analyticsEnabled, d.analyticsEnabled),
+    milestonesSeen: Array.isArray(r.milestonesSeen)
+      ? r.milestonesSeen.filter((day): day is number => typeof day === 'number' && Number.isInteger(day))
+      : [],
+    milestonesKept: Array.isArray(r.milestonesKept)
+      ? r.milestonesKept.filter((day): day is number => typeof day === 'number' && Number.isInteger(day))
+      : [],
+    ministry: typeof r.ministry === 'string' && r.ministry.length > 0 ? r.ministry : null,
+    altarReminder: bool(r.altarReminder, d.altarReminder),
+    // Em release, nada de DEV sobrevive (DIA-01/PER-01).
+    dev: {
+      dayOverride:
+        isDevBuild() && typeof override === 'number' && Number.isInteger(override) && override >= 1 ? override : null,
+    },
   };
 }
 
 export async function loadSettings(): Promise<Settings> {
   if (cache) return cache;
+  let value: Settings;
   try {
     const raw = await AsyncStorage.getItem(SETTINGS_KEY);
-    cache = raw ? merge(JSON.parse(raw)) : DEFAULT_SETTINGS;
+    value = raw ? normalizeSettings(JSON.parse(raw)) : DEFAULT_SETTINGS;
   } catch {
-    cache = DEFAULT_SETTINGS;
+    value = DEFAULT_SETTINGS;
   }
+  // Uma gravação pode ter terminado enquanto o disco era lido: ela vale mais.
+  if (cache) return cache;
+  cache = value;
   return cache;
 }
 
-export async function updateSettings(patch: (current: Settings) => Settings): Promise<Settings> {
-  const next = patch(await loadSettings());
-  cache = next;
-  await AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(next));
-  emit();
-  return next;
+/** Grava no disco e só então atualiza o cache (PER-02). Se o disco falhar, rejeita e nada muda. */
+export function updateSettings(patch: (current: Settings) => Settings): Promise<Settings> {
+  return enqueue(async () => {
+    const next = normalizeSettings(patch(await loadSettings()));
+    await AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(next));
+    cache = next;
+    emit();
+    return next;
+  });
+}
+
+/** Volta as preferências ao padrão, no disco e no cache, e avisa as telas (PER-03). */
+export function wipeSettings(): Promise<void> {
+  return enqueue(async () => {
+    await AsyncStorage.removeItem(SETTINGS_KEY);
+    cache = DEFAULT_SETTINGS;
+    emit();
+  });
 }
 
 export function getCachedSettings(): Settings | null {

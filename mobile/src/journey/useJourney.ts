@@ -1,9 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
-import { AppState } from 'react-native';
+import { useMemo } from 'react';
 
 import {
   completedCount,
-  daysSinceLastCompletion,
   isDayCompleted,
   pendingDaysUpTo,
   useCompletions,
@@ -11,9 +9,12 @@ import {
 } from '@/progress/completionsStore';
 import { useSettings } from '@/settings/settingsStore';
 
+import { useCampaignNow } from './campaignClock';
 import { contentState, getCampaign, getDataset, getDay, type ContentState } from './datasetSource';
+import { isDevBuild } from './devBuild';
 import { officialDayInfo, type CampaignPhase } from './officialDay';
 import { nextMilestoneAfter, reachedMilestones, type Milestone } from './milestones';
+import { daysSinceLastCompletion, WELCOME_BACK_MIN_GAP } from './returnGap';
 import type { Campaign, JourneyDay } from './types';
 
 export type DayState = 'completed' | 'today' | 'pending' | 'future';
@@ -29,7 +30,21 @@ export type JourneySnapshot = {
   completions: Completions | null;
   completedCount: number;
   pendingDays: number[];
+  /**
+   * Dias desde a última conclusão, medidos pelo instante em que ela aconteceu
+   * (DIA-02): 0 = concluiu algo hoje. Nulo antes da campanha e para quem nunca
+   * concluiu nada. O primeiro dia em aberto da sequência é `officialDay − gapDays + 1`.
+   */
   gapDays: number | null;
+  /**
+   * Retorno após lacuna: campanha em curso, hoje em aberto e pelo menos três
+   * dias em aberto consecutivos antes de hoje (`gapDays ≥ 4`, R0-5). Hoje só
+   * alimenta a métrica return_after_gap; a mensagem de entrada da Jornada vem
+   * de `entryMessage()` em journey/returnGap.ts.
+   */
+  welcomeBack: boolean;
+  /** Dias até o início (0 durante e depois da campanha), do mesmo relógio que a fase (DIA-04). */
+  daysToStart: number;
   nextMilestone: Milestone | null;
   reached: Milestone[];
   todayDay: JourneyDay | null;
@@ -39,31 +54,31 @@ export type JourneySnapshot = {
   ready: boolean;
 };
 
-/** Reavalia o Dia oficial ao voltar do background (a virada de meia-noite não deve exigir reinício). */
-function useNow(): Date {
-  const [now, setNow] = useState(() => new Date());
-  useEffect(() => {
-    const subscription = AppState.addEventListener('change', (state) => {
-      if (state === 'active') setNow(new Date());
-    });
-    return () => subscription.remove();
-  }, []);
-  return now;
-}
-
 export function useJourney(): JourneySnapshot {
-  const now = useNow();
+  // Relógio único do app: vira na meia-noite de São Paulo e ao voltar do background (DIA-04).
+  const now = useCampaignNow();
   const settings = useSettings();
   const campaign = getCampaign();
   const completions = useCompletions(campaign.id);
 
   const info = useMemo(() => officialDayInfo(now, campaign), [now, campaign]);
-  const override = settings?.dev.dayOverride ?? null;
-  const officialDay = override ?? info.officialDay;
+  // O dia simulado do painel DEV só vale em build de desenvolvimento (DIA-01/PER-01).
+  const override = isDevBuild() ? (settings?.dev.dayOverride ?? null) : null;
+  /** Um override além do último dia simula a campanha encerrada (E5) no painel DEV. */
+  const overrideFinished = override !== null && override > campaign.total_days;
+  const officialDay = override === null ? info.officialDay : Math.min(override, campaign.total_days);
   /** Simular um dia no painel DEV coloca a campanha em curso, senão nada abriria. */
-  const phase: CampaignPhase = override !== null ? 'running' : info.phase;
+  const phase: CampaignPhase = override === null ? info.phase : overrideFinished ? 'finished' : 'running';
   const done = completedCount(completions);
   const state = contentState();
+  /** "Hoje" no calendário da campanha; com o dia simulado, o calendário inteiro anda junto. */
+  const todayCampaignDay = override === null ? info.rawDay : officialDay;
+  const gapDays =
+    phase === 'before_start'
+      ? null
+      : daysSinceLastCompletion(completions, todayCampaignDay, campaign, todayCampaignDay - info.rawDay);
+  const welcomeBack =
+    phase === 'running' && !isDayCompleted(completions, officialDay) && gapDays !== null && gapDays >= WELCOME_BACK_MIN_GAP;
 
   /**
    * Antes da campanha começar, NENHUM dia abre — inclusive o Dia 1. O clamp do dia
@@ -88,7 +103,9 @@ export function useJourney(): JourneySnapshot {
     completions,
     completedCount: done,
     pendingDays: phase === 'before_start' ? [] : pendingDaysUpTo(completions, officialDay).filter((d) => phase === 'finished' || d !== officialDay),
-    gapDays: phase === 'before_start' ? null : daysSinceLastCompletion(completions, officialDay),
+    gapDays,
+    welcomeBack,
+    daysToStart: phase === 'before_start' ? Math.max(0, 1 - info.rawDay) : 0,
     nextMilestone: nextMilestoneAfter(done),
     reached: reachedMilestones(done),
     todayDay: phase === 'before_start' ? null : getDay(officialDay),

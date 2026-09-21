@@ -1,6 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useEffect, useState } from 'react';
 
+import { createWriteQueue } from '@/progress/writeQueue';
+
 /**
  * Reflexão privada por dia (spec §11). LOCAL-ONLY: não vai ao backend, não é analisada,
  * não alimenta analytics e não entra em IA. "Compartilhar insight" é uma ação social
@@ -15,6 +17,7 @@ const keyFor = (campaignId: string) => `${REFLECTIONS_PREFIX}${campaignId}`;
 const cache = new Map<string, Reflections>();
 const listeners = new Set<() => void>();
 const emit = () => listeners.forEach((l) => l());
+const enqueue = createWriteQueue();
 
 export async function loadReflections(campaignId: string): Promise<Reflections> {
   const cached = cache.get(campaignId);
@@ -37,21 +40,27 @@ export async function loadReflections(campaignId: string): Promise<Reflections> 
   } catch {
     value = EMPTY;
   }
+  // Uma gravação pode ter terminado enquanto o disco era lido: ela vale mais.
+  const settled = cache.get(campaignId);
+  if (settled) return settled;
   cache.set(campaignId, value);
   return value;
 }
 
-export async function saveReflection(campaignId: string, dayNumber: number, body: string): Promise<Reflections> {
-  const current = await loadReflections(campaignId);
-  const byDay = { ...current.byDay };
-  const trimmed = body.trim();
-  if (trimmed) byDay[dayNumber] = { body: trimmed, updatedAt: new Date().toISOString() };
-  else delete byDay[dayNumber];
-  const next: Reflections = { byDay };
-  cache.set(campaignId, next);
-  await AsyncStorage.setItem(keyFor(campaignId), JSON.stringify(next));
-  emit();
-  return next;
+/** Grava no disco e só então atualiza o cache (PER-02). Se o disco falhar, rejeita e nada muda. */
+export function saveReflection(campaignId: string, dayNumber: number, body: string): Promise<Reflections> {
+  return enqueue(async () => {
+    const current = await loadReflections(campaignId);
+    const byDay = { ...current.byDay };
+    const trimmed = body.trim();
+    if (trimmed) byDay[dayNumber] = { body: trimmed, updatedAt: new Date().toISOString() };
+    else delete byDay[dayNumber];
+    const next: Reflections = { byDay };
+    await AsyncStorage.setItem(keyFor(campaignId), JSON.stringify(next));
+    cache.set(campaignId, next);
+    emit();
+    return next;
+  });
 }
 
 export const deleteReflection = (campaignId: string, dayNumber: number) => saveReflection(campaignId, dayNumber, '');
@@ -68,10 +77,22 @@ export function reflectionDays(reflections: Reflections | null): number[] {
   return reflections ? Object.keys(reflections.byDay).map(Number).sort((a, b) => a - b) : [];
 }
 
-export async function resetReflections(campaignId: string): Promise<void> {
-  await AsyncStorage.removeItem(keyFor(campaignId));
-  cache.delete(campaignId);
-  emit();
+export function resetReflections(campaignId: string): Promise<void> {
+  return enqueue(async () => {
+    await AsyncStorage.removeItem(keyFor(campaignId));
+    cache.delete(campaignId);
+    emit();
+  });
+}
+
+/** Apaga as reflexões de TODAS as campanhas, no disco e no cache, e avisa as telas (PER-03). */
+export function wipeAllReflections(): Promise<void> {
+  return enqueue(async () => {
+    const keys = (await AsyncStorage.getAllKeys()).filter((key) => key.startsWith(REFLECTIONS_PREFIX));
+    if (keys.length > 0) await AsyncStorage.multiRemove(keys);
+    cache.clear();
+    emit();
+  });
 }
 
 export function subscribeReflections(listener: () => void): () => void {

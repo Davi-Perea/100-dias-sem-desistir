@@ -1,7 +1,7 @@
 import Svg, { Circle, G, Path, Polyline, Rect } from 'react-native-svg';
 
 /**
- * Ícones do handoff: convencionais, traço 1,9px, 22×22, `currentColor`.
+ * Ícones: convencionais, traço de 2px (2,5 no cadeado), caixa de 24, `currentColor`.
  *
  * São desenhados aqui em vez de virem de uma biblioteca porque o traço e a caixa
  * fazem parte da direção visual — o handoff permite trocar por Lucide/SF Symbols,
@@ -28,11 +28,26 @@ export type IconName =
   | 'bell'
   | 'share'
   | 'flag-finish'
-  | 'alert';
+  | 'alert'
+  // Barra de navegação do redesenho (TOKENS §5, "Ícones").
+  | 'journey'
+  | 'community'
+  | 'you';
 
-type Props = { name: IconName; size?: number; color: string; strokeWidth?: number };
+type Props = {
+  name: IconName;
+  size?: number;
+  color: string;
+  strokeWidth?: number;
+  /**
+   * Cor do fundo onde o ícone está. Só o ícone de comunidade usa: o círculo da
+   * direita é preenchido com ela para recortar o da esquerda, como no desenho.
+   */
+  cutout?: string;
+};
 
-export function Icon({ name, size = 22, color, strokeWidth = 1.9 }: Props) {
+// Traço de 2px (TOKENS §5, "Ícones"); 2,5 no cadeado.
+export function Icon({ name, size = 22, color, strokeWidth = 2, cutout = 'transparent' }: Props) {
   const common = {
     stroke: color,
     strokeWidth,
@@ -92,8 +107,8 @@ export function Icon({ name, size = 22, color, strokeWidth = 1.9 }: Props) {
       {name === 'chevron-down' ? <Polyline points="5,9 12,16 19,9" {...common} /> : null}
       {name === 'lock' ? (
         <G>
-          <Rect x={4.6} y={10.2} width={14.8} height={10.2} rx={2.4} {...common} />
-          <Path d="M8.2 10.2V7.6a3.8 3.8 0 0 1 7.6 0v2.6" {...common} />
+          <Rect x={4.6} y={10.2} width={14.8} height={10.2} rx={2.4} {...common} strokeWidth={2.5} />
+          <Path d="M8.2 10.2V7.6a3.8 3.8 0 0 1 7.6 0v2.6" {...common} strokeWidth={2.5} />
         </G>
       ) : null}
       {name === 'check' ? <Polyline points="4.5,12.4 9.6,17.5 19.5,7" {...common} /> : null}
@@ -138,6 +153,32 @@ export function Icon({ name, size = 22, color, strokeWidth = 1.9 }: Props) {
           <Circle cx={12} cy={12} r={8.4} {...common} />
           <Path d="M12 7.6v5" {...common} />
           <Circle cx={12} cy={16.2} r={1.1} fill={color} stroke="none" />
+        </G>
+      ) : null}
+      {name === 'journey' ? (
+        // A régua dos cem dias reduzida: quatro traços de 2,5 de largura, alturas
+        // 9 / 16 / 12 / 6, intervalo 3, alinhados pela base. Raio 1,5 pedido; numa
+        // largura de 2,5 ele é reduzido a 1,25 — o mesmo que o CSS do desenho faz.
+        // Medidas em pixels quando o ícone é desenhado em 24 (1 unidade = 1px).
+        <G>
+          <Rect x={2.5} y={11} width={2.5} height={9} rx={1.25} fill={color} />
+          <Rect x={8} y={4} width={2.5} height={16} rx={1.25} fill={color} />
+          <Rect x={13.5} y={8} width={2.5} height={12} rx={1.25} fill={color} />
+          <Rect x={19} y={14} width={2.5} height={6} rx={1.25} fill={color} />
+        </G>
+      ) : null}
+      {name === 'community' ? (
+        // Dois círculos vazados de 12 e 14, traço 2; o da direita recorta o outro.
+        <G>
+          <Circle cx={8.5} cy={12} r={6} stroke={color} strokeWidth={2} fill="none" />
+          <Circle cx={15} cy={12} r={7} stroke={color} strokeWidth={2} fill={cutout} />
+        </G>
+      ) : null}
+      {name === 'you' ? (
+        // Cabeça de 9 sobre ombros de 18×8 com topo arredondado e sem base.
+        <G>
+          <Circle cx={12} cy={7.5} r={4.5} stroke={color} strokeWidth={2} fill="none" />
+          <Path d="M3 21 A9 8 0 0 1 21 21" stroke={color} strokeWidth={2} fill="none" strokeLinecap="round" />
         </G>
       ) : null}
     </Svg>

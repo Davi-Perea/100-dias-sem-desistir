@@ -6,7 +6,7 @@ import { devDataset } from '@/journey/fixtures/devCampaign';
 import { calendarDateInCampaignTz } from '@/journey/officialDay';
 import type { JourneyDataset } from '@/journey/types';
 import { useJourney } from '@/journey/useJourney';
-import { _resetCompletionsCacheForTests, setDayCompleted } from '@/progress/completionsStore';
+import { _resetCompletionsCacheForTests, COMPLETIONS_PREFIX, setDayCompleted } from '@/progress/completionsStore';
 import { _resetSettingsCacheForTests, SETTINGS_KEY } from '@/settings/settingsStore';
 
 const CAMPAIGN_ID = 'dev-fixture-campaign';
@@ -101,6 +101,31 @@ describe('dia oficial por fase da campanha', () => {
   });
 });
 
+describe('painel DEV: simular o dia oficial', () => {
+  async function mountWithOverride(dayOverride: number) {
+    await AsyncStorage.setItem(
+      SETTINGS_KEY,
+      JSON.stringify({ onboardingCompleted: true, dev: { dayOverride } }),
+    );
+    _resetSettingsCacheForTests();
+    return mountOnDay(-5);
+  }
+
+  test('um dia dentro da campanha força a fase em curso', async () => {
+    const { result } = await mountWithOverride(25);
+    await waitFor(() => expect(result.current.officialDay).toBe(25));
+    expect(result.current.phase).toBe('running');
+  });
+
+  test('"Depois da campanha" (LACUNAS B35) simula o encerramento: fase finished, dia fixo em 100', async () => {
+    const { result } = await mountWithOverride(101);
+    await waitFor(() => expect(result.current.phase).toBe('finished'));
+    expect(result.current.officialDay).toBe(100);
+    expect(result.current.dayState(100)).toBe('pending');
+    expect(result.current.isDayUnlocked(101)).toBe(false);
+  });
+});
+
 describe('entrada tardia e atraso', () => {
   test('igreja no dia 17: usuário entra no dia 17, sem backlog obrigatório', async () => {
     const { result } = await mountOnDay(17);
@@ -114,19 +139,33 @@ describe('entrada tardia e atraso', () => {
   });
 
   test('atraso NÃO replaneja o calendário individual: o dia oficial segue a campanha', async () => {
-    const { result, rerender } = await mountOnDay(30);
+    const { result } = await mountOnDay(30);
     expect(result.current.officialDay).toBe(30);
 
-    // A pessoa lê só o dia 10, com 20 dias de intervalo.
-    await setDayCompleted(CAMPAIGN_ID, 10, true);
-    rerender({});
-    await waitFor(() => expect(result.current.completedCount).toBe(1));
+    // A pessoa lê só o dia 10, no próprio dia 10, e some por 20 dias.
+    await AsyncStorage.setItem(
+      `${COMPLETIONS_PREFIX}${CAMPAIGN_ID}`,
+      JSON.stringify({ days: { 10: new Date(Date.now() - 20 * DAY_MS).toISOString() }, updatedAt: '' }),
+    );
+    _resetCompletionsCacheForTests();
+    const again = await mountOnDay(30);
+    await waitFor(() => expect(again.result.current.completedCount).toBe(1));
 
     // O dia de hoje continua sendo o 30 da igreja, não "o dia 11 dela".
-    expect(result.current.officialDay).toBe(30);
-    expect(result.current.todayDay?.day_number).toBe(30);
-    expect(result.current.gapDays).toBe(20);
-    expect(result.current.isDayUnlocked(31)).toBe(false);
+    expect(again.result.current.officialDay).toBe(30);
+    expect(again.result.current.todayDay?.day_number).toBe(30);
+    // DIA-02: a lacuna conta desde QUANDO leu (há 20 dias), não o número do dia lido.
+    expect(again.result.current.gapDays).toBe(20);
+    expect(again.result.current.welcomeBack).toBe(true);
+    expect(again.result.current.isDayUnlocked(31)).toBe(false);
+  });
+
+  test('DIA-02: entrou no dia 20 e leu o Dia 1 hoje — não é "de volta"', async () => {
+    const { result } = await mountOnDay(20);
+    await setDayCompleted(CAMPAIGN_ID, 1, true);
+    await waitFor(() => expect(result.current.completedCount).toBe(1));
+    expect(result.current.gapDays).toBe(0);
+    expect(result.current.welcomeBack).toBe(false);
   });
 });
 

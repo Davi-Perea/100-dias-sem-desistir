@@ -1,28 +1,41 @@
-import { router, useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
+import { Alert, KeyboardAvoidingView, ScrollView, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { getDay } from '@/journey/datasetSource';
+import { formatDayDate } from '@/journey/officialDay';
 import { readingSummary } from '@/journey/readingSummary';
 import { useJourney } from '@/journey/useJourney';
 import { deleteReflection, getReflection, saveReflection, useReflections } from '@/reflections/reflectionsStore';
-import { AppText, Button, Cap, Rule, Screen, StateView } from '@/ui/components';
+import { BackBar, goBackOrHome } from '@/ui/BackBar';
+import { LockedDayScreen } from '@/ui/LockSheet';
+import { TextField } from '@/ui/TextField';
+import { AppText, Block, Button, DevContentBanner, Screen, StateView } from '@/ui/components';
 import { Icon } from '@/ui/icons';
-import { MAX_CONTENT_WIDTH, MIN_TOUCH, fonts, spacing, useGutter, useTheme } from '@/ui/theme';
+import { spokenReference } from '@/ui/leitor/spoken';
+import { MAX_CONTENT_WIDTH, spacing, useGutter, useTheme } from '@/ui/theme';
+
+/** Piso do campo (TELAS B5). */
+const FIELD_MIN_HEIGHT = 220;
+/** Entrelinha do campo (Source Serif 19/32) e o padding dele (16 + 16). */
+const FIELD_LINE = 32;
+const FIELD_PADDING = 32;
 
 /**
- * Minha reflexão (tela 09). Privada por padrão e guardada só neste aparelho.
+ * B5 · Reflexão privada. Guardada só neste aparelho.
  *
- * Regra de produto do handoff, aplicada literalmente: a reflexão privada NUNCA
- * pré-preenche o insight público. São dois textos diferentes, escritos em
- * momentos diferentes, com públicos diferentes.
+ * Regra de produto (REGRAS 14), aplicada literalmente: a reflexão privada NUNCA
+ * pré-preenche uma publicação. O bloco "Compartilhar um insight" que existia aqui
+ * saiu — o desenho não o tem; no lugar entra a caixa azul que manda escrever de
+ * novo, do zero, de propósito.
  */
 export default function ReflectionScreen() {
   const params = useLocalSearchParams<{ day: string }>();
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const inset = useGutter();
+  const { fontScale } = useWindowDimensions();
   const journey = useJourney();
   const reflections = useReflections(journey.campaign.id);
 
@@ -31,6 +44,11 @@ export default function ReflectionScreen() {
   const [draftKey, setDraftKey] = useState<string | null>(null);
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
+  /** A última gravação (ou exclusão) falhou no disco: a pessoa fica no editor, com o rascunho, e é avisada. */
+  const [saveFailed, setSaveFailed] = useState(false);
+  /** Altura da coluna abaixo da barra (rolagem + rodapé, já descontado o teclado) e do rodapé. */
+  const [columnHeight, setColumnHeight] = useState(0);
+  const [footerHeight, setFooterHeight] = useState(0);
 
   // Deriva o rascunho a partir do valor guardado sem setState dentro de efeito.
   const key = `${journey.campaign.id}:${day}:${reflections ? 'ready' : 'loading'}`;
@@ -44,11 +62,21 @@ export default function ReflectionScreen() {
       <Screen>
         <StateView
           kind="empty"
+          icon="alert"
           title="Dia não encontrado"
-          action={<Button title="Voltar" variant="outline" onPress={() => router.back()} />}
+          message="Este link não leva a nenhum dia da jornada."
+          action={<Button title="Voltar" variant="outline" onPress={goBackOrHome} />}
         />
       </Screen>
     );
+  }
+
+  // O bloqueio é da ROTA (REGRAS 7, A4): link direto para a reflexão de um dia
+  // que ainda não abriu chega no mesmo cadeado, sem editor e sem a referência.
+  // PROVISÓRIO (LACUNAS P15): a variante de texto da reflexão não foi escrita;
+  // usa a da leitura, como a fundação prevê.
+  if (!journey.isDayUnlocked(day)) {
+    return <LockedDayScreen dayNumber={day} dateLabel={formatDayDate(day, journey.campaign)} />;
   }
 
   if (!reflections) {
@@ -59,19 +87,29 @@ export default function ReflectionScreen() {
     );
   }
 
-  // A referência da leitura é conteúdo do dia: num dia que ainda não abriu ela
-  // não aparece, mesmo que a rota seja alcançada por link direto.
-  const summary = journey.isDayUnlocked(day) ? readingSummary(getDay(day)) : null;
+  const isToday = journey.phase === 'running' && day === journey.officialDay;
+  const summary = readingSummary(getDay(day));
+  const footerCap = summary ? `${summary.label} · salva neste aparelho` : 'salva neste aparelho';
+  const footerCapSpoken = summary ? `${spokenReference(summary.label)}, salva neste aparelho` : 'Salva neste aparelho';
 
-  const save = async () => {
-    setBusy(true);
-    try {
-      await saveReflection(journey.campaign.id, day, draft.trim());
-      router.back();
-    } finally {
-      setBusy(false);
-    }
-  };
+  /**
+   * Teclado aberto é estado de layout (REGRAS 28). O rodapé fica preso embaixo
+   * enquanto sobra, acima dele, uma janela de rolagem de pelo menos três linhas
+   * do campo na escala de fonte atual. Quando não sobra (fonte grande + teclado),
+   * o rodapé desce para o fim da rolagem: a pessoa continua vendo o que digita e
+   * o campo nunca vai a zero — no app antigo, a partir de ~1,65×, ia.
+   *
+   * CORREÇÃO TÉCNICA (REGRAS 25/28): nem o desenho ("rodapé fixo") nem o app
+   * antigo (rodapé sempre preso) desprendem o rodapé. Limiar escolhido: três
+   * linhas do campo na escala atual (32 × 3 × fontScale + 32 de padding) acima
+   * do rodapé preso. Motivo: abaixo disso, com teclado aberto e fonte grande, o
+   * campo que a pessoa está digitando sumia atrás do rodapé. Custo: nesse caso
+   * "Salvar para mim" fica no fim da rolagem, fora de vista enquanto digita.
+   * PROVISÓRIO (pergunta 6 ao designer): o desenho exato da versão com teclado;
+   * mostrar este comportamento na revisão da etapa.
+   */
+  const minViewport = FIELD_LINE * 3 * fontScale + FIELD_PADDING;
+  const footerPinned = columnHeight === 0 || footerHeight === 0 || columnHeight - footerHeight >= minViewport;
 
   const remove = () => {
     Alert.alert('Excluir reflexão', 'Esta reflexão será apagada deste aparelho.', [
@@ -80,141 +118,177 @@ export default function ReflectionScreen() {
         text: 'Excluir',
         style: 'destructive',
         onPress: async () => {
-          await deleteReflection(journey.campaign.id, day);
-          router.back();
+          setSaveFailed(false);
+          try {
+            await deleteReflection(journey.campaign.id, day);
+            goBackOrHome();
+          } catch {
+            setSaveFailed(true);
+          }
         },
       },
     ]);
   };
 
+  const save = async () => {
+    const body = draft.trim();
+    // R1-6: esvaziar o campo e salvar apagaria a reflexão guardada sem a
+    // confirmação que o "Excluir" pede. Passa pela mesma confirmação.
+    if (body.length === 0 && stored.length > 0) {
+      remove();
+      return;
+    }
+    setBusy(true);
+    setSaveFailed(false);
+    try {
+      await saveReflection(journey.campaign.id, day, body);
+      goBackOrHome();
+    } catch {
+      // PER-02 (parte da tela): o disco recusou. A pessoa continua no editor com
+      // o rascunho e fica sabendo que não salvou — nunca sai como se tivesse salvo.
+      setSaveFailed(true);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const footer = (
+    <View
+      testID="reflection-footer"
+      // Só a altura do rodapé PRESO conta: medir também o solto (mais baixo)
+      // faria a decisão oscilar entre os dois estados.
+      onLayout={footerPinned ? (event) => setFooterHeight(Math.round(event.nativeEvent.layout.height)) : undefined}
+      style={
+        footerPinned
+          ? {
+              paddingHorizontal: inset,
+              paddingTop: spacing.md,
+              paddingBottom: insets.bottom + spacing.md,
+              gap: spacing.md,
+              borderTopWidth: 1,
+              borderTopColor: colors.border,
+              backgroundColor: colors.background,
+            }
+          : { gap: spacing.md, paddingTop: spacing.sm }
+      }
+    >
+      <AppText variant="cap" accessibilityLabel={footerCapSpoken}>
+        {footerCap}
+      </AppText>
+      {saveFailed ? (
+        // Cor `danger` sobre `background`: a mesma do "Excluir" da barra. Anunciado
+        // assim que aparece (região viva), porque o foco está no botão.
+        <AppText
+          variant="bodySm"
+          accessibilityRole="alert"
+          accessibilityLiveRegion="polite"
+          style={{ color: colors.danger }}
+          testID="reflection-save-error"
+        >
+          Não foi possível salvar. Sua reflexão continua aqui; tente de novo.
+        </AppText>
+      ) : null}
+      <Button title="Salvar para mim" onPress={save} loading={busy} testID="reflection-save" />
+    </View>
+  );
+
   return (
     <Screen edges={['top', 'left', 'right']}>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        // R1-4: 'padding' também no Android. Com o edge-to-edge (obrigatório no
+        // RN 0.86) a janela não encolhe com o teclado, então sem comportamento a
+        // coluna nunca encolhia, o rodapé nunca desprendia e "Salvar para mim"
+        // ficava sob o teclado. Se algum aparelho ainda encolher a janela, o
+        // KeyboardAvoidingView mede sobreposição zero e não soma nada — não há
+        // espaço dobrado. PROVISÓRIO (decisão do engenheiro, 2026-09-21: ainda
+        // não verificado em APK de desenvolvimento; risco aberto até lá).
+        behavior="padding"
         keyboardVerticalOffset={insets.top}
       >
         {/* ------------------------------------------------------------ barra */}
-        <View
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            paddingHorizontal: inset - spacing.sm,
-            minHeight: MIN_TOUCH,
-          }}
-        >
-          <Pressable
-            onPress={() => router.back()}
-            accessibilityRole="button"
-            testID="reflection-cancel"
-            style={({ pressed }) => [{ minHeight: MIN_TOUCH, justifyContent: 'center', paddingHorizontal: spacing.sm }, pressed && { opacity: 0.72 }]}
-          >
-            <AppText variant="item">Cancelar</AppText>
-          </Pressable>
-          <View style={{ flex: 1, alignItems: 'center' }}>
-            <AppText style={{ fontFamily: fonts.label, fontSize: 15, color: colors.text }}>Dia {day}</AppText>
-          </View>
-          <Pressable
-            onPress={remove}
-            disabled={stored.length === 0}
-            accessibilityRole="button"
-            accessibilityState={{ disabled: stored.length === 0 }}
-            testID="reflection-delete"
-            style={({ pressed }) => [
-              { minHeight: MIN_TOUCH, justifyContent: 'center', paddingHorizontal: spacing.sm },
-              stored.length === 0 && { opacity: 0.4 },
-              pressed && stored.length > 0 && { opacity: 0.72 },
-            ]}
-          >
-            <AppText variant="item" style={{ color: colors.danger }}>
-              Excluir
-            </AppText>
-          </Pressable>
-        </View>
-
-        <ScrollView
-          contentContainerStyle={{
-            paddingHorizontal: inset,
-            paddingTop: spacing.lg,
-            paddingBottom: spacing.xxl,
-            gap: spacing.lg,
-            width: '100%',
-            maxWidth: MAX_CONTENT_WIDTH + inset * 2,
-            alignSelf: 'center',
-          }}
-          keyboardShouldPersistTaps="handled"
-        >
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
-            <Icon name="lock" size={16} color={colors.textMuted} />
-            <Cap>Minha reflexão · só você vê</Cap>
-          </View>
-
-          <AppText variant="blockTitleLg">O que ficou com você hoje?</AppText>
-
-          <TextInput
-            value={draft}
-            onChangeText={setDraft}
-            multiline
-            autoFocus={stored.length === 0}
-            textAlignVertical="top"
-            placeholder="Escreva à vontade."
-            placeholderTextColor={colors.textMuted}
-            accessibilityLabel="Texto da sua reflexão privada"
-            testID="reflection-input"
-            selectionColor={colors.text}
-            style={{
-              minHeight: 220,
-              fontFamily: fonts.read,
-              fontSize: 19,
-              lineHeight: 30.4,
-              color: colors.text,
+        <View style={{ paddingHorizontal: inset - spacing.sm }}>
+          <BackBar
+            label="Cancelar"
+            chevron={false}
+            title={`Dia ${day}`}
+            rightAction={{
+              label: 'Excluir',
+              variant: 'danger',
+              onPress: remove,
+              disabled: stored.length === 0,
+              accessibilityLabel: 'Excluir reflexão',
+              testID: 'reflection-delete',
             }}
           />
+        </View>
 
-          <Rule />
-
-          {/*
-            Caminho social. O composer de insight começa SEMPRE em branco: a
-            reflexão privada não é semente do texto público. Enquanto a área da
-            comunidade não estiver conectada, dizemos isso em vez de abrir um
-            caminho que não existe.
-          */}
-          <AppText variant="caption">
-            Um insight começa em branco e sua reflexão continua privada. Compartilhar abre quando a área da
-            comunidade estiver conectada.
-          </AppText>
-          <Button
-            title="Compartilhar um insight"
-            variant="outline"
-            disabled
-            onPress={() => {}}
-            testID="share-insight"
-          />
-        </ScrollView>
-
-        {/*
-          Rodapé: só o que precisa estar sempre à mão enquanto se escreve.
-          O teclado come ~336pt da coluna; com o caminho social aqui dentro, a
-          partir de fonte ~1,65× o rodapé sozinho passava do que sobrava e o
-          ScrollView ia a zero — a pessoa digitava num campo de altura nenhuma.
-          O bloco de compartilhar desceu para o fim da rolagem, junto do texto
-          que o explica.
-        */}
         <View
-          style={{
-            paddingHorizontal: inset,
-            paddingTop: spacing.md,
-            paddingBottom: insets.bottom + spacing.md,
-            gap: spacing.md,
-            borderTopWidth: 1,
-            borderTopColor: colors.border,
-            backgroundColor: colors.surface,
-          }}
+          style={{ flex: 1 }}
+          testID="reflection-column"
+          onLayout={(event) => setColumnHeight(Math.round(event.nativeEvent.layout.height))}
         >
-          <Cap>
-            {summary ? `${summary.label} · ` : ''}salva neste aparelho
-          </Cap>
-          <Button title="Salvar para mim" onPress={save} loading={busy} testID="reflection-save" />
+          <ScrollView
+            style={{ flex: 1 }}
+            contentContainerStyle={{
+              paddingHorizontal: inset,
+              paddingTop: spacing.lg,
+              paddingBottom: footerPinned ? spacing.xxl : insets.bottom + spacing.lg,
+              gap: spacing.lg,
+              width: '100%',
+              maxWidth: MAX_CONTENT_WIDTH + inset * 2,
+              alignSelf: 'center',
+            }}
+            keyboardShouldPersistTaps="handled"
+          >
+            {/* PROVISÓRIO (pergunta 5 ao designer): aviso de conteúdo (C-07). O
+                rodapé mostra a referência do dia, material da igreja. */}
+            <DevContentBanner state={journey.contentState} compact />
+
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+              <Icon name="lock" size={16} color={colors.textMuted} />
+              <AppText
+                variant="cap"
+                accessibilityRole="header"
+                accessibilityLabel="Minha reflexão, só você vê"
+                style={{ flex: 1 }}
+              >
+                Minha reflexão · só você vê
+              </AppText>
+            </View>
+
+            {/* Cópia literal do desenho no dia oficial. A reflexão abre também
+                para dias passados, e ali o "hoje" feriria o invariante §5.1: o dia
+                passado usa "neste dia", o mesmo recorte do jejum no A3.
+                PROVISÓRIO (decisão do engenheiro, 2026-09-21: LACUNAS C31, a
+                variante para dia passado ainda não foi desenhada). */}
+            <AppText variant="blockTitleLg" accessibilityRole="header">
+              {isToday ? 'O que ficou com você hoje?' : 'O que ficou com você neste dia?'}
+            </AppText>
+
+            <TextField
+              minHeight={FIELD_MIN_HEIGHT}
+              value={draft}
+              onChangeText={setDraft}
+              // PROVISÓRIO (pergunta 6 ao designer): foco automático com o campo
+              // vazio, como hoje.
+              autoFocus={stored.length === 0}
+              placeholder="Escreva à vontade."
+              accessibilityLabel="Texto da sua reflexão privada"
+              selectionColor={colors.text}
+              testID="reflection-input"
+            />
+
+            <Block tone="blueSoft" testID="reflection-private-note">
+              <AppText variant="bodySm" style={{ color: colors.onBlueSoft }}>
+                Isto fica neste aparelho. Se depois você quiser dizer algo para a igreja, escreve de novo — do zero,
+                de propósito.
+              </AppText>
+            </Block>
+
+            {footerPinned ? null : footer}
+          </ScrollView>
+          {footerPinned ? footer : null}
         </View>
       </KeyboardAvoidingView>
     </Screen>

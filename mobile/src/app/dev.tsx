@@ -1,20 +1,46 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Redirect, router } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { View } from 'react-native';
+import { Alert, View } from 'react-native';
 
-import { clearRecordedEvents, recordedEvents } from '@/analytics/analytics';
+import { recordedEvents } from '@/analytics/analytics';
 import { contentState, getDataset, resetToBundledContent, resetToDevFixtures } from '@/journey/datasetSource';
 import { useJourney } from '@/journey/useJourney';
 import { validateDataset, assertProductionReady } from '@/journey/validator';
 import { resetCompletions } from '@/progress/completionsStore';
 import { resetFasting } from '@/fasting/fastingStore';
 import { resetReflections } from '@/reflections/reflectionsStore';
+import { isDevBuild } from '@/journey/devBuild';
 import { updateSettings, useSettings } from '@/settings/settingsStore';
-import { AppText, Button, Card, Checkbox, Divider, Screen, ScreenScroll, StateView } from '@/ui/components';
+import { wipeLocalData } from '@/settings/wipeLocalData';
+import { AppText, Button, Card, Divider, Screen, ScreenScroll, StateView } from '@/ui/components';
 import { spacing, useTheme } from '@/ui/theme';
 
-/** Ferramentas de desenvolvimento. Não faz parte do produto: remover ou ocultar em produção. */
-export default function DevScreen() {
+/**
+ * Ferramentas de desenvolvimento. Não faz parte do produto.
+ * A rota existe em todo build (o Expo Router registra todo arquivo de app/ e o
+ * esquema de URL abre qualquer rota), então em release ela redireciona para o
+ * início antes de montar qualquer coisa (DIA-01/PER-01/DIR-01), como o catálogo
+ * de componentes já fazia.
+ */
+export default function DevRoute() {
+  if (!isDevBuild()) return <Redirect href="/" />;
+  return <DevScreen />;
+}
+
+/** Pede confirmação antes de apagar tudo (PER-03): não há como desfazer. */
+function confirmWipe(onConfirm: () => void) {
+  Alert.alert(
+    'Apagar todos os dados locais?',
+    'Progresso, jejum, reflexões, preferências e posição de leitura deste aparelho serão apagados. Não dá para desfazer.',
+    [
+      { text: 'Cancelar', style: 'cancel' },
+      { text: 'Apagar tudo', style: 'destructive', onPress: onConfirm },
+    ],
+  );
+}
+
+function DevScreen() {
   const { colors } = useTheme();
   const settings = useSettings();
   const journey = useJourney();
@@ -56,7 +82,7 @@ export default function DevScreen() {
         <Card tone="muted">
           <View style={{ gap: spacing.xs }}>
             <AppText variant="cap">Dataset ativo</AppText>
-            <AppText style={{ fontWeight: '600' }}>{dataset.provenance.source_name}</AppText>
+            <AppText variant="rowLabel">{dataset.provenance.source_name}</AppText>
             <AppText variant="muted">
               rights_status: {dataset.provenance.rights_status} · versão: {dataset.provenance.content_version}
             </AppText>
@@ -93,6 +119,8 @@ export default function DevScreen() {
         </Card>
 
         <View style={{ gap: spacing.sm }}>
+          {/* Bancada de revisão do redesenho: componentes-base isolados. */}
+          <Button title="Catálogo de componentes" onPress={() => router.push('/componentes')} testID="dev-catalog" />
           <Button
             title="Validar dataset"
             variant="outline"
@@ -133,28 +161,24 @@ export default function DevScreen() {
                   onPress={() => updateSettings((s) => ({ ...s, dev: { ...s.dev, dayOverride: day } }))}
                 />
               ))}
+              {/* LACUNAS B35: sem esta opção o E5 (campanha encerrada) não podia ser visto. */}
+              <Button
+                title="Depois da campanha"
+                variant={
+                  settings.dev.dayOverride !== null && settings.dev.dayOverride > journey.campaign.total_days
+                    ? 'primary'
+                    : 'outline'
+                }
+                onPress={() =>
+                  updateSettings((s) => ({ ...s, dev: { ...s.dev, dayOverride: journey.campaign.total_days + 1 } }))
+                }
+              />
               <Button
                 title="Data real"
                 variant={settings.dev.dayOverride === null ? 'primary' : 'outline'}
                 onPress={() => updateSettings((s) => ({ ...s, dev: { ...s.dev, dayOverride: null } }))}
               />
             </View>
-          </View>
-        </Card>
-
-        <Card>
-          <View style={{ gap: spacing.md }}>
-            <AppText variant="cap">Simular estados</AppText>
-            <DevToggle
-              label="Carregamento lento"
-              checked={settings.dev.slowLoad}
-              onToggle={() => updateSettings((s) => ({ ...s, dev: { ...s.dev, slowLoad: !s.dev.slowLoad } }))}
-            />
-            <DevToggle
-              label="Falha ao carregar"
-              checked={settings.dev.failLoad}
-              onToggle={() => updateSettings((s) => ({ ...s, dev: { ...s.dev, failLoad: !s.dev.failLoad } }))}
-            />
           </View>
         </Card>
 
@@ -186,12 +210,13 @@ export default function DevScreen() {
             <Button
               title="Apagar tudo e voltar ao conteúdo real"
               variant="danger"
-              onPress={async () => {
-                await AsyncStorage.clear();
-                resetToBundledContent();
-                clearRecordedEvents();
-                await refresh();
-              }}
+              onPress={() =>
+                confirmWipe(async () => {
+                  await wipeLocalData();
+                  resetToBundledContent();
+                  await refresh();
+                })
+              }
             />
           </View>
         </Card>
@@ -199,11 +224,7 @@ export default function DevScreen() {
         <Card tone="muted">
           <View style={{ gap: spacing.xs }}>
             <AppText variant="cap">Eventos registrados ({events.length})</AppText>
-            <AppText variant="muted">
-              {settings.analyticsEnabled
-                ? 'Buffer local. Nenhum evento sai do aparelho: não há fornecedor conectado.'
-                : 'Analytics desligado nos ajustes (padrão).'}
-            </AppText>
+            <AppText variant="muted">Buffer local. Nenhum evento sai do aparelho: não há fornecedor conectado.</AppText>
             {events.slice(0, 12).map((e, i) => (
               <AppText key={i} variant="muted" style={{ fontSize: 11, color: colors.textMuted }}>
                 {e.at.slice(11, 19)} · {JSON.stringify(e.event)}
@@ -217,7 +238,7 @@ export default function DevScreen() {
             <AppText variant="cap">AsyncStorage ({keys.length} chaves)</AppText>
             {keys.map((item) => (
               <View key={item.key} style={{ gap: 2, paddingVertical: 4 }}>
-                <AppText style={{ fontWeight: '600', fontSize: 12 }}>{item.key}</AppText>
+                <AppText variant="rowLabel" style={{ fontSize: 12 }}>{item.key}</AppText>
                 <AppText variant="muted" style={{ fontSize: 11 }}>
                   {item.value}
                 </AppText>
@@ -230,14 +251,3 @@ export default function DevScreen() {
   );
 }
 
-/** Alternância simples do painel DEV; não faz parte do sistema visual do produto. */
-function DevToggle({ label, checked, onToggle }: { label: string; checked: boolean; onToggle: () => void }) {
-  return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
-      <AppText variant="item" style={{ flex: 1 }}>
-        {label}
-      </AppText>
-      <Checkbox checked={checked} onToggle={onToggle} label={label} />
-    </View>
-  );
-}

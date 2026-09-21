@@ -2,15 +2,17 @@ import { router } from 'expo-router';
 
 import { track } from '@/analytics/analytics';
 import { updateSettings, useSettings, type ReadingMode } from '@/settings/settingsStore';
-import { AppText, Button, ChoiceRow } from '@/ui/components';
-import { OnboardingStep } from '@/ui/OnboardingStep';
+import { Button, ChoiceRow } from '@/ui/components';
+import { OnboardingStep, StepSupport } from '@/ui/OnboardingStep';
 
-const OPTIONS: { mode: ReadingMode; title: string; subtitle: string }[] = [
-  { mode: 'in_app', title: 'Ler aqui no app', subtitle: 'O texto aparece direto na tela de hoje' },
-  { mode: 'own_bible', title: 'Usar minha Bíblia', subtitle: 'Você lê onde preferir e marca o dia como concluído' },
-  { mode: 'both', title: 'Vou alternar', subtitle: 'Depende do dia' },
+/** Rótulos exatos do F2. As descrições de antes saíram com o desenho. */
+const OPTIONS: { mode: ReadingMode; label: string }[] = [
+  { mode: 'in_app', label: 'Ler aqui no app' },
+  { mode: 'own_bible', label: 'Usar a minha Bíblia' },
+  { mode: 'both', label: 'Vou alternar' },
 ];
 
+/** F2 · Como você vai ler — passo 1 de 3. "Continuar" fica desabilitado até escolher. */
 export default function ReadingModeScreen() {
   const settings = useSettings();
   const selected = settings?.readingMode ?? null;
@@ -19,7 +21,11 @@ export default function ReadingModeScreen() {
     <OnboardingStep
       step={1}
       title="Como você pretende ler na maioria dos dias?"
-      subtitle="Isso muda só o destaque dos botões. As duas formas continuam disponíveis, sempre."
+      support={
+        <StepSupport testID="reading-support">
+          Ler na Bíblia impressa não é pior. Dá para mudar depois quando quiser.
+        </StepSupport>
+      }
       footer={
         <Button
           title="Continuar"
@@ -30,20 +36,20 @@ export default function ReadingModeScreen() {
           }}
           testID="reading-continue"
         />
-      }>
+      }
+    >
       {OPTIONS.map((option) => (
         <ChoiceRow
           key={option.mode}
-          label={option.title}
-          description={option.subtitle}
+          label={option.label}
           selected={selected === option.mode}
-          onPress={() => updateSettings((s) => ({ ...s, readingMode: option.mode, lastUsedReadingMode: option.mode }))}
+          // PER-02: se não gravar, a opção não fica marcada e a pessoa toca de novo.
+          onPress={() =>
+            updateSettings((s) => ({ ...s, readingMode: option.mode, lastUsedReadingMode: option.mode })).catch(() => undefined)
+          }
           testID={`onboarding-mode-${option.mode}`}
         />
       ))}
-      <AppText variant="caption">
-        Ler na Bíblia impressa ou em outro aplicativo não é uma experiência inferior. Aqui organizamos a jornada.
-      </AppText>
     </OnboardingStep>
   );
 }

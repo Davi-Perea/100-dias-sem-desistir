@@ -4,11 +4,16 @@
  * escolher a ferramenta, sem enviar nada para fora do aparelho.
  *
  * PROIBIDO por spec: reflexão privada, jejum, texto de insight, texto editorial
- * consumido, texto de oração, e-mail e nome. Os tipos abaixo não têm campo para isso.
+ * consumido, texto de oração, e-mail e nome. Os tipos abaixo não têm campo para isso
+ * — nem sequer o booleano de adesão ao jejum no fim do onboarding (PER-06).
+ *
+ * D-4 (2026-09-21): o app não tem SDK de análise e o interruptor "Enviar dados de
+ * uso anônimos" saiu da interface. O buffer só liga em desenvolvimento
+ * (`app/_layout.tsx`); em release `track` não grava nada.
  */
 export type AnalyticsEvent =
   | { name: 'onboarding_started' }
-  | { name: 'onboarding_completed'; readingMode: string; fasting: boolean; reminder: string }
+  | { name: 'onboarding_completed'; readingMode: string; reminder: string }
   | { name: 'journey_day_viewed'; dayNumber: number; isOfficialDay: boolean }
   | { name: 'reading_started'; dayNumber: number; mode: 'in_app' | 'own_bible' }
   | { name: 'reading_completed'; dayNumber: number; mode: 'in_app' | 'own_bible' | 'unknown' }

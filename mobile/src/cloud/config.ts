@@ -26,12 +26,31 @@ function readEnv(): { url: string | null; anonKey: string | null } {
 
 let override: CloudConfig | null = null;
 
+/**
+ * PORTÃO DE RELEASE DA NUVEM (D-6, SEC-04). Enquanto o app não tiver "Excluir conta"
+ * no próprio app E numa página web (Apple 5.1.1(v); política de exclusão do Google
+ * Play; LGPD art. 18), nenhuma build de release pode criar conta no servidor.
+ * Por isso, com `__DEV__ === false`, a nuvem fica DESLIGADA à força mesmo que as
+ * variáveis EXPO_PUBLIC_SUPABASE_* tenham sido embutidas por engano.
+ *
+ * Só vira `true` no mesmo commit que entregar: Edge Function de exclusão + tela
+ * "Sair"/"Excluir conta" em conta.tsx + página web de exclusão (SECURITY_V0.md).
+ */
+export const ACCOUNT_DELETION_AVAILABLE = false;
+
+/** A nuvem pode existir nesta build? Desenvolvimento sim; release só com exclusão de conta pronta. */
+export function cloudAllowedInThisBuild(isDev: boolean = typeof __DEV__ === 'undefined' ? false : __DEV__): boolean {
+  return isDev || ACCOUNT_DELETION_AVAILABLE;
+}
+
 /** Usado apenas por testes para simular uma build configurada. */
 export function _setCloudConfigForTests(config: CloudConfig | null) {
   override = config;
 }
 
 export function getCloudConfig(): CloudConfig | null {
+  // O portão vem antes de tudo, inclusive do override de teste: release nunca liga a nuvem.
+  if (!cloudAllowedInThisBuild()) return null;
   if (override) return override;
   const { url, anonKey } = readEnv();
   if (!url || !anonKey) return null;

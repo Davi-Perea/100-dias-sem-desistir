@@ -138,7 +138,7 @@ export default function AdminScreen() {
                       {index > 0 ? <Divider /> : null}
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
                         <View style={{ flex: 1, gap: 2 }}>
-                          <AppText style={{ fontWeight: '600' }}>
+                          <AppText variant="rowLabel">
                             {row.profile?.display_name ?? 'Participante'}
                           </AppText>
                           <AppText variant="muted">{row.role === 'leader' ? 'Líder' : 'Membro'}</AppText>

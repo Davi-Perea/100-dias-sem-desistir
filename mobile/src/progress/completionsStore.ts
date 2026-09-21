@@ -1,6 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useEffect, useState } from 'react';
 
+import { createWriteQueue } from './writeQueue';
+
 /**
  * Conclusão de leitura por dia da jornada. LOCAL-first (spec §21/§22): funciona offline
  * e é a fonte de verdade do progresso pessoal. A sincronização com `user_day_completions`
@@ -19,6 +21,7 @@ const keyFor = (campaignId: string) => `${COMPLETIONS_PREFIX}${campaignId}`;
 const cache = new Map<string, Completions>();
 const listeners = new Set<() => void>();
 const emit = () => listeners.forEach((l) => l());
+const enqueue = createWriteQueue();
 
 export async function loadCompletions(campaignId: string): Promise<Completions> {
   const cached = cache.get(campaignId);
@@ -38,24 +41,26 @@ export async function loadCompletions(campaignId: string): Promise<Completions> 
   } catch {
     value = EMPTY;
   }
+  // Uma gravação pode ter terminado enquanto o disco era lido: ela vale mais.
+  const settled = cache.get(campaignId);
+  if (settled) return settled;
   cache.set(campaignId, value);
   return value;
 }
 
-export async function setDayCompleted(
-  campaignId: string,
-  dayNumber: number,
-  completed: boolean,
-): Promise<Completions> {
-  const current = await loadCompletions(campaignId);
-  const days = { ...current.days };
-  if (completed) days[dayNumber] = new Date().toISOString();
-  else delete days[dayNumber];
-  const next: Completions = { days, updatedAt: new Date().toISOString() };
-  cache.set(campaignId, next);
-  await AsyncStorage.setItem(keyFor(campaignId), JSON.stringify(next));
-  emit();
-  return next;
+/** Grava no disco e só então atualiza o cache (PER-02). Se o disco falhar, rejeita e nada muda. */
+export function setDayCompleted(campaignId: string, dayNumber: number, completed: boolean): Promise<Completions> {
+  return enqueue(async () => {
+    const current = await loadCompletions(campaignId);
+    const days = { ...current.days };
+    if (completed) days[dayNumber] = new Date().toISOString();
+    else delete days[dayNumber];
+    const next: Completions = { days, updatedAt: new Date().toISOString() };
+    await AsyncStorage.setItem(keyFor(campaignId), JSON.stringify(next));
+    cache.set(campaignId, next);
+    emit();
+    return next;
+  });
 }
 
 export function isDayCompleted(completions: Completions | null, dayNumber: number): boolean {
@@ -77,17 +82,35 @@ export function pendingDaysUpTo(completions: Completions | null, officialDay: nu
   return out;
 }
 
-/** Dias desde a última conclusão; usado para a mensagem de retomada, não para punição. */
-export function daysSinceLastCompletion(completions: Completions | null, officialDay: number): number | null {
-  const done = completedDayNumbers(completions);
-  if (done.length === 0) return null;
-  return officialDay - done[done.length - 1];
+/**
+ * Instante da conclusão mais recente (qualquer dia). A lacuna da acolhida de
+ * retorno é medida a partir dele (`journey/returnGap.ts`, DIA-02).
+ */
+export function lastCompletionInstant(completions: Completions | null): Date | null {
+  let latest: number | null = null;
+  for (const iso of Object.values(completions?.days ?? {})) {
+    const ms = Date.parse(iso);
+    if (Number.isFinite(ms) && (latest === null || ms > latest)) latest = ms;
+  }
+  return latest === null ? null : new Date(latest);
 }
 
-export async function resetCompletions(campaignId: string): Promise<void> {
-  await AsyncStorage.removeItem(keyFor(campaignId));
-  cache.delete(campaignId);
-  emit();
+export function resetCompletions(campaignId: string): Promise<void> {
+  return enqueue(async () => {
+    await AsyncStorage.removeItem(keyFor(campaignId));
+    cache.delete(campaignId);
+    emit();
+  });
+}
+
+/** Apaga o progresso de TODAS as campanhas, no disco e no cache, e avisa as telas (PER-03). */
+export function wipeAllCompletions(): Promise<void> {
+  return enqueue(async () => {
+    const keys = (await AsyncStorage.getAllKeys()).filter((key) => key.startsWith(COMPLETIONS_PREFIX));
+    if (keys.length > 0) await AsyncStorage.multiRemove(keys);
+    cache.clear();
+    emit();
+  });
 }
 
 export function subscribeCompletions(listener: () => void): () => void {

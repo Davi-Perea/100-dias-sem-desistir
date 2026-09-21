@@ -37,9 +37,11 @@ const TAB_LABEL: Record<Tab, string> = {
 /**
  * Grupo (tela 07) com a folha de ferramentas de líder.
  *
- * A lista de membros é real e vem da RLS: quem não lidera o grupo recebe zero
- * linhas do servidor. Esconder o botão não seria segurança — a interface só
- * evita mostrar algo inútil, quem recusa é o banco.
+ * A lista de membros é real e vem da RLS: líder do grupo e admin recebem todas
+ * as linhas; membro comum recebe SÓ A PRÓPRIA (não zero). Por isso a contagem e a
+ * lista só aparecem para quem modera ESTE grupo (SEC-12); para os demais o
+ * tamanho da lista não diz nada sobre o grupo. Esconder o botão não seria
+ * segurança — a interface só evita mostrar algo inútil, quem recusa é o banco.
  *
  * As ferramentas de publicação (aviso, direção do dia, lembrete ao grupo,
  * moderação) ainda não existem: foram deixadas fora de escopo. Elas aparecem na
@@ -95,10 +97,16 @@ export default function GroupScreen() {
     );
   }
 
-  const canModerate = session.role === 'leader' || session.role === 'admin';
-  const group = session.membership?.group;
+  // SEC-12: a moderação vale para o grupo DA ROTA. session.role é global (admin,
+  // ou o papel da membership principal); liderar o grupo A não dá ferramenta no B.
+  const membershipHere = session.membership?.group.id === id ? session.membership : null;
+  const canModerate = session.role === 'admin' || membershipHere?.role === 'leader';
+  const leadsHere = membershipHere?.role === 'leader';
+  const myUserId = session.session?.user?.id ?? null;
+  const group = membershipHere?.group;
   const progress = getGroupProgress(id ?? '');
-  const memberCount = rows?.length ?? null;
+  // Contagem só para quem recebe a lista inteira; para membro comum a RLS entrega uma linha.
+  const memberCount = canModerate ? rows?.length ?? null : null;
 
   return (
     <Screen tone="warm">
@@ -127,7 +135,7 @@ export default function GroupScreen() {
           <AppText variant="caption">
             {[
               memberCount !== null ? `${memberCount} ${memberCount === 1 ? 'membro' : 'membros'}` : null,
-              canModerate ? 'você lidera este grupo' : null,
+              leadsHere ? 'você lidera este grupo' : null,
             ]
               .filter(Boolean)
               .join(' · ') || 'Grupo da jornada'}
@@ -206,12 +214,15 @@ export default function GroupScreen() {
 
         {tab === 'membros' ? (
           <View style={{ gap: spacing.sm }}>
-            {rows === null ? (
-              <StateView kind="loading" />
-            ) : rows.length === 0 ? (
+            {!canModerate ? (
               <AppText variant="secondary">
                 Você só vê a lista de membros dos grupos que lidera. Esta restrição é aplicada pelo servidor.
               </AppText>
+            ) : rows === null ? (
+              <StateView kind="loading" />
+            ) : rows.length === 0 ? (
+              // PROVISÓRIO (decisão do engenheiro, 2026-09-21: SEC-12 — quem modera e recebe zero linhas está num grupo vazio ou viu um erro, já mostrado acima)
+              error ? null : <AppText variant="secondary">Nenhum membro ativo neste grupo agora.</AppText>
             ) : (
               rows.map((row, index) => (
                 <View key={row.user_id}>
@@ -230,7 +241,7 @@ export default function GroupScreen() {
                       <AppText variant="item">{row.profile?.display_name ?? 'Participante'}</AppText>
                       <AppText variant="caption">{row.role === 'leader' ? 'Líder' : 'Membro'}</AppText>
                     </View>
-                    {canModerate && row.role !== 'leader' ? (
+                    {canModerate && row.role !== 'leader' && row.user_id !== myUserId ? (
                       <Button
                         title="Remover"
                         variant="underline"

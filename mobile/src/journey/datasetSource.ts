@@ -1,5 +1,6 @@
 import bundledJson from '../../content/100-dias-2026/dataset.json';
 
+import { isDevBuild } from './devBuild';
 import { devDataset } from './fixtures/devCampaign';
 import type { DayAltar, JourneyDataset, JourneyDay } from './types';
 import { assertProductionReady, validateDataset, type ValidationResult } from './validator';
@@ -31,7 +32,7 @@ export const BUNDLED_CONTENT: JourneyDataset = bundledJson as unknown as Journey
  * pendente em builds de desenvolvimento.
  */
 function chooseInitialDataset(): JourneyDataset {
-  if (!__DEV__) {
+  if (!isDevBuild()) {
     const gate = assertProductionReady(BUNDLED_CONTENT);
     if (!gate.valid) {
       const reasons = gate.issues.filter((i) => i.severity === 'error').map((i) => i.message);
@@ -98,15 +99,20 @@ export function altarForDisplay(day: JourneyDay | null): DayAltar | null {
 /**
  * Caminho de importação de um dataset em tempo de execução (painel DEV e testes).
  * `mode: 'production'` recusa qualquer dataset não autorizado ou marcado como DEV.
+ * Em build de release o modo é SEMPRE 'production', peça quem pedir (DIR-01): o
+ * portão de produção não vale só na abertura.
  */
 export function loadDataset(candidate: JourneyDataset, mode: 'development' | 'production' = 'development'): LoadResult {
-  const validation = mode === 'production' ? assertProductionReady(candidate) : validateDataset(candidate);
+  const effective = isDevBuild() ? mode : 'production';
+  const validation = effective === 'production' ? assertProductionReady(candidate) : validateDataset(candidate);
   if (!validation.valid) return { ok: false, validation };
   active = candidate;
   return { ok: true, dataset: candidate };
 }
 
+/** Fixtures fictícias: só em build de desenvolvimento. Em release, lança e não troca nada (DIR-01). */
 export function resetToDevFixtures(reference?: Date): JourneyDataset {
+  if (!isDevBuild()) throw new Error('Fixtures DEV não podem ser carregadas em build de release.');
   active = devDataset(reference);
   return active;
 }

@@ -2,69 +2,17 @@ import { router } from 'expo-router';
 import type { ReactNode } from 'react';
 import { Pressable, View } from 'react-native';
 
-import { Dove } from './brand';
-import { AppText, Avatar } from './components';
+import { AppText } from './components';
 import { Icon } from './icons';
 import { MIN_TOUCH, fonts, spacing, useTheme } from './theme';
 
 /**
- * Lockup de cabeçalho: pomba + "100 dias na Palavra", com uma ação à direita.
- * Aparece no Início, na Jornada e nos estados.
+ * Barra de topo das rotas contextuais: ‹ voltar, título opcional, ação à direita.
+ *
+ * @deprecated tela nova usa `BackBar` (src/ui/BackBar.tsx), que tem o rótulo de
+ * voltar em texto ("‹ Jornada", "‹ Dia 17", "Cancelar") como no desenho. Este
+ * fica só para as telas antigas e sai com a última delas.
  */
-export function BrandHeader({ right, subtitle }: { right?: ReactNode; subtitle?: string }) {
-  const { colors } = useTheme();
-  return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
-      <Dove width={26} role="signature" />
-      <View style={{ flex: 1 }}>
-        <AppText style={{ fontFamily: fonts.label, fontSize: 13.5, color: colors.text }}>
-          100 dias na Palavra
-        </AppText>
-        {subtitle ? <AppText variant="caption">{subtitle}</AppText> : null}
-      </View>
-      {right}
-    </View>
-  );
-}
-
-/**
- * Avatar do cabeçalho. Sem nome conhecido ele vira um botão neutro de conta —
- * inventar iniciais para quem não entrou seria mostrar uma identidade que não existe.
- */
-export function AccountButton({ name }: { name: string | null }) {
-  const { colors } = useTheme();
-  return (
-    <Pressable
-      onPress={() => router.push('/conta')}
-      accessibilityRole="button"
-      accessibilityLabel={name ? `Conta de ${name}` : 'Conta'}
-      testID="account-button"
-      style={({ pressed }) => [
-        { minWidth: MIN_TOUCH, minHeight: MIN_TOUCH, alignItems: 'flex-end', justifyContent: 'center' },
-        pressed && { opacity: 0.72 },
-      ]}
-    >
-      {name ? (
-        <Avatar name={name} size={40} />
-      ) : (
-        <View
-          style={{
-            width: 40,
-            height: 40,
-            borderRadius: 20,
-            backgroundColor: colors.surfaceMuted,
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <Icon name="person" size={20} color={colors.textMuted} />
-        </View>
-      )}
-    </Pressable>
-  );
-}
-
-/** Barra de topo das rotas contextuais: ‹ voltar, título opcional, ação à direita. */
 export function TopBar({
   title,
   right,

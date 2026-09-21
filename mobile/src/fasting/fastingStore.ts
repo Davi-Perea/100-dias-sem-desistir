@@ -1,6 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useEffect, useState } from 'react';
 
+import { createWriteQueue } from '@/progress/writeQueue';
+
 /**
  * Jejum: acompanhamento PRIVADO de uma decisão já tomada (spec §9).
  * LOCAL-ONLY e permanentemente fora de grupo, líder, admin, analytics, ranking e nuvem.
@@ -15,6 +17,7 @@ const keyFor = (campaignId: string) => `${FASTING_PREFIX}${campaignId}`;
 const cache = new Map<string, FastingLog>();
 const listeners = new Set<() => void>();
 const emit = () => listeners.forEach((l) => l());
+const enqueue = createWriteQueue();
 
 export async function loadFasting(campaignId: string): Promise<FastingLog> {
   const cached = cache.get(campaignId);
@@ -34,20 +37,26 @@ export async function loadFasting(campaignId: string): Promise<FastingLog> {
   } catch {
     value = EMPTY;
   }
+  // Uma gravação pode ter terminado enquanto o disco era lido: ela vale mais.
+  const settled = cache.get(campaignId);
+  if (settled) return settled;
   cache.set(campaignId, value);
   return value;
 }
 
-export async function setFastingKept(campaignId: string, dayNumber: number, kept: boolean): Promise<FastingLog> {
-  const current = await loadFasting(campaignId);
-  const days = { ...current.days };
-  if (kept) days[dayNumber] = new Date().toISOString();
-  else delete days[dayNumber];
-  const next: FastingLog = { days, updatedAt: new Date().toISOString() };
-  cache.set(campaignId, next);
-  await AsyncStorage.setItem(keyFor(campaignId), JSON.stringify(next));
-  emit();
-  return next;
+/** Grava no disco e só então atualiza o cache (PER-02). Se o disco falhar, rejeita e nada muda. */
+export function setFastingKept(campaignId: string, dayNumber: number, kept: boolean): Promise<FastingLog> {
+  return enqueue(async () => {
+    const current = await loadFasting(campaignId);
+    const days = { ...current.days };
+    if (kept) days[dayNumber] = new Date().toISOString();
+    else delete days[dayNumber];
+    const next: FastingLog = { days, updatedAt: new Date().toISOString() };
+    await AsyncStorage.setItem(keyFor(campaignId), JSON.stringify(next));
+    cache.set(campaignId, next);
+    emit();
+    return next;
+  });
 }
 
 export function isFastingKept(log: FastingLog | null, dayNumber: number): boolean {
@@ -62,10 +71,22 @@ export function fastingKeptDays(log: FastingLog | null): number[] {
   return log ? Object.keys(log.days).map(Number).sort((a, b) => a - b) : [];
 }
 
-export async function resetFasting(campaignId: string): Promise<void> {
-  await AsyncStorage.removeItem(keyFor(campaignId));
-  cache.delete(campaignId);
-  emit();
+export function resetFasting(campaignId: string): Promise<void> {
+  return enqueue(async () => {
+    await AsyncStorage.removeItem(keyFor(campaignId));
+    cache.delete(campaignId);
+    emit();
+  });
+}
+
+/** Apaga o jejum de TODAS as campanhas, no disco e no cache, e avisa as telas (PER-03). */
+export function wipeAllFasting(): Promise<void> {
+  return enqueue(async () => {
+    const keys = (await AsyncStorage.getAllKeys()).filter((key) => key.startsWith(FASTING_PREFIX));
+    if (keys.length > 0) await AsyncStorage.multiRemove(keys);
+    cache.clear();
+    emit();
+  });
 }
 
 export function subscribeFasting(listener: () => void): () => void {

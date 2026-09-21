@@ -2,8 +2,9 @@ import { BlurView } from 'expo-blur';
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { useFace } from './components';
 import { Icon, type IconName } from './icons';
-import { BRAND_YELLOW, TAB_BAR_HEIGHT, fonts, glass, useTheme } from './theme';
+import { MIN_TOUCH, TABBAR_MIN_HEIGHT, faces, glass, navShadow, useTheme } from './theme';
 
 /**
  * Forma mínima do que a tab bar precisa do navegador. Tipar estruturalmente
@@ -12,107 +13,142 @@ import { BRAND_YELLOW, TAB_BAR_HEIGHT, fonts, glass, useTheme } from './theme';
  */
 type TabBarProps = {
   state: { index: number; routes: { key: string; name: string }[] };
-  descriptors: Record<string, { options: { title?: string } }>;
+  descriptors: Record<string, { options: { title?: string; tabBarItemStyle?: unknown } }>;
   navigation: {
     emit: (event: { type: 'tabPress'; target: string; canPreventDefault: true }) => { defaultPrevented: boolean };
     navigate: (name: string) => void;
   };
-  /** Altura renderizada, para a cena reservar o espaço certo embaixo. */
+  /** Espaço que a barra ocupa a partir do fundo da tela, para a cena reservar. */
   onHeight?: (height: number) => void;
 };
 
+/**
+ * Uma aba com `href: null` no layout (ex.: Comunidade desligada em
+ * `config/features.ts`) continua no estado do navegador; o expo-router só a
+ * marca com `tabBarItemStyle: { display: 'none' }`, que esta barra própria
+ * precisa respeitar. A rota segue existindo, só não tem botão.
+ */
+function isHiddenTab(options: { tabBarItemStyle?: unknown }): boolean {
+  const flat = StyleSheet.flatten(options.tabBarItemStyle as never) as { display?: string } | undefined;
+  return flat?.display === 'none';
+}
+
 const ICONS: Record<string, IconName> = {
-  index: 'home',
-  jornada: 'flag',
-  juntos: 'users',
-  voce: 'person',
+  // A casa (rota "index", em "/") é a Jornada.
+  index: 'journey',
+  jornada: 'journey',
+  juntos: 'community',
+  comunidade: 'community',
+  voce: 'you',
 };
 
 /**
- * Tab bar do handoff: 86px, vidro, ícone E rótulo sempre visíveis.
+ * Barra de navegação flutuante (TOKENS §5): pílula solta sobre o conteúdo, 20 de
+ * margem lateral, piso 64, vidro, filete e sombra. Ícone E rótulo sempre — nenhum
+ * ícone carrega significado sozinho neste app.
  *
- * O estado ativo não depende só do amarelo. A pílula é o realce, mas a tinta do
- * ícone e o peso do rótulo também mudam (700/#111 contra 600/#55534E), e o item
- * anuncia `selected` para leitores de tela. Amarelo sobre branco mede 1,46:1 —
- * sozinho ele não seria um indicador de estado aceitável.
+ * Ativo: pílula `markSurface` com ícone e rótulo em `onMark`, rótulo em 700.
+ * Inativo: sem fundo, `navInactive`, rótulo em 500.
  *
- * Android recebe superfície sólida com elevação em vez de vidro, como pede o
- * handoff: imitar o material do iOS ali fica errado.
+ * Os "26 do fundo" do desenho valem na moldura do iPhone, onde o padding de 8
+ * deixa os alvos exatamente acima da área do indicador de home (34). Aqui a
+ * distância nunca é menor que a área segura menos esse padding, senão, no
+ * Android com três botões, a pílula cobriria a navegação do sistema.
  */
 export function GlassTabBar({ state, descriptors, navigation, onHeight }: TabBarProps) {
   const { colors, isDark } = useTheme();
   const insets = useSafeAreaInsets();
+  const face = useFace();
   const useGlass = Platform.OS === 'ios';
-
-  const surface = isDark ? glass.darkLight : glass.light;
-
-  const items = (
-    <View style={{ flexDirection: 'row', minHeight: TAB_BAR_HEIGHT, paddingTop: 10 }}>
-      {state.routes.map((route, index) => {
-        const { options } = descriptors[route.key];
-        const label = (options.title ?? route.name) as string;
-        const focused = state.index === index;
-        const tint = focused ? colors.text : colors.navInactive;
-
-        return (
-          <Pressable
-            key={route.key}
-            accessibilityRole="tab"
-            accessibilityState={{ selected: focused }}
-            accessibilityLabel={label}
-            testID={`tab-${route.name}`}
-            onPress={() => {
-              const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
-              if (!focused && !event.defaultPrevented) navigation.navigate(route.name);
-            }}
-            style={{ flex: 1, alignItems: 'center', gap: 4 }}
-          >
-            <View
-              style={{
-                width: 52,
-                height: 30,
-                borderRadius: 15,
-                alignItems: 'center',
-                justifyContent: 'center',
-                backgroundColor: focused ? BRAND_YELLOW : 'transparent',
-              }}
-            >
-              <Icon name={ICONS[route.name] ?? 'home'} size={22} color={focused ? '#111111' : tint} />
-            </View>
-            <Text style={{ fontFamily: focused ? fonts.label : fonts.item, fontSize: 11, color: tint }}>
-              {label}
-            </Text>
-          </Pressable>
-        );
-      })}
-    </View>
-  );
+  const bottom = Math.max(26, insets.bottom - 8);
+  const barTint = isDark ? glass.navDark : glass.nav;
 
   return (
     <View
-      onLayout={(event) => onHeight?.(Math.round(event.nativeEvent.layout.height))}
+      testID="tab-bar"
+      onLayout={(event) => onHeight?.(Math.round(event.nativeEvent.layout.height + bottom))}
       style={{
         position: 'absolute',
-        left: 0,
-        right: 0,
-        bottom: 0,
-        borderTopWidth: StyleSheet.hairlineWidth,
-        borderTopColor: isDark ? glass.hairlineDark : glass.hairline,
-        paddingBottom: insets.bottom,
+        left: 20,
+        right: 20,
+        bottom,
+        borderRadius: 999,
+        // No Android a elevação precisa de fundo próprio; ali não se imita vidro
+        // com opacidade chapada: é superfície sólida, como pede o TOKENS.
         backgroundColor: useGlass ? 'transparent' : colors.surface,
-        ...(useGlass
-          ? {}
-          : { elevation: 8, shadowColor: '#111111', shadowOpacity: 0.12, shadowRadius: 12 }),
+        ...navShadow(isDark),
       }}
     >
-      {useGlass ? (
-        <BlurView
-          intensity={40}
-          tint={isDark ? 'dark' : 'light'}
-          style={[StyleSheet.absoluteFill, { backgroundColor: surface }]}
-        />
-      ) : null}
-      {items}
+      <View
+        style={{
+          borderRadius: 999,
+          overflow: 'hidden',
+          borderWidth: 1,
+          borderColor: isDark ? glass.hairlineDark : glass.hairline,
+        }}
+      >
+        {useGlass ? (
+          <BlurView
+            intensity={60}
+            tint={isDark ? 'dark' : 'light'}
+            style={[StyleSheet.absoluteFill, { backgroundColor: barTint }]}
+          />
+        ) : null}
+        <View style={{ flexDirection: 'row', minHeight: TABBAR_MIN_HEIGHT, padding: 8 }}>
+          {state.routes.map((route, index) => {
+            const { options } = descriptors[route.key];
+            if (isHiddenTab(options)) return null;
+            const label = (options.title ?? route.name) as string;
+            const focused = state.index === index;
+            const tint = focused ? colors.onMark : colors.navInactive;
+            // O recorte do ícone de comunidade precisa ser OPACO: com a tinta
+            // translúcida do vidro, o círculo de trás aparecia através do da frente.
+            const background = focused ? colors.markSurface : colors.surface;
+            return (
+              <Pressable
+                key={route.key}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: focused }}
+                accessibilityLabel={label}
+                testID={`tab-${route.name}`}
+                onPress={() => {
+                  const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
+                  if (!focused && !event.defaultPrevented) navigation.navigate(route.name);
+                }}
+                style={({ pressed }) => [
+                  {
+                    flex: 1,
+                    minHeight: MIN_TOUCH,
+                    borderRadius: 999,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 3,
+                    paddingVertical: 6,
+                    paddingHorizontal: 4,
+                    backgroundColor: focused ? colors.markSurface : 'transparent',
+                  },
+                  pressed && !focused && { opacity: 0.72 },
+                ]}
+              >
+                {/* 24: os ícones da barra são medidos em pixels no TOKENS
+                    (traços de 2,5, alturas 9/16/12/6), com 1 unidade = 1px. */}
+                <Icon name={ICONS[route.name] ?? 'journey'} size={24} color={tint} cutout={background} />
+                <Text
+                  style={{
+                    fontFamily: face(focused ? faces.sg700 : faces.sg500),
+                    fontSize: 11,
+                    lineHeight: 13,
+                    color: tint,
+                    textAlign: 'center',
+                  }}
+                >
+                  {label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      </View>
     </View>
   );
 }
