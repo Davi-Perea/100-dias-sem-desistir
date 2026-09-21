@@ -1,11 +1,12 @@
 import * as Haptics from 'expo-haptics';
-import { useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AccessibilityInfo, Platform, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { track } from '@/analytics/analytics';
 import { expandChapters, parseReference } from '@/bible/references';
+import { COMMUNITY_ENABLED } from '@/config/features';
 import { getDay } from '@/journey/datasetSource';
 import { formatDayDate } from '@/journey/officialDay';
 import { useJourney } from '@/journey/useJourney';
@@ -220,9 +221,14 @@ export default function ReaderScreen() {
       await setDayCompleted(journey.campaign.id, dayNumber, true);
       if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       track({ name: 'reading_completed', dayNumber, mode: 'in_app' });
-      // PROVISÓRIO (perguntas 4 e 8 ao designer): o B4 ("depois de concluir")
-      // ainda não existe, nem a ordem dele com o marco; mantém fechar o leitor.
-      goBackOrHome();
+      // B4 ('depois de concluir') só existe com a Comunidade ligada. Sem ela
+      // (a V1) o leitor fecha como sempre. PROVISÓRIO (perguntas 4 e 8 ao
+      // designer): a ordem do B4 com o marco ainda não está desenhada.
+      if (COMMUNITY_ENABLED) {
+        router.replace({ pathname: '/comunidade/depois/[day]', params: { day: String(dayNumber) } });
+      } else {
+        goBackOrHome();
+      }
     } catch {
       // PER-02: não gravou, nada mudou; fica no leitor com o aviso.
       setSaveFailed(true);

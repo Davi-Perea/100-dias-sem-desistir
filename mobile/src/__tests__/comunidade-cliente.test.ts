@@ -9,6 +9,7 @@
 import {
   createCommunityApi,
   getCommunityApi,
+  requestServerAccountDeletion,
   termsSha256,
   toFeedPage,
   toMyPost,
@@ -325,5 +326,44 @@ describe('erros do servidor viram mensagens seguras', () => {
     fake.rpc.mockRejectedValueOnce(new TypeError('Network request failed'));
     const community = createCommunityApi(fake.client, { randomUUID: () => 'x' });
     await expectCode(community.feedPage(), 'offline');
+  });
+});
+
+describe('exclusão de conta (Edge Function delete-account)', () => {
+  function edgeError(status: number, body: unknown, name = 'FunctionsHttpError') {
+    return { name, message: 'Edge Function returned a non-2xx status code', context: { status, json: async () => body } };
+  }
+  function functions(result: { data?: unknown; error?: unknown } | Error) {
+    return {
+      invoke: jest.fn(async (_name: string, _options: { body: Record<string, unknown> }) => {
+        if (result instanceof Error) throw result;
+        return { data: result.data ?? null, error: result.error ?? null };
+      }),
+    };
+  }
+
+  test('chama delete-account com confirm: true e nenhum id de pessoa', async () => {
+    const fake = functions({ data: { deleted: true } });
+    await expect(requestServerAccountDeletion(fake)).resolves.toBe('deleted');
+    expect(fake.invoke).toHaveBeenCalledWith('delete-account', { body: { confirm: true } });
+    expect(JSON.stringify(fake.invoke.mock.calls)).not.toMatch(/user_id|author_id|email/);
+  });
+
+  test('login antigo vira "needs_recent_login" (pedir código novo), sem erro', async () => {
+    const fake = functions({ error: edgeError(401, { error: 'reauth_required', max_age_seconds: 600 }) });
+    await expect(requestServerAccountDeletion(fake)).resolves.toBe('needs_recent_login');
+  });
+
+  test('sessão inválida, falha do servidor, resposta estranha e rede viram erros seguros', async () => {
+    await expectCode(requestServerAccountDeletion(functions({ error: edgeError(401, { error: 'unauthorized' }) })), 'session_expired');
+    await expectCode(
+      requestServerAccountDeletion(functions({ error: edgeError(500, { error: 'deletion_failed' }) })),
+      'unknown',
+    );
+    await expectCode(requestServerAccountDeletion(functions({ data: { ok: 1 } })), 'unknown');
+    await expectCode(
+      requestServerAccountDeletion(functions({ error: { name: 'FunctionsFetchError', message: 'x' } })),
+      'offline',
+    );
   });
 });

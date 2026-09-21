@@ -17,7 +17,7 @@ import aesjs from 'aes-js';
 import { render, screen, waitFor } from '@testing-library/react-native';
 import { createElement } from 'react';
 
-import appConfig, { assertContactForStore, assertRightsForStore } from '../../app.config';
+import appConfig, { assertCommunityForStore, assertContactForStore, assertRightsForStore } from '../../app.config';
 import { _setSupabaseClientForTests } from '@/cloud/client';
 import { _setCloudConfigForTests, cloudAllowedInThisBuild, getCloudConfig, isCloudConfigured } from '@/cloud/config';
 import { classifyError } from '@/cloud/errors';
@@ -461,6 +461,37 @@ describe('DIR-04/05/06: o README diz a verdade', () => {
     expect(() => assertContactForStore(root)).toThrow(/SUPPORT_EMAIL/);
     write("'contato@exemplo.org'", "'https://exemplo.org/privacidade'");
     expect(() => assertContactForStore(root)).not.toThrow();
+  });
+
+  test('2.1 / 5.1.1(v): a variante production com Comunidade exige exclusão de conta no app, na web e manifesto preenchido', () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'comunidade-'));
+    fs.mkdirSync(path.join(root, 'src', 'config'), { recursive: true });
+    fs.mkdirSync(path.join(root, 'src', 'cloud'), { recursive: true });
+    const write = (available: string, url: string) => {
+      fs.writeFileSync(path.join(root, 'src', 'cloud', 'config.ts'), `export const ACCOUNT_DELETION_AVAILABLE = ${available};\n`);
+      fs.writeFileSync(
+        path.join(root, 'src', 'config', 'contato.ts'),
+        `export const ACCOUNT_DELETION_URL: string | null = ${url};\n`,
+      );
+    };
+    const previous = process.env.EXPO_PUBLIC_COMMUNITY_ENABLED;
+    try {
+      write('false', 'null');
+      delete process.env.EXPO_PUBLIC_COMMUNITY_ENABLED;
+      expect(() => assertCommunityForStore(root, [])).not.toThrow();
+      process.env.EXPO_PUBLIC_COMMUNITY_ENABLED = 'true';
+      expect(() => assertCommunityForStore(root, [{}])).toThrow(/ACCOUNT_DELETION_AVAILABLE .* e ACCOUNT_DELETION_URL/);
+      write('true', "'http://exemplo.org/excluir'");
+      expect(() => assertCommunityForStore(root, [{}])).toThrow(/ACCOUNT_DELETION_URL https/);
+      write('true', "'https://exemplo.org/excluir'");
+      expect(() => assertCommunityForStore(root, [])).toThrow(/NSPrivacyCollectedDataTypes/);
+      expect(() => assertCommunityForStore(root, [{}])).not.toThrow();
+      // O app como está hoje: a Comunidade não pode ir para a loja.
+      expect(() => assertCommunityForStore(MOBILE)).toThrow(/Comunidade bloqueada/);
+    } finally {
+      if (previous === undefined) delete process.env.EXPO_PUBLIC_COMMUNITY_ENABLED;
+      else process.env.EXPO_PUBLIC_COMMUNITY_ENABLED = previous;
+    }
   });
 });
 

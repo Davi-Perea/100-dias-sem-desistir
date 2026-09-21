@@ -11,7 +11,7 @@
 -- =============================================================================
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(24);
+select plan(28);
 
 update private.community_settings set value = 'v-teste' where key in ('publish_consent_version', 'rules_version');
 update private.community_settings set value = repeat('a', 64) where key = 'publish_consent_sha256';
@@ -119,6 +119,27 @@ select lives_ok(
   $$ select public.moderate_community_post('20000000-0000-4000-8000-000000000901', 'remove', 'crianca_exposta',
                                            'Fotos de crianças não podem ser publicadas.') $$,
   'a moderadora remove com motivo');
+-- Nem a moderação recebe o user_id de outra pessoa: suspender vai pelo conteúdo.
+select ok(
+  not exists (
+    select 1 from pg_proc p cross join lateral unnest(p.proargnames) as a(name)
+    where p.pronamespace = 'public'::regnamespace
+      and p.proname in ('community_moderation_queue', 'community_open_reports')
+      and a.name in ('author_id', 'reported_user_id')
+  ),
+  'fila e denúncias não devolvem user_id'
+);
+select throws_ok(
+  $$ select private.set_community_member_status('00000000-0000-4000-8000-0000000009b1', 'suspended', 'ofensivo', null) $$,
+  '42501', null, 'o app não chama a função que recebe user_id');
+select throws_ok(
+  $$ select public.suspend_community_author(target_post => '20000000-0000-4000-8000-000000000901',
+                                            target_report => gen_random_uuid(), decision_reason => 'ofensivo') $$,
+  '22023', null, 'suspender exige exatamente um alvo');
+select throws_ok(
+  $$ select public.suspend_community_author(target_post => '20000000-0000-4000-8000-000000000909',
+                                            decision_reason => 'ofensivo') $$,
+  '42501', null, 'ninguém suspende a si mesmo (o servidor resolve o autor pelo post)');
 reset role;
 
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-8000-0000000009a1","role":"authenticated"}', true);

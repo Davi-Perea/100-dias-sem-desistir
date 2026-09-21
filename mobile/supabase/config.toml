@@ -1,0 +1,35 @@
+# Supabase CLI — Bible Study App (mobile/supabase).
+# Tudo o que não está aqui fica no padrão do CLI. Este arquivo vale para o
+# ambiente LOCAL (supabase start) e para o deploy das Edge Functions; ele NÃO
+# muda nada no projeto hospedado sozinho (não rodar `supabase config push`).
+# Passo a passo: docs/technical/COMUNIDADE_V2_DEPLOY.md
+
+project_id = "bible-study-app"
+
+[api]
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+
+[db]
+# Conferir que é a mesma versão do projeto hospedado (Settings → Infrastructure).
+major_version = 17
+
+[db.seed]
+# seed.dev.sql é só de desenvolvimento, manual e trancado por chave.
+enabled = false
+
+# As três funções verificam o chamador por conta própria (token da pessoa pelo
+# Auth, ou o segredo x-cron-secret). verify_jwt = false porque a verificação do
+# gateway não funciona com as chaves novas de assinatura de JWT, e porque o cron
+# e o gatilho do banco não mandam JWT.
+[functions.delete-account]
+verify_jwt = false
+import_map = "./functions/delete-account/deno.json"
+
+[functions.drain-storage-deletions]
+verify_jwt = false
+import_map = "./functions/drain-storage-deletions/deno.json"
+
+[functions.moderate-text]
+verify_jwt = false
+import_map = "./functions/moderate-text/deno.json"

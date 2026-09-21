@@ -1,0 +1,12 @@
+{
+  "//": "Confere os tipos das Edge Functions (Deno) com o tsc do app, já que esta máquina não tem Deno. Rodar: npx tsc -p supabase/functions/tsconfig.check.json. O tsconfig do app exclui supabase/functions.",
+  "extends": "../../node_modules/expo/tsconfig.base.json",
+  "compilerOptions": {
+    "strict": true,
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
+    "lib": ["DOM", "ESNext"],
+    "types": ["jest", "node"]
+  },
+  "include": ["**/*.ts"]
+}

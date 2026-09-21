@@ -8,14 +8,15 @@ import { GlassTabBar } from '@/ui/TabBar';
 import { TABBAR_MIN_HEIGHT, useTheme } from '@/ui/theme';
 
 /**
- * Destinos (TELAS): Jornada (casa) · Comunidade · Bíblia · Você. Não existe mais a
+ * Destinos: Jornada (casa) · Bíblia · Comunidade · Você (a Comunidade entre Bíblia
+ * e Você, decisão do branch comunidade-v2). Não existe mais a
  * aba "Início": ela e a Jornada mostravam o mesmo dia de dois jeitos e viraram
  * uma só, a casa em "/". O leitor, o dia e a intercessão são rotas contextuais,
  * sem barra.
  *
  * A Comunidade ainda mora em `juntos.tsx` (a rota não muda de nome para não
  * quebrar quem já navega para ela).
- * PROVISÓRIO até o grupo C (feed) existir: o conteúdo dela é o do Juntos de hoje.
+ * Ligada, é o feed (C1); desligada, o conteúdo é o do Juntos da V1.
  *
  * PROVISÓRIO (decisão do engenheiro, 2026-09-21: sem servidor na V1, uma aba
  * "em breve" é rejeição na Apple, guideline 2.1): com `COMMUNITY_ENABLED`
@@ -45,10 +46,12 @@ export default function TabsLayout() {
       }}
     >
       <Tabs.Screen name="index" options={{ title: 'Jornada' }} />
-      <Tabs.Screen name="juntos" options={{ title: 'Comunidade', href: COMMUNITY_ENABLED ? undefined : null }} />
       {/* Leitura livre (decisão do fundador, 2026-09-21: a Bíblia Livre dentro do
           app). Entre Jornada e Você; em release só aparece com texto de verdade. */}
       <Tabs.Screen name="biblia" options={{ title: 'Bíblia', href: bibleTabVisible() ? undefined : null }} />
+      {/* Comunidade entre Bíblia e Você, só com EXPO_PUBLIC_COMMUNITY_ENABLED=true.
+          Desligada, sai da barra (href: null) e a barra fica igual à V1. */}
+      <Tabs.Screen name="juntos" options={{ title: 'Comunidade', href: COMMUNITY_ENABLED ? undefined : null }} />
       <Tabs.Screen name="voce" options={{ title: 'Você' }} />
     </Tabs>
   );

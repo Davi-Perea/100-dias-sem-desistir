@@ -32,7 +32,14 @@ export type IconName =
   // Barra de navegação do redesenho (TOKENS §5, "Ícones").
   | 'journey'
   | 'community'
-  | 'you';
+  | 'you'
+  // Comunidade (C1, C5, C6).
+  | 'amen'
+  | 'amen-filled'
+  | 'comment'
+  | 'send'
+  | 'block'
+  | 'trash';
 
 type Props = {
   name: IconName;
@@ -46,8 +53,42 @@ type Props = {
   cutout?: string;
 };
 
+/**
+ * Amém: Phosphor `hands-praying` (REGRAS §5, decisão 2: `bold` = desmarcado,
+ * `fill` = marcado), de @phosphor-icons/core 2.1.1 (assets/bold e assets/fill),
+ * lidos em 2026-09-21 em https://cdn.jsdelivr.net/npm/@phosphor-icons/core@2.1.1/.
+ * É vetor: segue a cor do token nos dois temas (o PNG antigo só invertia por filtro).
+ *
+ * MIT License. Copyright (c) 2023 Phosphor Icons.
+ * Permission is hereby granted, free of charge, to any person obtaining a copy of
+ * this software and associated documentation files (the "Software"), to deal in
+ * the Software without restriction, including without limitation the rights to
+ * use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
+ * the Software, and to permit persons to whom the Software is furnished to do so,
+ * subject to the following conditions: The above copyright notice and this
+ * permission notice shall be included in all copies or substantial portions of
+ * the Software. THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO
+ * EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+ * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
+ */
+const AMEN_BOLD =
+  'M238.15,177.18l-35.53-35.53L166.45,22.3A25.75,25.75,0,0,0,128,8,25.75,25.75,0,0,0,89.55,22.3L53.38,141.65,17.85,177.18a20,20,0,0,0,0,28.28l32.69,32.69a20,20,0,0,0,28.28,0l48.29-48.28c.31-.31.6-.62.89-.94.29.32.58.63.89.94l48.29,48.28a20,20,0,0,0,28.28,0l32.69-32.69A20,20,0,0,0,238.15,177.18ZM64.68,218.35l-27-27,11-11,27,27ZM116,158.75a19.85,19.85,0,0,1-5.86,14.14L92.68,190.35l-27-27,6.83-6.83a11.94,11.94,0,0,0,3-5l37-122.23a1.78,1.78,0,0,1,3.48.52Zm47.5,31.78-17.64-17.64A19.85,19.85,0,0,1,140,158.75v-129a1.78,1.78,0,0,1,3.48-.52l37,122.23a11.94,11.94,0,0,0,3,5l7.6,7.6Zm27.82,27.82-10.85-10.84,27.63-26.44,10.25,10.25Z';
+const AMEN_FILL =
+  'M235.32,180l-36.24-36.25L162.62,23.46A21.76,21.76,0,0,0,128,12.93,21.76,21.76,0,0,0,93.38,23.46L56.92,143.76,20.68,180a16,16,0,0,0,0,22.62l32.69,32.69a16,16,0,0,0,22.63,0L124.28,187a40.68,40.68,0,0,0,3.72-4.29,40.68,40.68,0,0,0,3.72,4.29L180,235.32a16,16,0,0,0,22.63,0l32.69-32.69A16,16,0,0,0,235.32,180ZM120,158.75a23.85,23.85,0,0,1-7,17L88.68,200,56,167.32l13.65-13.66a8,8,0,0,0,2-3.34l37-122.22A5.78,5.78,0,0,1,120,29.78Zm47.44,41.38L143,175.72a23.85,23.85,0,0,1-7-17v-129a5.78,5.78,0,0,1,11.31-1.68l37,122.22a8,8,0,0,0,2,3.34l14.49,14.49Z';
+
 // Traço de 2px (TOKENS §5, "Ícones"); 2,5 no cadeado.
 export function Icon({ name, size = 22, color, strokeWidth = 2, cutout = 'transparent' }: Props) {
+  if (name === 'amen' || name === 'amen-filled') {
+    return (
+      <Svg width={size} height={size} viewBox="0 0 256 256" aria-hidden>
+        <Path d={name === 'amen' ? AMEN_BOLD : AMEN_FILL} fill={color} />
+      </Svg>
+    );
+  }
   const common = {
     stroke: color,
     strokeWidth,
@@ -179,6 +220,30 @@ export function Icon({ name, size = 22, color, strokeWidth = 2, cutout = 'transp
         <G>
           <Circle cx={12} cy={7.5} r={4.5} stroke={color} strokeWidth={2} fill="none" />
           <Path d="M3 21 A9 8 0 0 1 21 21" stroke={color} strokeWidth={2} fill="none" strokeLinecap="round" />
+        </G>
+      ) : null}
+      {name === 'comment' ? (
+        // TOKENS §5: balão arredondado (raio 7) com a ponta na base esquerda.
+        <Path d="M8.5 4h7a6.5 6.5 0 0 1 0 13H9.6L5 20.5v-4.6A6.5 6.5 0 0 1 8.5 4Z" {...common} />
+      ) : null}
+      {name === 'send' ? (
+        // Seta diagonal do botão de enviar comentário (C6).
+        <G>
+          <Path d="M6.5 17.5 17.5 6.5" {...common} />
+          <Polyline points="8.5,6.5 17.5,6.5 17.5,15.5" {...common} />
+        </G>
+      ) : null}
+      {name === 'block' ? (
+        // C5: círculo de 20, traço 2,5, cortado por barra a 45°.
+        <G>
+          <Circle cx={12} cy={12} r={8.75} {...common} strokeWidth={2.5} />
+          <Path d="M5.8 18.2 18.2 5.8" {...common} strokeWidth={2.5} />
+        </G>
+      ) : null}
+      {name === 'trash' ? (
+        <G>
+          <Path d="M4.5 6.6h15M9.6 6.6V4.4h4.8v2.2" {...common} />
+          <Path d="M6.4 6.6l.9 12.9a1.2 1.2 0 0 0 1.2 1.1h7a1.2 1.2 0 0 0 1.2-1.1l.9-12.9" {...common} />
         </G>
       ) : null}
     </Svg>

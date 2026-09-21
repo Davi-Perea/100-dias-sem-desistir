@@ -1,5 +1,7 @@
 import type { Session } from '@supabase/supabase-js';
 
+import { accountDeletionFrom, requestServerAccountDeletion } from '@/community/api';
+
 import { getSupabase } from './client';
 import { isCloudConfigured } from './config';
 import { classifyError, cloudError, CloudError } from './errors';
@@ -111,19 +113,33 @@ export function onAuthStateChange(callback: (session: Session | null) => void): 
 }
 
 /**
- * Exclusão de conta — ARQUITETURA PREPARADA, ainda não implementada.
+ * Exclusão de conta pela Edge Function `delete-account` (service_role no
+ * servidor; o cliente nunca apaga `auth.users`). O servidor apaga tudo o que a
+ * pessoa fez na Comunidade, as fotos dela e a conta, e só aceita login recente
+ * (até 10 min). A jornada local fica no aparelho (o texto da tela diz isso).
  *
- * Exige uma Edge Function com service_role, porque o cliente não pode (e não deve)
- * apagar `auth.users`. O caminho definido em SECURITY_V0.md é:
- *   reautenticação recente → apagar objetos de Storage → auth.admin.deleteUser
- *   (cascata nas tabelas com FK) → registrar o pedido → e-mail de confirmação.
- * Também precisa existir uma página web equivalente (exigência do Google Play).
+ * Só é oferecida na tela com ACCOUNT_DELETION_AVAILABLE (src/cloud/config.ts),
+ * que continua false até a função estar no ar e existir a página web
+ * equivalente (exigência do Google Play).
  *
- * Fica explícito em vez de silencioso: a loja exige o fluxo antes do lançamento.
+ * - "deleted": encerra a sessão só neste aparelho (a conta já não existe).
+ * - "needs_recent_login": nada foi apagado; a pessoa entra de novo com um código
+ *   por e-mail e repete. PROVISÓRIO: o pedido de código novo dentro da própria
+ *   folha ainda não existe; a mensagem orienta sair e entrar de novo.
  */
-export async function requestAccountDeletion(): Promise<never> {
-  throw new CloudError(
-    'unknown',
-    'Exclusão de conta ainda não está disponível: depende da Edge Function de exclusão.',
-  );
+export const DELETION_NEEDS_RECENT_LOGIN_MESSAGE =
+  'Por segurança, excluir a conta pede um acesso recente. Saia da conta, entre de novo com o código do e-mail e tente outra vez.';
+
+export async function requestAccountDeletion(): Promise<void> {
+  const supabase = getSupabase();
+  if (!supabase) throw cloudError('not_configured');
+  const result = await requestServerAccountDeletion(accountDeletionFrom(supabase));
+  if (result === 'needs_recent_login') {
+    throw new CloudError('session_expired', DELETION_NEEDS_RECENT_LOGIN_MESSAGE);
+  }
+  try {
+    await supabase.auth.signOut({ scope: 'local' });
+  } catch {
+    // A conta já foi apagada no servidor; a sessão local sai de qualquer jeito.
+  }
 }

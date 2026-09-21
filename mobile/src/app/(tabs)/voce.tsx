@@ -1,12 +1,14 @@
 import { router } from 'expo-router';
 
 import { SUPPORT_EMAIL } from '@/config/contato';
+import { COMMUNITY_ENABLED } from '@/config/features';
 import { fastingKeptCount, useFasting } from '@/fasting/fastingStore';
 import { useJourney } from '@/journey/useJourney';
 import { completedDayNumbers } from '@/progress/completionsStore';
 import { reflectionCount, useReflections } from '@/reflections/reflectionsStore';
 import { useSettings } from '@/settings/settingsStore';
 import { AppText, Button, Screen, ScreenScroll, SettingRow, StateView } from '@/ui/components';
+import { ModerationEntry } from '@/ui/comunidade/moderacao/ModerationEntry';
 import { spacing } from '@/ui/theme';
 import { ProgressBlock } from '@/ui/voce/ProgressBlock';
 import { RowGroup } from '@/ui/voce/SubScreen';
@@ -124,6 +126,9 @@ export default function YouScreen() {
           <SettingRow label="Privacidade" onPress={() => router.push('/privacidade')} testID="row-privacy" />
           <SettingRow label={SUPPORT_EMAIL ? 'Ajuda e contato' : 'Ajuda'} onPress={() => router.push('/ajuda')} testID="row-help" />
         </RowGroup>
+
+        {/* Só com a Comunidade ligada e só para quem o servidor diz que modera. */}
+        {COMMUNITY_ENABLED ? <ModerationEntry /> : null}
 
         {__DEV__ ? (
           <Button title="Painel de desenvolvimento" variant="underline" onPress={() => router.push('/dev')} />

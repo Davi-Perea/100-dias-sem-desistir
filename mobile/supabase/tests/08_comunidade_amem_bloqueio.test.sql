@@ -7,7 +7,7 @@
 -- =============================================================================
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(20);
+select plan(22);
 
 update private.community_settings set value = 'v-teste' where key in ('publish_consent_version', 'rules_version');
 update private.community_settings set value = repeat('a', 64) where key = 'publish_consent_sha256';
@@ -16,12 +16,14 @@ update private.community_settings set value = repeat('b', 64) where key = 'rules
 insert into auth.users (id, email) values
   ('00000000-0000-4000-8000-0000000008a1', 'ana@exemplo.test'),
   ('00000000-0000-4000-8000-0000000008b1', 'bruno@exemplo.test'),
-  ('00000000-0000-4000-8000-0000000008c1', 'carla@exemplo.test');
+  ('00000000-0000-4000-8000-0000000008c1', 'carla@exemplo.test'),
+  ('00000000-0000-4000-8000-0000000008d1', 'dora@exemplo.test');
 
 insert into public.community_profiles (user_id, display_name, adult_attested_at) values
   ('00000000-0000-4000-8000-0000000008a1', 'Ana',   now()),
   ('00000000-0000-4000-8000-0000000008b1', 'Bruno', now()),
-  ('00000000-0000-4000-8000-0000000008c1', 'Carla', now());
+  ('00000000-0000-4000-8000-0000000008c1', 'Carla', now()),
+  ('00000000-0000-4000-8000-0000000008d1', 'Dora',  now()); -- membro SEM consentimento
 
 insert into public.consent_records (user_id, purpose, text_version, text_sha256)
 select u, p.purpose, 'v-teste', p.sha
@@ -60,6 +62,15 @@ select throws_ok($$ select user_id from public.community_amens $$, '42501', null
 select throws_ok($$ insert into public.community_amens (user_id, post_id)
                     values ('00000000-0000-4000-8000-0000000008a1', '20000000-0000-4000-8000-000000000803') $$,
   '42501', null, 'Amém só pela RPC, nunca por INSERT direto');
+reset role;
+
+-- Amém é dado de convicção religiosa: sem consentimento vigente, nem pela RPC direta.
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-8000-0000000008d1","role":"authenticated"}', true);
+set local role authenticated;
+select throws_ok($$ select public.set_amen('20000000-0000-4000-8000-000000000801', true) $$, 'CM002', null,
+  'membro sem consentimento não marca Amém (LGPD art. 11)');
+select is(public.set_amen('20000000-0000-4000-8000-000000000801', false), false,
+  'desmarcar continua livre, mesmo sem consentimento');
 reset role;
 
 select ok(

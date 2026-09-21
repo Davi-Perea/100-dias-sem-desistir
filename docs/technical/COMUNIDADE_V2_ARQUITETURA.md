@@ -120,10 +120,12 @@ published ── moderação "remove" (com motivo) ──→ removed (a foto é 
 A página web interna usa o mesmo login do app e chama `community_moderation_queue` (tudo o que está em análise, mais o
 que está publicado com denúncia aberta, com o urgente primeiro e depois o prazo), `community_open_reports`,
 `moderate_community_post` e `moderate_community_comment` (approve, reject, remove e restore), `resolve_community_report` e
-`set_community_member_status`. O admin gera e revoga códigos (`admin_create_invite_code`, que devolve o código em claro
+`suspend_community_author` (suspende, remove ou reativa quem escreveu, a partir do post, do comentário ou da denúncia: nem
+a moderação recebe o user_id de outra pessoa; a fila traz só `author_known`/`reported_known`, e
+`set_community_member_status`, que recebe user_id, não é executável pelo app). O admin gera e revoga códigos (`admin_create_invite_code`, que devolve o código em claro
 **uma única vez**; `admin_revoke_invite_code`; `admin_list_invite_codes`, que mostra quantos membros vieram de cada
 código para achar o que vazou) e nomeia moderadores (`admin_set_community_moderator`). Tudo isso vai para
-`admin_audit_log`. O prazo é de 48 h para denúncia comum e 4 h para urgente, ambos **PROPOSTA**, e fica em
+`admin_audit_log`. O prazo é de 24 h para denúncia comum (o que a Apple cobra pela 1.2) e 4 h para urgente, ambos **PROPOSTA**, e fica em
 `community_settings`. A promessa da tela C5 precisa bater com esses números.
 
 ## 8. Exclusão de conta

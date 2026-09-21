@@ -423,3 +423,62 @@ export function getCommunityApi(
     randomUUID: deps.randomUUID ?? (() => Crypto.randomUUID()),
   });
 }
+
+// ---------------------------------------------------------------------------
+// Exclusão de conta (Edge Function delete-account). Vale para o app inteiro,
+// com ou sem Comunidade: por isso NÃO depende de COMMUNITY_ENABLED nem de
+// getCommunityApi(). Quem liga isto à tela é src/cloud/auth.ts
+// (requestAccountDeletion), que depois da resposta 'deleted' encerra a sessão
+// local e apaga os dados do aparelho.
+// ---------------------------------------------------------------------------
+
+/** 'needs_recent_login' = pedir um código novo por e-mail e chamar de novo. */
+export type AccountDeletionResult = 'deleted' | 'needs_recent_login';
+
+/** O que a exclusão precisa do supabase-js (supabase.functions). */
+export type FunctionsInvoker = {
+  invoke(name: string, options: { body: Record<string, unknown> }): PromiseLike<{ data: unknown; error: unknown }>;
+};
+
+export const DELETE_ACCOUNT_FUNCTION = 'delete-account';
+
+/** Lê o `{ error: '…' }` do corpo de uma resposta não-2xx da Edge Function. */
+async function edgeErrorCode(error: unknown): Promise<string | null> {
+  const context = (error as { context?: unknown } | null)?.context as { json?: () => Promise<unknown> } | undefined;
+  if (!context || typeof context.json !== 'function') return null;
+  try {
+    const body = await context.json();
+    return str((body as Row | null)?.error);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Pede ao servidor a exclusão da conta da sessão atual. Apaga a conta, tudo o que
+ * a pessoa fez na Comunidade e as fotos dela. Só funciona com login recente (até
+ * 10 min): fora disso devolve 'needs_recent_login', sem apagar nada.
+ */
+export async function requestServerAccountDeletion(functions: FunctionsInvoker): Promise<AccountDeletionResult> {
+  let result: { data: unknown; error: unknown };
+  try {
+    result = await functions.invoke(DELETE_ACCOUNT_FUNCTION, { body: { confirm: true } });
+  } catch (error) {
+    throw toCommunityError(error);
+  }
+  if (!result.error) {
+    if ((result.data as Row | null)?.deleted === true) return 'deleted';
+    throw communityError('unknown');
+  }
+  const name = (result.error as { name?: unknown } | null)?.name;
+  if (name === 'FunctionsFetchError') throw communityError('offline');
+  const code = await edgeErrorCode(result.error);
+  if (code === 'reauth_required') return 'needs_recent_login';
+  if (code === 'unauthorized') throw communityError('session_expired');
+  throw communityError('unknown');
+}
+
+/** Adapta o SupabaseClient (o tsc confere que supabase.functions serve). */
+export function accountDeletionFrom(supabase: SupabaseClient): FunctionsInvoker {
+  return supabase.functions;
+}

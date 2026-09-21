@@ -260,9 +260,12 @@ begin
   delete from public.community_posts    p  where p.author_id = target;   -- fotos vão para a fila
   delete from public.community_comments c  where c.author_id = target;
   delete from public.community_amens    am where am.user_id  = target;
-  delete from public.community_blocks   bl where bl.blocker_id = target;
   update public.community_reports r set reporter_id = null where r.reporter_id = target;
   if drop_profile then
+    -- Bloqueios só saem quando a pessoa deixa a comunidade ou a conta. Na revogação
+    -- ("Apagar tudo o que publiquei") ela continua lendo, e o bloqueio continua a
+    -- protegê-la de quem ela bloqueou.
+    delete from public.community_blocks bl where bl.blocker_id = target;
     delete from public.consent_records cr where cr.user_id = target;
     delete from private.invite_code_attempts att where att.user_id = target;
     delete from public.community_profiles cp where cp.user_id = target and cp.status = 'active';
@@ -796,7 +799,7 @@ revoke all on function public.delete_my_community_comment(uuid) from public, ano
 grant execute on function public.delete_my_community_comment(uuid) to authenticated;
 
 -- Amém: liga ou desliga, idempotente (toque duplo ou reenvio offline não quebra).
--- Devolve só o MEU novo estado. Nunca um total.
+-- Devolve só o MEU novo estado. Nunca um total. Marcar exige consentimento (CM002).
 create or replace function private.set_amen(target_post uuid, amen boolean)
 returns boolean language plpgsql security definer set search_path = '' as $$
 declare
@@ -806,6 +809,11 @@ begin
     delete from public.community_amens am where am.user_id = v_uid and am.post_id = target_post;
     return false;
   end if;
+  -- Marcar exige o mesmo que publicar: consentimento destacado e regras aceitas
+  -- (has_current_consents), conta ativa. Amém é dado de convicção religiosa
+  -- (LGPD art. 11): sem consentimento vigente não se grava, nem por RPC direta.
+  -- Desmarcar continua livre (só assert_member), para a pessoa sempre poder retirar.
+  perform private.assert_can_publish();
   if not private.can_view_post(target_post, v_uid) then
     raise exception 'publicação não encontrada' using errcode = 'P0002';
   end if;
@@ -1007,11 +1015,13 @@ grant execute on function public.my_community_blocks() to authenticated;
 -- =============================================================================
 
 -- Fila: tudo em análise + tudo publicado com denúncia aberta. Urgente primeiro,
--- depois o prazo mais apertado.
+-- depois o prazo mais apertado. Nem a moderação recebe o user_id de outra pessoa:
+-- só `author_known` (o autor ainda existe); suspender vai pelo conteúdo
+-- (suspend_community_author), e o servidor resolve quem é.
 create or replace function private.community_moderation_queue()
 returns table (
   item_kind text, item_id uuid, post_id uuid, body text, photo_path text, hold_reason text,
-  item_status text, author_id uuid, author_name text, author_status text, created_at timestamptz,
+  item_status text, author_known boolean, author_name text, author_status text, created_at timestamptz,
   open_reports int, urgent boolean, due_at timestamptz
 )
 language sql stable security definer set search_path = '' as $$
@@ -1036,7 +1046,7 @@ language sql stable security definer set search_path = '' as $$
        or exists (select 1 from open_r o where o.target_kind = 'comment' and o.target_id = c.id)
   )
   select i.kind, i.item_id, i.post_id, i.body, i.photo_path, i.hold_reason, i.status::text,
-         i.author_id, a.display_name, a.status::text, i.created_at,
+         i.author_id is not null, a.display_name, a.status::text, i.created_at,
          coalesce(o.n, 0), coalesce(o.urgent, false), o.due
   from items i
   left join public.community_profiles a on a.user_id = i.author_id
@@ -1051,7 +1061,7 @@ grant execute on function private.community_moderation_queue() to authenticated;
 create or replace function public.community_moderation_queue()
 returns table (
   item_kind text, item_id uuid, post_id uuid, body text, photo_path text, hold_reason text,
-  item_status text, author_id uuid, author_name text, author_status text, created_at timestamptz,
+  item_status text, author_known boolean, author_name text, author_status text, created_at timestamptz,
   open_reports int, urgent boolean, due_at timestamptz
 )
 language sql stable security invoker set search_path = '' as $$
@@ -1060,14 +1070,15 @@ $$;
 revoke all on function public.community_moderation_queue() from public, anon;
 grant execute on function public.community_moderation_queue() to authenticated;
 
--- Denúncias abertas (inclusive de pessoa), para quem modera.
+-- Denúncias abertas (inclusive de pessoa), para quem modera. Sem user_id: só
+-- `reported_known`; suspender a pessoa denunciada vai pelo id da denúncia.
 create or replace function private.community_open_reports()
 returns table (
-  report_id uuid, target_kind text, post_id uuid, comment_id uuid, reported_user_id uuid,
+  report_id uuid, target_kind text, post_id uuid, comment_id uuid, reported_known boolean,
   reported_name text, reason text, details text, urgent boolean, created_at timestamptz, due_at timestamptz
 )
 language sql stable security definer set search_path = '' as $$
-  select r.id, r.target_kind::text, r.post_id, r.comment_id, r.reported_user_id,
+  select r.id, r.target_kind::text, r.post_id, r.comment_id, r.reported_user_id is not null,
          cp.display_name, r.reason::text, r.details, r.urgent, r.created_at, r.due_at
   from public.community_reports r
   left join public.community_profiles cp on cp.user_id = r.reported_user_id
@@ -1080,7 +1091,7 @@ grant execute on function private.community_open_reports() to authenticated;
 
 create or replace function public.community_open_reports()
 returns table (
-  report_id uuid, target_kind text, post_id uuid, comment_id uuid, reported_user_id uuid,
+  report_id uuid, target_kind text, post_id uuid, comment_id uuid, reported_known boolean,
   reported_name text, reason text, details text, urgent boolean, created_at timestamptz, due_at timestamptz
 )
 language sql stable security invoker set search_path = '' as $$
@@ -1320,17 +1331,52 @@ begin
   insert into public.community_moderation_actions (actor_id, decided_by, kind, target_user_id, reason, note_for_author)
   values (v_uid, 'pessoa', v_kind, target_user, v_reason, nullif(trim(note_for_author), ''));
 end $$;
-revoke all on function private.set_community_member_status(uuid, text, text, text) from public, anon;
-grant execute on function private.set_community_member_status(uuid, text, text, text) to authenticated;
+-- Recebe um user_id: por isso ninguém a chama pela API. Só funções SECURITY DEFINER
+-- que resolvem o alvo no servidor (suspend_community_author). Sem invólucro em public.
+revoke all on function private.set_community_member_status(uuid, text, text, text) from public, anon, authenticated;
 
-create or replace function public.set_community_member_status(
-  target_user uuid, new_status text, decision_reason text default null, note_for_author text default null
+-- Suspender, remover ou reativar QUEM ESCREVEU, a partir do conteúdo ou da denúncia.
+-- Exatamente um alvo: post, comentário ou denúncia (a denúncia de pessoa guarda o
+-- denunciado). O servidor resolve o user_id; o aparelho de quem modera nunca o recebe.
+create or replace function private.suspend_community_author(
+  target_post uuid, target_comment uuid, target_report uuid,
+  new_status text, decision_reason text, note_for_author text
+)
+returns void language plpgsql security definer set search_path = '' as $$
+declare
+  v_target uuid;
+begin
+  if (select auth.uid()) is null or not private.is_community_moderator() then
+    raise exception 'apenas moderação' using errcode = '42501';
+  end if;
+  if num_nonnulls(target_post, target_comment, target_report) <> 1 then
+    raise exception 'informe exatamente um alvo' using errcode = '22023';
+  end if;
+  if target_post is not null then
+    select p.author_id into v_target from public.community_posts p where p.id = target_post;
+  elsif target_comment is not null then
+    select c.author_id into v_target from public.community_comments c where c.id = target_comment;
+  else
+    select r.reported_user_id into v_target from public.community_reports r where r.id = target_report;
+  end if;
+  if v_target is null then
+    raise exception 'participante não encontrado' using errcode = 'P0002';
+  end if;
+  perform private.set_community_member_status(v_target, new_status, decision_reason, note_for_author);
+end $$;
+revoke all on function private.suspend_community_author(uuid, uuid, uuid, text, text, text) from public, anon;
+grant execute on function private.suspend_community_author(uuid, uuid, uuid, text, text, text) to authenticated;
+
+create or replace function public.suspend_community_author(
+  target_post uuid default null, target_comment uuid default null, target_report uuid default null,
+  new_status text default 'suspended', decision_reason text default null, note_for_author text default null
 )
 returns void language sql security invoker set search_path = '' as $$
-  select private.set_community_member_status(target_user, new_status, decision_reason, note_for_author);
+  select private.suspend_community_author(target_post, target_comment, target_report,
+                                          new_status, decision_reason, note_for_author);
 $$;
-revoke all on function public.set_community_member_status(uuid, text, text, text) from public, anon;
-grant execute on function public.set_community_member_status(uuid, text, text, text) to authenticated;
+revoke all on function public.suspend_community_author(uuid, uuid, uuid, text, text, text) from public, anon;
+grant execute on function public.suspend_community_author(uuid, uuid, uuid, text, text, text) to authenticated;
 
 -- =============================================================================
 -- Administração (app_admins): códigos de entrada e moderadores. Tudo auditado.

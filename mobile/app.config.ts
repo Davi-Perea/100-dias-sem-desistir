@@ -131,6 +131,54 @@ export function assertContactForStore(projectRoot: string): void {
   }
 }
 
+/**
+ * NSPrivacyCollectedDataTypes. Vazio = V1-A (nada sai do aparelho). Um build de loja com a
+ * Comunidade é recusado por assertCommunityForStore enquanto isto estiver vazio: preencher
+ * (e-mail, nome, conteúdo do usuário e fotos, vinculados à conta, sem rastreamento) junto com
+ * o rótulo de privacidade do App Store Connect, nunca um sem o outro.
+ */
+type CollectedDataType = {
+  NSPrivacyCollectedDataType: string;
+  NSPrivacyCollectedDataTypeLinked: boolean;
+  NSPrivacyCollectedDataTypeTracking: boolean;
+  NSPrivacyCollectedDataTypePurposes: string[];
+};
+const COLLECTED_DATA_TYPES: readonly CollectedDataType[] = [];
+
+/**
+ * Comunidade no build de loja. Com EXPO_PUBLIC_COMMUNITY_ENABLED=true a aba aparece,
+ * mas em release a nuvem só liga com ACCOUNT_DELETION_AVAILABLE (src/cloud/config.ts):
+ * sem isso a aba ficaria sempre "indisponível" (App Store 2.1). A Comunidade cria conta,
+ * então a exclusão tem de existir no app (5.1.1(v)) e na web (política do Google Play),
+ * e o manifesto de privacidade tem de declarar o que é coletado (e-mail, nome, conteúdo
+ * e fotos). Lê os arquivos como texto, como assertContactForStore.
+ */
+export function assertCommunityForStore(
+  projectRoot: string,
+  collectedDataTypes: readonly unknown[] = COLLECTED_DATA_TYPES,
+): void {
+  if (process.env.EXPO_PUBLIC_COMMUNITY_ENABLED !== 'true') return;
+  const cloud = fs.readFileSync(path.join(projectRoot, 'src', 'cloud', 'config.ts'), 'utf8');
+  const contato = fs.readFileSync(path.join(projectRoot, 'src', 'config', 'contato.ts'), 'utf8');
+  const missing: string[] = [];
+  if (!/export const ACCOUNT_DELETION_AVAILABLE = true;/.test(cloud)) {
+    missing.push('ACCOUNT_DELETION_AVAILABLE = true (src/cloud/config.ts)');
+  }
+  if (!/export const ACCOUNT_DELETION_URL: string \| null = ['"]https:\/\/\S+['"];/.test(contato)) {
+    missing.push('ACCOUNT_DELETION_URL https (src/config/contato.ts)');
+  }
+  if (collectedDataTypes.length === 0) {
+    missing.push('NSPrivacyCollectedDataTypes (COLLECTED_DATA_TYPES em app.config.ts)');
+  }
+  if (missing.length > 0) {
+    throw new Error(
+      'Variante production com Comunidade bloqueada: ' +
+        missing.join(' e ') +
+        ' (Apple 2.1 e 5.1.1(v); exclusão de conta pela web no Google Play; manifesto de privacidade).',
+    );
+  }
+}
+
 export default ({ config, projectRoot }: ConfigContext): ExpoConfig => {
   const variant = readVariant();
   const identifier = identifierFor(variant);
@@ -170,11 +218,11 @@ export default ({ config, projectRoot }: ConfigContext): ExpoConfig => {
       // Manifesto de privacidade (PrivacyInfo.xcprivacy). Sem ele a Apple recusa o envio. O Expo não junta de forma
       // confiável os manifestos das dependências, então os motivos vão aqui. Fonte: PRIVACIDADE_NAS_LOJAS_rascunho.md §4
       // (lido em node_modules/**/ios/PrivacyInfo.xcprivacy em 2026-09-21; atualizar dependências pode mudar a lista).
-      // NSPrivacyCollectedDataTypes vazio = V1-A (nada sai do aparelho). Build com nuvem/Comunidade: preencher.
+      // NSPrivacyCollectedDataTypes: ver COLLECTED_DATA_TYPES (build de loja com Comunidade exige preenchido).
       privacyManifests: {
         NSPrivacyTracking: false,
         NSPrivacyTrackingDomains: [],
-        NSPrivacyCollectedDataTypes: [],
+        NSPrivacyCollectedDataTypes: [...COLLECTED_DATA_TYPES],
         NSPrivacyAccessedAPITypes: [
           {
             NSPrivacyAccessedAPIType: 'NSPrivacyAccessedAPICategoryUserDefaults',
@@ -244,6 +292,19 @@ export default ({ config, projectRoot }: ConfigContext): ExpoConfig => {
       ],
       'expo-secure-store',
       'expo-font',
+      [
+        // Comunidade (C3): só a galeria do sistema, sem câmera nem microfone. No
+        // iOS 14+ e no Android 13+ o seletor do sistema não pede permissão, mas o
+        // módulo entra no binário mesmo com a Comunidade desligada, e a App Store
+        // recusa binário que cita a fototeca sem texto de finalidade (ITMS-90683).
+        'expo-image-picker',
+        {
+          photosPermission:
+            'O app usa a sua galeria só quando você escolhe uma foto para publicar na comunidade da igreja.',
+          cameraPermission: false,
+          microphonePermission: false,
+        },
+      ],
     ],
     experiments: {
       typedRoutes: true,

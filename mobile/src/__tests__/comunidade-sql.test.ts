@@ -40,11 +40,12 @@ function fn(name: string): FnDef {
 const policies = [...sql.matchAll(/create policy[\s\S]*?;/g)].map((m) => m[0]);
 
 describe('arquivos', () => {
-  test('três migrations novas, depois da fundação, e quatro pgTAP novos', () => {
+  test('quatro migrations novas, depois da fundação, e quatro pgTAP novos', () => {
     expect(communityFiles).toEqual([
       '20260921130000_comunidade_tabelas.sql',
       '20260921130100_comunidade_funcoes.sql',
       '20260921130200_comunidade_storage.sql',
+      '20260921140000_comunidade_edge_functions.sql',
     ]);
     const foundation = allFiles.filter((f) => !f.includes('comunidade'));
     expect(foundation.every((f) => f < communityFiles[0])).toBe(true);
@@ -190,9 +191,51 @@ describe('regras de conteúdo', () => {
     expect(body).toMatch(/recusar ou remover exige motivo/);
     expect(body).toMatch(/v_author = v_uid/);
   });
+
+  test('marcar Amém exige consentimento vigente no servidor; desmarcar continua livre', () => {
+    const body = fn('private.set_amen').body;
+    const [unmark, mark] = body.split(/return false;\s*end if;/);
+    expect(unmark).toMatch(/private\.assert_member\(\)/);
+    expect(unmark).not.toMatch(/perform private\.assert_can_publish/);
+    expect(mark).toMatch(/perform private\.assert_can_publish\(\);/);
+    expect(mark.indexOf('perform private.assert_can_publish')).toBeLessThan(
+      mark.indexOf('insert into public.community_amens'),
+    );
+    expect(fn('private.assert_can_publish').body).toMatch(/private\.has_current_consents\(v_uid\)/);
+  });
+
+  test('prazo da denúncia comum é 24 h (Apple 1.2) e o urgente, 4 h', () => {
+    expect(sql).toMatch(/\('report_due_hours',\s*'24'\)/);
+    expect(sql).toMatch(/\('urgent_report_due_hours',\s*'4'\)/);
+  });
+
+  test('nem a moderação recebe o user_id de outra pessoa', () => {
+    for (const name of ['community_moderation_queue', 'community_open_reports']) {
+      for (const schema of ['private', 'public']) {
+        const header = fn(`${schema}.${name}`).header;
+        expect(header).not.toMatch(/author_id|reported_user_id/);
+      }
+    }
+    // A função que recebe user_id não é alcançável pela API; suspender vai pelo conteúdo.
+    expect(functions.some((f) => f.name === 'public.set_community_member_status')).toBe(false);
+    expect(sql).toMatch(
+      /revoke all on function private\.set_community_member_status\(uuid, text, text, text\) from public, anon, authenticated;/,
+    );
+    expect(sql).not.toMatch(/grant execute on function private\.set_community_member_status/);
+    const suspend = fn('private.suspend_community_author').body;
+    expect(suspend).toMatch(/private\.is_community_moderator\(\)/);
+    expect(suspend).toMatch(/num_nonnulls\(target_post, target_comment, target_report\) <> 1/);
+  });
 });
 
 describe('exclusão de conta e LGPD', () => {
+  test('revogar o consentimento NÃO desfaz os bloqueios; só sair da comunidade ou apagar a conta desfaz', () => {
+    const body = fn('private.purge_community_member').body;
+    const [beforeDrop, insideDrop] = body.split(/if drop_profile then/);
+    expect(beforeDrop).not.toMatch(/community_blocks/);
+    expect(insideDrop).toMatch(/delete from public.community_blocks bl where bl.blocker_id = target/);
+  });
+
   test('toda referência a auth.users é cascade ou set null (nada trava a exclusão)', () => {
     const refs = [...sql.matchAll(/references auth\.users\(id\)([^,\n]*)/g)].map((m) => m[1]);
     expect(refs.length).toBeGreaterThan(10);

@@ -161,7 +161,31 @@ describe('sessão', () => {
 });
 
 describe('exclusão de conta', () => {
-  test('está declarada e falha alto: exige a Edge Function, não existe atalho no cliente', async () => {
+  function withFunctions(response: { data: unknown; error: unknown }) {
+    const invoke = jest.fn(async () => response);
+    (fake.client as unknown as { functions: unknown }).functions = { invoke };
+    return invoke;
+  }
+
+  test('sem nuvem configurada falha alto, sem atalho no cliente', async () => {
+    _setSupabaseClientForTests(null);
+    _setCloudConfigForTests(null);
     await expect(requestAccountDeletion()).rejects.toBeInstanceOf(CloudError);
+  });
+
+  test('chama só a Edge Function delete-account e encerra a sessão local', async () => {
+    const invoke = withFunctions({ data: { deleted: true }, error: null });
+    await requestAccountDeletion();
+    expect(invoke).toHaveBeenCalledWith('delete-account', { body: { confirm: true } });
+    expect(fake.client.auth.signOut).toHaveBeenCalledWith({ scope: 'local' });
+  });
+
+  test('login antigo: nada é apagado, a sessão continua e a mensagem pede um acesso recente', async () => {
+    withFunctions({
+      data: null,
+      error: { name: 'FunctionsHttpError', context: { json: async () => ({ error: 'reauth_required' }) } },
+    });
+    await expect(requestAccountDeletion()).rejects.toThrow(/acesso recente/);
+    expect(fake.client.auth.signOut).not.toHaveBeenCalled();
   });
 });

@@ -18,3 +18,13 @@ export const SUPPORT_EMAIL: string | null = null;
 
 /** URL https da política de privacidade completa. Preenchido pelo fundador antes do envio. */
 export const PRIVACY_URL: string | null = null;
+
+/**
+ * URL https da página web de exclusão de conta (exigência do Google Play para
+ * apps com conta). Enquanto for `null`, o link não aparece em "Conta e
+ * privacidade" (src/ui/comunidade/perfil/copy.ts). Ainda NÃO entra em
+ * assertContactForStore: a V1 não cria conta em release (a nuvem só liga com
+ * ACCOUNT_DELETION_AVAILABLE, em src/cloud/config.ts). Passa a ser obrigatória
+ * no build de loja no mesmo dia em que a conta ligar em release.
+ */
+export const ACCOUNT_DELETION_URL: string | null = null;

@@ -1,4 +1,4 @@
-import { Stack, useLocalSearchParams } from 'expo-router';
+import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -11,11 +11,14 @@ import {
   signOut,
   verifyOtp,
 } from '@/cloud/auth';
-import { isCloudConfigured } from '@/cloud/config';
+import { ACCOUNT_DELETION_AVAILABLE, isCloudConfigured } from '@/cloud/config';
 import { CloudError } from '@/cloud/errors';
 import { useCloudSession } from '@/cloud/useSession';
+import { COMMUNITY_ENABLED } from '@/config/features';
 import { BackBar, goBackOrHome } from '@/ui/BackBar';
-import { AppText, Block, Button, Cap, Screen, StateView, useFace } from '@/ui/components';
+import { AppText, Block, Button, Cap, Screen, SettingRow, StateView, useFace } from '@/ui/components';
+import { AccountDeletionSection } from '@/ui/comunidade/perfil/AccountDeletionSection';
+import { COMMUNITY_ACCOUNT_ROUTE } from '@/ui/comunidade/perfil/routes';
 import { faces, radius, spacing, useGutter, useTheme } from '@/ui/theme';
 
 type Step = 'email' | 'code';
@@ -142,10 +145,27 @@ export default function AccountScreen() {
             <>
               <View style={{ gap: spacing.sm }} testID="account-signed-in">
                 <AppText variant="bodySm">Conectado como {signedInEmail}.</AppText>
-                <AppText variant="caption">
-                  Excluir a conta e exportar os dados ainda não estão disponíveis nesta versão.
-                </AppText>
+                {COMMUNITY_ENABLED || ACCOUNT_DELETION_AVAILABLE ? null : (
+                  <AppText variant="caption">
+                    Excluir a conta e exportar os dados ainda não estão disponíveis nesta versão.
+                  </AppText>
+                )}
               </View>
+
+              {COMMUNITY_ENABLED ? (
+                // Com a Comunidade ligada, sair dela, apagar o que publicou e
+                // excluir a conta moram em "Conta e privacidade" da comunidade.
+                <SettingRow
+                  first
+                  label="Conta e privacidade"
+                  onPress={() => router.push(COMMUNITY_ACCOUNT_ROUTE)}
+                  testID="account-community-privacy"
+                />
+              ) : null}
+
+              {/* Apple 5.1.1(v): a exclusão depende só da sessão, nunca da Comunidade nem
+                  de my_community_status responder. Por isso também mora aqui. */}
+              {ACCOUNT_DELETION_AVAILABLE ? <AccountDeletionSection /> : null}
 
               {error ? (
                 <AppText variant="rowLabel" accessibilityLiveRegion="polite" style={{ color: colors.danger }} testID="auth-error">
@@ -162,7 +182,9 @@ export default function AccountScreen() {
                 <AppText variant="bodySm">
                   {reason === 'group'
                     ? 'Para entrar em um grupo, precisamos identificar você. Nada da sua jornada pessoal muda.'
-                    : 'Usamos a conta apenas para o que depende do servidor.'}
+                    : reason === 'comunidade'
+                      ? 'A comunidade usa uma conta com e-mail, só para quem tem 18 anos ou mais. Ninguém na comunidade vê o seu e-mail, e nada da sua jornada pessoal muda.'
+                      : 'Usamos a conta apenas para o que depende do servidor.'}
                 </AppText>
               </View>
 

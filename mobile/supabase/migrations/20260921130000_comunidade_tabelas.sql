@@ -60,7 +60,7 @@ insert into private.community_settings (key, value) values
   ('rules_sha256',            'PENDENTE'),
   ('campaign_start',          '2026-09-23'), -- dia 1 dos 100 Dias
   ('feed_window_days',        '7'),          -- feed com fim: só a última semana
-  ('report_due_hours',        '48'),         -- prazo prometido na tela C5 (decisão pendente: 24 ou 48)
+  ('report_due_hours',        '24'),         -- Apple 1.2: denúncia tratada em até 24 h; a tela só promete prazo com REVIEW_HOURS
   ('urgent_report_due_hours', '4'),          -- criança, rosto de terceiro, risco à vida (PROPOSTA)
   ('max_posts_per_day',       '10'),
   ('max_comments_per_day',    '60'),

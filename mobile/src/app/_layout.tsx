@@ -149,6 +149,20 @@ export default function RootLayout() {
         <Stack.Screen name="lembrete" options={{ headerShown: false, presentation: 'modal' }} />
         <Stack.Screen name="conta" options={{ headerShown: false, presentation: 'modal' }} />
         <Stack.Screen name="grupo/[id]" options={{ headerShown: false }} />
+        {/*
+          Comunidade (branch comunidade-v2). Declarar as rotas não as liga: cada
+          tela se protege com COMMUNITY_ENABLED e, com a flag desligada, nada no
+          app leva até elas (a V1 fica igual).
+        */}
+        <Stack.Screen name="comunidade/depois/[day]" options={{ headerShown: false }} />
+        <Stack.Screen name="comunidade/publicar" options={{ headerShown: false }} />
+        <Stack.Screen name="comunidade/regras" options={{ headerShown: false }} />
+        <Stack.Screen name="comunidade/consentimento" options={{ headerShown: false }} />
+        <Stack.Screen name="comunidade/post/[id]" options={{ headerShown: false }} />
+        <Stack.Screen name="comunidade/entrar/index" options={{ headerShown: false }} />
+        <Stack.Screen name="comunidade/minhas-publicacoes" options={{ headerShown: false }} />
+        <Stack.Screen name="comunidade/conta-e-privacidade" options={{ headerShown: false }} />
+        <Stack.Screen name="moderacao/index" options={{ headerShown: false }} />
         <Stack.Screen name="admin" options={{ title: 'Administração' }} />
         <Stack.Screen name="dev" options={{ title: 'Painel de desenvolvimento', presentation: 'modal' }} />
         <Stack.Screen name="componentes" options={{ headerShown: false }} />
