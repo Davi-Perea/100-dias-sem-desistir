@@ -24,3 +24,6 @@ Thumbs.db
 
 # Conteúdo bíblico bruto (nunca versionar textos licenciados)
 content-pipeline/raw/
+
+# Configuração local do preview no navegador (por máquina, não é do produto)
+**/.claude/launch.json
