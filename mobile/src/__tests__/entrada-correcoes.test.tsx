@@ -213,12 +213,11 @@ describe('R4-9 · o F6 usa o cadeado do desenho', () => {
 /* ------------------------------------------------ F2 · passo do lembrete */
 
 describe('F2 · passo 3, lembrete', () => {
-  test('R4-5: nenhuma opção promete escolher; a de 21h diz o horário que grava', async () => {
+  test('R4-5: cada chip diz o horário que grava (21:00 grava 21h)', async () => {
     await seedSettings();
     await render(<LembreteStep />);
-    expect(screen.queryByText('Escolher horário')).toBeNull();
-    expect(screen.getByText('À noite, às 21h')).toBeTruthy();
-    await fireEvent.press(screen.getByTestId('onboarding-reminder-custom'));
+    expect(screen.getByText('21:00')).toBeTruthy();
+    await fireEvent.press(screen.getByTestId('onboarding-reminder-2100'));
     await waitFor(() => expect(mockReminders.scheduleDailyReminder).toHaveBeenCalledWith(21, 0));
   });
 
@@ -229,7 +228,7 @@ describe('F2 · passo 3, lembrete', () => {
       reason: 'Permissão de notificações negada. Você pode ativar nos ajustes do sistema.',
     });
     await render(<LembreteStep />);
-    await fireEvent.press(screen.getByTestId('onboarding-reminder-morning'));
+    await fireEvent.press(screen.getByTestId('onboarding-reminder-0700'));
     await waitFor(() => expect(screen.getByTestId('reminder-notice')).toBeTruthy());
     expect(screen.getByTestId('reminder-notice').props.children).toBe(
       'Permissão de notificações negada. Você pode seguir sem lembrete e ativar depois em Você.',
@@ -240,7 +239,7 @@ describe('F2 · passo 3, lembrete', () => {
     await seedSettings();
     mockReminders.scheduleDailyReminder.mockRejectedValue(new Error('quota'));
     await render(<LembreteStep />);
-    await fireEvent.press(screen.getByTestId('onboarding-reminder-morning'));
+    await fireEvent.press(screen.getByTestId('onboarding-reminder-0700'));
     await waitFor(() => expect(screen.getByTestId('reminder-notice')).toBeTruthy());
     expect(screen.getByTestId('reminder-notice').props.children).toMatch(/^Não deu para agendar o lembrete agora\./);
     expect(JSON.stringify(screen.toJSON())).not.toMatch(/quota/);
@@ -252,9 +251,9 @@ describe('F2 · passo 3, lembrete', () => {
     await seedSettings();
     mockReminders.scheduleDailyReminder.mockResolvedValueOnce({ ok: false, reason: 'Permissão de notificações negada.' });
     await render(<LembreteStep />);
-    await fireEvent.press(screen.getByTestId('onboarding-reminder-morning'));
+    await fireEvent.press(screen.getByTestId('onboarding-reminder-0700'));
     await waitFor(() => expect(screen.getByText('Continuar sem lembrete')).toBeTruthy());
-    await fireEvent.press(screen.getByTestId('onboarding-reminder-evening'));
+    await fireEvent.press(screen.getByTestId('onboarding-reminder-1900'));
     await waitFor(() => expect(getCachedSettings()?.reminder.slot).toBe('evening'));
     expect(screen.getByText('Continuar')).toBeTruthy();
     expect(screen.queryByText('Continuar sem lembrete')).toBeNull();

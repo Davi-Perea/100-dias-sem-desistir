@@ -11,32 +11,24 @@ import {
   scheduleDailyReminder,
   scheduleTestNotification,
   syncAltarReminders,
-  SLOT_LABELS,
-  SLOT_TIMES,
 } from '@/reminders/reminders';
 import { updateSettings, useSettings, type ReminderSlot } from '@/settings/settingsStore';
-import { AppText, Block, Button, Cap, ChoiceRow, SAVE_ERROR_COPY, Screen, StateView } from '@/ui/components';
+import { AppText, Block, Button, Cap, SAVE_ERROR_COPY, Screen, StateView } from '@/ui/components';
+import { ReminderTimePicker } from '@/ui/lembrete/ReminderTimePicker';
 import { spacing, useTheme } from '@/ui/theme';
 import { announceNotice } from '@/ui/voce/announce';
 import { SubScreen } from '@/ui/voce/SubScreen';
 import { ToggleRow } from '@/ui/voce/ToggleRow';
 
-const CUSTOM_TIMES = [
-  { hour: 5, minute: 30 },
-  { hour: 6, minute: 0 },
-  { hour: 12, minute: 0 },
-  { hour: 18, minute: 30 },
-  { hour: 21, minute: 30 },
-  { hour: 22, minute: 0 },
-];
-
 /**
  * Lembretes (D1 → aqui): a leitura diária e o aviso do altar das 12h30.
  * Notificações locais, sem conta e sem rede.
  *
- * PROVISÓRIO (pergunta 12 ao designer): tela não desenhada; mesma função de
- * antes, com os componentes novos. A permissão do sistema só é pedida no gesto
- * de escolher um horário (REGRAS 13); recusa volta para "Sem lembrete".
+ * PROVISÓRIO (pergunta 12 ao designer): tela não desenhada. O horário é o
+ * seletor único (`ReminderTimePicker`, o mesmo do onboarding): horários prontos
+ * ou o do seletor do sistema, e todo dia da campanha chega "Hora de ler a
+ * Bíblia". A permissão do sistema só é pedida no gesto de escolher um horário
+ * (REGRAS 13); recusa volta para "Sem lembrete".
  */
 export default function ReminderScreen() {
   const { colors } = useTheme();
@@ -97,7 +89,7 @@ export default function ReminderScreen() {
           report(
             journey.phase === 'finished'
               ? 'A jornada terminou; não há leituras a lembrar.'
-              : `Lembrete diário às ${formatTime(hour, minute)}.`,
+              : `Todo dia às ${formatTime(hour, minute)} chega: Hora de ler a Bíblia.`,
           );
         }
       }
@@ -158,46 +150,12 @@ export default function ReminderScreen() {
         </Block>
       ) : null}
 
-      <View style={{ gap: spacing.sm }}>
-        {(['morning', 'afternoon', 'evening'] as const).map((slot) => (
-          <ChoiceRow
-            key={slot}
-            label={SLOT_LABELS[slot]}
-            description={formatTime(SLOT_TIMES[slot].hour, SLOT_TIMES[slot].minute)}
-            compact
-            selected={current.slot === slot}
-            onPress={() => apply(slot, SLOT_TIMES[slot].hour, SLOT_TIMES[slot].minute)}
-            testID={`reminder-${slot}`}
-          />
-        ))}
-        <ChoiceRow
-          label={SLOT_LABELS.none}
-          selected={current.slot === 'none'}
-          onPress={() => apply('none', current.hour, current.minute)}
-          testID="reminder-none"
-        />
-      </View>
-
-      <View style={{ gap: spacing.sm }}>
-        <Cap>Escolher horário</Cap>
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
-          {CUSTOM_TIMES.map((t) => {
-            const selected = current.slot === 'custom' && current.hour === t.hour && current.minute === t.minute;
-            return (
-              <Button
-                key={`${t.hour}-${t.minute}`}
-                title={formatTime(t.hour, t.minute)}
-                variant={selected ? 'primary' : 'outline'}
-                // O selecionado é dito, não só desenhado (preenchido vs contornado).
-                selected={selected}
-                disabled={busy}
-                onPress={() => apply('custom', t.hour, t.minute)}
-                style={{ paddingHorizontal: spacing.lg }}
-              />
-            );
-          })}
-        </View>
-      </View>
+      <ReminderTimePicker
+        current={current}
+        onChoose={(choice) => apply(choice.slot, choice.hour, choice.minute)}
+        disabled={busy}
+        testIDPrefix="reminder"
+      />
 
       {status ? (
         // Tinta, não amarelo: o amarelo sobre branco mede 1,46:1, e este texto

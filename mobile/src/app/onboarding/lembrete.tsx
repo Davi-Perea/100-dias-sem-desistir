@@ -2,38 +2,11 @@ import { router } from 'expo-router';
 import { useRef, useState } from 'react';
 
 import { track } from '@/analytics/analytics';
-import {
-  cancelDailyReminder,
-  formatTime,
-  scheduleDailyReminder,
-  SLOT_LABELS,
-  SLOT_TIMES,
-} from '@/reminders/reminders';
-import { updateSettings, useSettings, type ReminderSlot } from '@/settings/settingsStore';
-import { AppText, Button, ChoiceRow, SAVE_ERROR_COPY } from '@/ui/components';
+import { cancelDailyReminder, scheduleDailyReminder } from '@/reminders/reminders';
+import { DEFAULT_SETTINGS, updateSettings, useSettings, type ReminderSlot } from '@/settings/settingsStore';
+import { AppText, Button, SAVE_ERROR_COPY } from '@/ui/components';
+import { ReminderTimePicker } from '@/ui/lembrete/ReminderTimePicker';
 import { OnboardingStep, StepSupport } from '@/ui/OnboardingStep';
-
-const CUSTOM = { hour: 21, minute: 0 };
-
-type TimedOption = {
-  slot: Exclude<ReminderSlot, 'none'>;
-  hour: number;
-  minute: number;
-  /** Rótulo desta tela, quando difere do SLOT_LABELS. Já diz o horário. */
-  label?: string;
-};
-
-const TIMED: TimedOption[] = [
-  { slot: 'morning', ...SLOT_TIMES.morning },
-  { slot: 'afternoon', ...SLOT_TIMES.afternoon },
-  { slot: 'evening', ...SLOT_TIMES.evening },
-  // PROVISÓRIO (pergunta 18 ao designer): não há seletor de hora (seria
-  // dependência nova). "Escolher horário" prometia uma escolha que não existe e
-  // gravava 21:00 — e, com a permissão pedida no toque, gastava o único diálogo
-  // do iOS num horário que a pessoa não escolheu (R4-5). Até o seletor, o
-  // rótulo diz o horário que grava de fato.
-  { slot: 'custom', ...CUSTOM, label: 'À noite, às 21h' },
-];
 
 const LATER = 'Você pode seguir sem lembrete e ativar depois em Você.';
 /**
@@ -54,8 +27,9 @@ const DENIED_NOTICE = `Permissão de notificações negada. ${LATER}`;
  * prometer um aviso que não vem. Nada aqui prende a pessoa: o lembrete é
  * opcional e "Continuar" funciona sempre.
  *
- * PROVISÓRIO (pergunta 18 ao designer): o TELAS só diz "no mesmo molde", sem
- * cópia nem lista de horários. Ficam o título e os horários que o passo já tinha.
+ * O horário é o seletor único (ReminderTimePicker, o mesmo da tela
+ * Lembretes, pedido do fundador em 2026-09-21): horários prontos ou o do seletor
+ * do sistema. Isso resolve a pergunta 18 ao designer (não havia seletor de hora).
  */
 export default function ReminderOnboardingScreen() {
   const settings = useSettings();
@@ -64,7 +38,6 @@ export default function ReminderOnboardingScreen() {
   const [denied, setDenied] = useState(false);
   // Trava síncrona: dois toques seguidos não podem abrir dois diálogos do sistema.
   const pending = useRef(false);
-  const slot = settings?.reminder.slot ?? 'none';
 
   const choose = async (next: ReminderSlot, hour: number, minute: number) => {
     if (pending.current) return;
@@ -138,7 +111,8 @@ export default function ReminderOnboardingScreen() {
             </AppText>
           ) : null}
           <StepSupport testID="reminder-support">
-            Um lembrete local, agendado no seu aparelho. Você pode mudar ou desligar depois, em Você.
+            Todo dia, no horário escolhido, chega “Hora de ler a Bíblia” com a leitura do dia. É um lembrete local,
+            agendado no seu aparelho. Você pode mudar ou desligar depois, em Você.
           </StepSupport>
         </>
       }
@@ -151,21 +125,11 @@ export default function ReminderOnboardingScreen() {
         />
       }
     >
-      {TIMED.map((option) => (
-        <ChoiceRow
-          key={option.slot}
-          label={option.label ?? SLOT_LABELS[option.slot]}
-          description={option.label ? undefined : formatTime(option.hour, option.minute)}
-          selected={slot === option.slot}
-          onPress={() => choose(option.slot, option.hour, option.minute)}
-          testID={`onboarding-reminder-${option.slot}`}
-        />
-      ))}
-      <ChoiceRow
-        label={SLOT_LABELS.none}
-        selected={slot === 'none'}
-        onPress={() => choose('none', 7, 0)}
-        testID="onboarding-reminder-none"
+      <ReminderTimePicker
+        current={settings?.reminder ?? DEFAULT_SETTINGS.reminder}
+        onChoose={(choice) => choose(choice.slot, choice.hour, choice.minute)}
+        disabled={busy}
+        testIDPrefix="onboarding-reminder"
       />
     </OnboardingStep>
   );

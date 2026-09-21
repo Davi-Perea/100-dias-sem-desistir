@@ -231,7 +231,7 @@ describe('F2 · passo 3, lembrete', () => {
     expect(screen.getByText('Passo 3 de 3')).toBeTruthy();
     expect(mockReminders.scheduleDailyReminder).not.toHaveBeenCalled();
 
-    await fireEvent.press(screen.getByTestId('onboarding-reminder-morning'));
+    await fireEvent.press(screen.getByTestId('onboarding-reminder-0700'));
     await waitFor(() => expect(mockReminders.scheduleDailyReminder).toHaveBeenCalledWith(7, 0));
     await waitFor(() => expect(getCachedSettings()?.reminder.slot).toBe('morning'));
   });
@@ -240,7 +240,7 @@ describe('F2 · passo 3, lembrete', () => {
     await seedSettings();
     mockReminders.scheduleDailyReminder.mockResolvedValue({ ok: false, reason: 'Permissão de notificações negada.' });
     await render(<LembreteStep />);
-    await fireEvent.press(screen.getByTestId('onboarding-reminder-evening'));
+    await fireEvent.press(screen.getByTestId('onboarding-reminder-1900'));
     await waitFor(() => expect(screen.getByTestId('reminder-notice')).toBeTruthy());
     expect(getCachedSettings()?.reminder.slot).toBe('none');
     expect(screen.getByRole('radio', { name: 'Sem lembrete' }).props.accessibilityState.selected).toBe(true);
