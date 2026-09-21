@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 
+import { demoDay } from '@/config/demo';
 import {
   completedCount,
   isDayCompleted,
@@ -11,6 +12,7 @@ import { useSettings } from '@/settings/settingsStore';
 
 import { useCampaignNow } from './campaignClock';
 import { contentState, getCampaign, getDataset, getDay, type ContentState } from './datasetSource';
+import { useDemoSeed } from './demoSeed';
 import { isDevBuild } from './devBuild';
 import { officialDayInfo, type CampaignPhase } from './officialDay';
 import { nextMilestoneAfter, reachedMilestones, type Milestone } from './milestones';
@@ -60,10 +62,13 @@ export function useJourney(): JourneySnapshot {
   const settings = useSettings();
   const campaign = getCampaign();
   const completions = useCompletions(campaign.id);
+  // Modo demonstração (só __DEV__, config/demo.ts): progresso de exemplo na primeira abertura.
+  useDemoSeed(campaign.id);
 
   const info = useMemo(() => officialDayInfo(now, campaign), [now, campaign]);
   // O dia simulado do painel DEV só vale em build de desenvolvimento (DIA-01/PER-01).
-  const override = isDevBuild() ? (settings?.dev.dayOverride ?? null) : null;
+  // O modo demonstração usa o mesmo caminho, sem gravar nada: o dia do painel, se houver, vale mais.
+  const override = isDevBuild() ? (settings?.dev.dayOverride ?? demoDay()) : null;
   /** Um override além do último dia simula a campanha encerrada (E5) no painel DEV. */
   const overrideFinished = override !== null && override > campaign.total_days;
   const officialDay = override === null ? info.officialDay : Math.min(override, campaign.total_days);

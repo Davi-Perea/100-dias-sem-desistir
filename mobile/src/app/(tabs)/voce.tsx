@@ -1,6 +1,7 @@
 import { router } from 'expo-router';
 
 import { SUPPORT_EMAIL } from '@/config/contato';
+import { isDemoMode } from '@/config/demo';
 import { fastingKeptCount, useFasting } from '@/fasting/fastingStore';
 import { useJourney } from '@/journey/useJourney';
 import { completedDayNumbers } from '@/progress/completionsStore';
@@ -125,7 +126,8 @@ export default function YouScreen() {
           <SettingRow label={SUPPORT_EMAIL ? 'Ajuda e contato' : 'Ajuda'} onPress={() => router.push('/ajuda')} testID="row-help" />
         </RowGroup>
 
-        {__DEV__ ? (
+        {/* Modo demonstração (config/demo.ts): o app aparece como a pessoa o verá, sem o painel. */}
+        {__DEV__ && !isDemoMode() ? (
           <Button title="Painel de desenvolvimento" variant="underline" onPress={() => router.push('/dev')} />
         ) : null}
       </ScreenScroll>
