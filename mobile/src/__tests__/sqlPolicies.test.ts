@@ -51,9 +51,21 @@ describe('escopo do schema', () => {
     expect(migrationFiles).toEqual([...migrationFiles].sort());
   });
 
-  test('só a fundação foi criada: nada de feed, reações, denúncias ou push', () => {
-    const created = [...sql.matchAll(/create table public\.(\w+)/g)].map((m) => m[1]).sort();
+  test('a fundação só cria as tabelas dela: nada de feed, reações, denúncias ou push', () => {
+    const foundationSql = migrationFiles
+      .filter((f) => !f.includes('comunidade'))
+      .map((f) => fs.readFileSync(path.join(MIGRATIONS_DIR, f), 'utf8'))
+      .join('\n');
+    const created = [...foundationSql.matchAll(/create table public\.(\w+)/g)].map((m) => m[1]).sort();
     expect(created).toEqual([...FOUNDATION_TABLES].sort());
+  });
+
+  test('as migrations da Comunidade (2026-09-21) só criam tabelas públicas community_* e consent_records', () => {
+    // Invariantes da Comunidade (RLS, sem contagem de Amém, sem user_id no feed) estão em comunidade-sql.test.ts.
+    const created = [...sql.matchAll(/create table public\.(\w+)/g)].map((m) => m[1]);
+    const extra = created.filter((t) => !FOUNDATION_TABLES.includes(t));
+    expect(extra.length).toBeGreaterThan(0);
+    for (const table of extra) expect(table).toMatch(/^(community_\w+|consent_records)$/);
   });
 
   test('não existem tabelas de conteúdo local-only no servidor', () => {
