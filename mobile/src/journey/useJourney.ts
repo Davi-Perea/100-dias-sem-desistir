@@ -67,8 +67,9 @@ export function useJourney(): JourneySnapshot {
 
   const info = useMemo(() => officialDayInfo(now, campaign), [now, campaign]);
   // O dia simulado do painel DEV só vale em build de desenvolvimento (DIA-01/PER-01).
-  // O modo demonstração usa o mesmo caminho, sem gravar nada: o dia do painel, se houver, vale mais.
-  const override = isDevBuild() ? (settings?.dev.dayOverride ?? demoDay()) : null;
+  // O modo demonstração usa o mesmo caminho, sem gravar nada, e vale MAIS que o dia do painel:
+  // em demo o painel some, então um dia antigo escolhido nele ficaria invisível e sem como limpar.
+  const override = isDevBuild() ? (demoDay() ?? settings?.dev.dayOverride ?? null) : null;
   /** Um override além do último dia simula a campanha encerrada (E5) no painel DEV. */
   const overrideFinished = override !== null && override > campaign.total_days;
   const officialDay = override === null ? info.officialDay : Math.min(override, campaign.total_days);

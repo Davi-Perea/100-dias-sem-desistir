@@ -157,12 +157,12 @@ describe('com __DEV__ e o modo ligado', () => {
     expect(await storedDays()).toEqual([5]);
   });
 
-  test('o dia escolhido no painel DEV vale mais que o da demonstração', async () => {
+  test('a demonstração vale mais que um dia antigo do painel DEV (que fica escondido em demo)', async () => {
     setDemoEnv('true', '3');
     await AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify({ onboardingCompleted: true, dev: { dayOverride: 25 } }));
     _resetSettingsCacheForTests();
     const { result } = await mountJourney();
-    expect(result.current.officialDay).toBe(25);
+    expect(result.current.officialDay).toBe(3);
   });
 
   test('a faixa de conteúdo não autorizado continua valendo', async () => {
