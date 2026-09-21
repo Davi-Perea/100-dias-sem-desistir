@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 
-import { demoDay, demoSeedDays } from '@/config/demo';
+import { demoDay, demoSeedDays, demoSeedEnabled } from '@/config/demo';
 import { completedCount, loadCompletions, setDayCompleted } from '@/progress/completionsStore';
 
 /**
@@ -12,7 +12,7 @@ const seeded = new Map<string, Promise<void>>();
 
 export function seedDemoProgress(campaignId: string): Promise<void> {
   const day = demoDay();
-  if (day === null) return Promise.resolve();
+  if (day === null || !demoSeedEnabled()) return Promise.resolve();
   const existing = seeded.get(campaignId);
   if (existing) return existing;
   const run = (async () => {

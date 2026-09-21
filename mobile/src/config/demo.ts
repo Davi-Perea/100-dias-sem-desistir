@@ -42,6 +42,26 @@ export function demoDay(): number | null {
   return Number.isInteger(n) && n >= 1 && n <= DEMO_DAY_MAX ? n : DEMO_DAY_DEFAULT;
 }
 
+/**
+ * "Pessoa nova" (EXPO_PUBLIC_DEMO_SEED=false): sem progresso de exemplo e sem
+ * publicação própria de exemplo na Comunidade — o app como alguém que acabou
+ * de instalar no Dia N o veria.
+ */
+export function demoSeedEnabled(): boolean {
+  return isDemoMode() && process.env.EXPO_PUBLIC_DEMO_SEED !== 'false';
+}
+
+/**
+ * Começo do zero a cada rodada (EXPO_PUBLIC_DEMO_FRESH_RUN=<id>): na primeira
+ * abertura com um id novo, o app apaga os dados locais deste aparelho, para a
+ * próxima pessoa testar desde as boas-vindas. Só em demonstração.
+ */
+export function demoFreshRunId(): string | null {
+  if (!isDemoMode()) return null;
+  const id = process.env.EXPO_PUBLIC_DEMO_FRESH_RUN;
+  return id && id.trim() !== '' ? id.trim() : null;
+}
+
 /** Dias que a demonstração marca como concluídos: 1..(dia − 2). Vazio nos dias 1 e 2. */
 export function demoSeedDays(day: number): number[] {
   const out: number[] = [];

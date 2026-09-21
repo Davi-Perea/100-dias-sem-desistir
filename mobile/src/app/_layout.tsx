@@ -1,9 +1,11 @@
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider, useRouter, useSegments } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useMemo, useState } from 'react';
 
 import { setAnalyticsEnabled } from '@/analytics/analytics';
+import { demoFreshRunId } from '@/config/demo';
 import { bibliaLivreProvider } from '@/reader/bibliaLivreProvider';
 import { setBibleProvider } from '@/reader/provider';
 import { setupNotificationHandler } from '@/reminders/reminders';
@@ -63,7 +65,45 @@ function useOnboardingGate(): boolean {
   return !inOnboarding;
 }
 
+/**
+ * Modo demonstração (config/demo.ts): com EXPO_PUBLIC_DEMO_FRESH_RUN, a primeira
+ * abertura de cada rodada apaga os dados locais deste aparelho, para a próxima
+ * pessoa começar das boas-vindas. Roda ANTES de qualquer store ler o disco. Em
+ * release demoFreshRunId() é sempre null e o app abre direto.
+ */
+const DEMO_RUN_KEY = 'demo:fresh-run';
+
+function useDemoFreshStart(): boolean {
+  const runId = demoFreshRunId();
+  const [ready, setReady] = useState(runId === null);
+  useEffect(() => {
+    if (runId === null) return;
+    let alive = true;
+    (async () => {
+      try {
+        if ((await AsyncStorage.getItem(DEMO_RUN_KEY)) !== runId) {
+          await AsyncStorage.clear();
+          await AsyncStorage.setItem(DEMO_RUN_KEY, runId);
+        }
+      } catch {
+        // Demonstração: se o disco falhar, segue com o que houver.
+      }
+      if (alive) setReady(true);
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [runId]);
+  return ready;
+}
+
 export default function RootLayout() {
+  const ready = useDemoFreshStart();
+  if (!ready) return null;
+  return <AppRoot />;
+}
+
+function AppRoot() {
   const { colors, isDark } = useTheme();
   const fontsReady = useAppFonts();
   const routeSettled = useOnboardingGate();

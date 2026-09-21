@@ -203,8 +203,11 @@ function seed(now = Date.now()): State {
     post(103, ana, 'Confesso que atrasei um dia, mas voltei. Ler junto com a igreja me ajuda a não desistir.', d(1), 60 * 20),
     post(104, pedro, 'O jejum de ontem foi mais difícil do que eu esperava. Terminei o dia grato e em paz.', d(1), 60 * 26),
     post(105, lucas, 'Comecei a ler com meu filho à noite. Ele faz perguntas em que eu nunca tinha pensado.', d(2), 60 * 45),
-    // A própria pessoa: um exemplo de publicação que ficou "em análise" (só ela vê).
-    {
+  ];
+  // A própria pessoa: um exemplo de publicação que ficou "em análise" (só ela vê).
+  // Some no modo "pessoa nova" (EXPO_PUBLIC_DEMO_SEED=false): quem acabou de entrar não publicou nada.
+  if (process.env.EXPO_PUBLIC_DEMO_SEED !== 'false') {
+    posts.push({
       postId: uuid(106),
       author: { key: 'me', name: '' },
       body: 'Exemplo de publicação em análise: é assim que aparece um texto que a equipe da igreja ainda vai olhar.',
@@ -214,8 +217,8 @@ function seed(now = Date.now()): State {
       status: 'in_review',
       holdReason: 'termo',
       amen: false,
-    },
-  ];
+    });
+  }
 
   const comments: DemoComment[] = [
     {
