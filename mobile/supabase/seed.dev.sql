@@ -32,9 +32,11 @@ on conflict (id) do nothing;
 
 -- ---------------------------------------------------------------------------
 -- Helper: liga contas já criadas pelo app aos papéis de teste.
+-- Uso: select * from private.dev_seed_roles('membro@exemplo.test', 'lider@exemplo.test', 'admin@exemplo.test');
+-- (e-mails de contas DE TESTE; nunca rode com contas de pessoas reais)
 -- Não cria usuários — o cadastro real passa pelo fluxo de OTP do app.
 -- ---------------------------------------------------------------------------
-create or replace function public.dev_seed_roles(
+create or replace function private.dev_seed_roles(
   member_email text,
   leader_email text,
   admin_email  text
@@ -42,7 +44,7 @@ create or replace function public.dev_seed_roles(
 returns table (papel text, email text, resultado text)
 language plpgsql
 security definer
-set search_path = public
+set search_path = ''
 as $$
 declare
   member_id uuid;
@@ -51,20 +53,20 @@ declare
   intercessao constant uuid := '11111111-1111-4111-8111-111111111111';
   louvor      constant uuid := '22222222-2222-4222-8222-222222222222';
 begin
-  if coalesce(current_setting('app.allow_dev_seed', true), 'off') <> 'on' then
+  if coalesce(pg_catalog.current_setting('app.allow_dev_seed', true), 'off') <> 'on' then
     raise exception 'dev_seed_roles bloqueado fora de desenvolvimento' using errcode = '42501';
   end if;
 
-  select id into member_id from auth.users where lower(auth.users.email) = lower(member_email);
-  select id into leader_id from auth.users where lower(auth.users.email) = lower(leader_email);
-  select id into admin_id  from auth.users where lower(auth.users.email) = lower(admin_email);
+  select id into member_id from auth.users where pg_catalog.lower(auth.users.email) = pg_catalog.lower(member_email);
+  select id into leader_id from auth.users where pg_catalog.lower(auth.users.email) = pg_catalog.lower(leader_email);
+  select id into admin_id  from auth.users where pg_catalog.lower(auth.users.email) = pg_catalog.lower(admin_email);
 
   if member_id is null or leader_id is null or admin_id is null then
     raise exception 'crie as três contas pelo app antes de rodar o seed';
   end if;
 
   -- Abre a janela para escrever papéis diretamente (o trigger normalmente recusa).
-  perform set_config('app.role_change_authorized', 'on', true);
+  perform pg_catalog.set_config('app.role_change_authorized', 'on', true);
 
   insert into public.group_memberships (group_id, user_id, role, status)
   values (intercessao, member_id, 'member', 'active'),
@@ -75,10 +77,10 @@ begin
   insert into public.app_admins (user_id, granted_by) values (admin_id, admin_id)
   on conflict (user_id) do nothing;
 
-  perform set_config('app.role_change_authorized', 'off', true);
+  perform pg_catalog.set_config('app.role_change_authorized', 'off', true);
 
   insert into public.admin_audit_log (actor_id, action, meta)
-  values (admin_id, 'dev_seed_roles', jsonb_build_object('ambiente', 'desenvolvimento'));
+  values (admin_id, 'dev_seed_roles', pg_catalog.jsonb_build_object('ambiente', 'desenvolvimento'));
 
   return query
     select 'member'::text, member_email, 'membro de Intercessão'::text
@@ -86,8 +88,10 @@ begin
     union all select 'admin',  admin_email,  'admin global + membro de Louvor';
 end $$;
 
-revoke execute on function public.dev_seed_roles(text, text, text) from anon, authenticated;
+-- Em private (fora da API) e sem EXECUTE para PUBLIC: o revoke só de anon/authenticated
+-- não bastava, porque as duas herdam o EXECUTE padrão que o Postgres dá a PUBLIC.
+revoke all on function private.dev_seed_roles(text, text, text) from public, anon, authenticated;
 
-comment on function public.dev_seed_roles(text, text, text) is
+comment on function private.dev_seed_roles(text, text, text) is
   'DEV ONLY. Sem GRANT para anon/authenticated: inalcançável pelo aplicativo. '
-  'Antes de ir para produção, rode: drop function if exists public.dev_seed_roles(text,text,text);';
+  'Antes de ir para produção, rode: drop function if exists private.dev_seed_roles(text,text,text);';
