@@ -17,8 +17,13 @@ Funciona **sem login** e offline; o que a pessoa escreve fica no aparelho dela. 
 material **próprio da igreja** — um guia diário de intercessão com leitura, ênfase, monte, versículo-base
 e motivos de oração, mais a escala de ministérios que conduzem o altar das 12h30.
 
-O que ele **não** é, e não deve virar num desenho novo: rede social, feed, ranking, gamificação,
-plataforma multi-igrejas, ou qualquer coisa que peça pagamento.
+O que ele **não** é, e não deve virar num desenho novo: ranking, gamificação, plataforma multi-igrejas,
+ou qualquer coisa que peça pagamento.
+
+> **Mudança de escopo em 2026-09-20.** O app passa a ter um **feed da comunidade**, e ele passa a ser a
+> primeira tela. Isso é decisão do fundador e supera quatro invariantes deste pacote — leia
+> [00-DECISAO-FEED.md](00-DECISAO-FEED.md) antes de qualquer outra coisa, porque ela diz exatamente o que
+> caiu, o que **continua valendo** e as dez obrigações legais e de loja que o feed traz junto.
 
 ---
 
@@ -26,7 +31,8 @@ plataforma multi-igrejas, ou qualquer coisa que peça pagamento.
 
 | Peça | O que é |
 |---|---|
-| [sistema-visual.html](sistema-visual.html) | **Abra primeiro.** Página autocontida: as duas paletas token por token, a tipografia renderizada nas fontes reais, espaço, raio, pisos de caixa e o inventário de componentes. As razões de contraste são calculadas na própria página a partir dos hex — não são números copiados à mão. |
+| [00-DECISAO-FEED.md](00-DECISAO-FEED.md) | **Leia primeiro.** A mudança de escopo de 20/09: o feed entra, vira a primeira tela, e supera quatro regras deste pacote. Diz o que caiu, o que continua valendo e o que o feed obriga a existir. |
+| [sistema-visual.html](sistema-visual.html) | Página autocontida: as duas paletas token por token, a tipografia renderizada nas fontes reais, espaço, raio, pisos de caixa e o inventário de componentes. As razões de contraste são calculadas na própria página a partir dos hex — não são números copiados à mão. |
 | [01-sistema-de-tokens.md](01-sistema-de-tokens.md) | O sistema inteiro em texto: 27 tokens por tema, 18 variantes de tipografia, vidro, sombra, movimento, e cada primitivo de interface que já existe. |
 | [02-contraste.md](02-contraste.md) | Contraste medido par a par nos dois temas, as exceções registradas e — mais importante — **o que a medição não alcança**. |
 | [03-telas.md](03-telas.md) | Toda rota do app: para que serve, o que mostra, em que ordem, e todos os estados (carregando, vazio, trancado, antes da campanha, encerrada, sem conta). |
