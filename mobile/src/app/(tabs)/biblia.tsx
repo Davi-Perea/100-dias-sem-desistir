@@ -3,6 +3,7 @@ import { useCallback, useState } from 'react';
 import { View } from 'react-native';
 
 import type { Book } from '@/bible/books';
+import { useJourney } from '@/journey/useJourney';
 import { getBibleProvider } from '@/reader/provider';
 import { AppText, Button, Screen, ScreenScroll, SettingRow } from '@/ui/components';
 import {
@@ -15,6 +16,7 @@ import {
   type BiblePosition,
 } from '@/ui/biblia/bibleNav';
 import { PlaceholderNotice } from '@/ui/biblia/PlaceholderNotice';
+import { TodayPlan, todayPlanState } from '@/ui/biblia/TodayPlan';
 import { spacing } from '@/ui/theme';
 
 /**
@@ -24,10 +26,16 @@ import { spacing } from '@/ui/theme';
  *
  * Decisão do fundador (2026-09-21): a Bíblia Livre entra dentro do app. A aba
  * também deixa o app útil antes de 23/09, quando a Jornada só mostra a contagem.
+ *
+ * Pedido do fundador (2026-09-21): no topo, o plano de hoje (a mesma leitura da
+ * Jornada); embaixo, a Bíblia convencional como estava.
  */
 export default function BibleTab() {
   const metadata = getBibleProvider().getMetadata();
   const [last, setLast] = useState<BiblePosition | null>(null);
+  const plan = todayPlanState(useJourney());
+  /** Um primário por tela: com o "Ler" do plano em aberto, o "Continuar em" vira contorno. */
+  const planIsPrimary = plan?.kind === 'today' && !plan.completed;
 
   // Relida a cada foco: voltar de um capítulo atualiza o "Continuar em".
   useFocusEffect(
@@ -56,10 +64,13 @@ export default function BibleTab() {
 
         {metadata.isDevPlaceholder ? <PlaceholderNotice /> : null}
 
+        {plan ? <TodayPlan state={plan} /> : null}
+
         {last ? (
           <Button
             title={`Continuar em ${chapterLabel(last)}`}
             icon="chevron-right"
+            variant={planIsPrimary ? 'outline' : 'primary'}
             onPress={() => router.push(chapterHref(last))}
             testID="bible-continue"
           />

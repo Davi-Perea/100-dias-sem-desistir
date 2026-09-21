@@ -3,6 +3,7 @@ import { Platform } from 'react-native';
 
 import { altarForDisplay, getCampaign, getDay } from '@/journey/datasetSource';
 import { listMinistries } from '@/journey/ministries';
+import { readingSummary } from '@/journey/readingSummary';
 import { dateOfDay, rawCampaignDay } from '@/journey/officialDay';
 import type { Campaign } from '@/journey/types';
 import type { ReminderSlot } from '@/settings/settingsStore';
@@ -23,7 +24,9 @@ import type { ReminderSlot } from '@/settings/settingsStore';
  * pendentes: ver `reminderWindowDays`.
  *
  * Texto na tela de bloqueio (LEM-02, decisão D-5): título e corpo neutros, sem
- * nome de ministério, sem "altar" e sem quem conduz. Filiação a ministério de
+ * nome de ministério, sem "altar" e sem quem conduz. A leitura diária é a
+ * exceção decidida pelo fundador em 2026-09-21: título "Hora de ler a Bíblia" e
+ * corpo com a referência do dia (só a passagem, nada de ministério). Filiação a ministério de
  * igreja é dado sensível (LGPD art. 5º, II; invariante C-10). O detalhe fica
  * dentro do app, que a notificação abre.
  */
@@ -186,9 +189,18 @@ export function campaignDateTimeForDay(
 
 export type PlannedReminder = { id: string; day: number; when: Date; title: string; body: string };
 
-/** Textos das notificações: neutros na tela de bloqueio (D-5). */
-export const DAILY_TITLE = 'Sua leitura de hoje';
-export const DAILY_BODY = 'Um dia de cada vez. Vamos continuar a jornada.';
+/**
+ * Leitura diária (decisão do fundador, 2026-09-21, substitui a D-5 só neste
+ * título): "Hora de ler a Bíblia", e o corpo leva a referência daquele dia.
+ * A véspera e o altar continuam neutros (D-5).
+ */
+export const DAILY_TITLE = 'Hora de ler a Bíblia';
+/** Dia sem referência no dataset: não inventa passagem, só aponta o dia. */
+export function dailyBody(dayNumber: number): string {
+  const summary = readingSummary(getDay(dayNumber));
+  return summary ? `Leitura de hoje: ${summary.label}` : `Abra o app para a leitura do Dia ${dayNumber}.`;
+}
+
 export const MINISTRY_EVE_TITLE = 'Lembrete para amanhã';
 export const ALTAR_TITLE = 'Lembrete para hoje';
 
@@ -211,7 +223,18 @@ export function dailyReminderPlan(
   for (let day = first; day <= campaign.total_days && plan.length < windowDays; day += 1) {
     const when = localDateTimeForDay(day, campaign, time);
     if (when.getTime() <= now.getTime()) continue;
-    plan.push({ id: `${DAILY_REMINDER_PREFIX}${day}`, day, when, title: DAILY_TITLE, body: DAILY_BODY });
+    // O texto nomeia a leitura do dia oficial NO INSTANTE do disparo: num fuso
+    // adiantado, um horário perto da meia-noite local ainda é o dia anterior em
+    // São Paulo, e o aviso não pode anunciar uma leitura que ainda está trancada.
+    const officialAtFire = rawCampaignDay(when, campaign);
+    if (officialAtFire < 1 || officialAtFire > campaign.total_days) continue;
+    plan.push({
+      id: `${DAILY_REMINDER_PREFIX}${day}`,
+      day,
+      when,
+      title: DAILY_TITLE,
+      body: dailyBody(officialAtFire),
+    });
   }
   return plan;
 }
@@ -389,7 +412,9 @@ export async function scheduleTestNotification(seconds = 5): Promise<ReminderRes
   if (!granted) return { ok: false, reason: 'Permissão de notificações negada pelo sistema.' };
   await ensureAndroidChannel();
   await Notifications.scheduleNotificationAsync({
-    content: { title: 'Teste de lembrete', body: `Disparado ${seconds}s depois de agendar.` },
+    // O teste mostra o texto de verdade da leitura diária (o do dia de hoje, ou
+    // o do Dia 1 antes da campanha), para conferir como chega no aparelho.
+    content: { title: DAILY_TITLE, body: dailyBody(testDay()) },
     trigger: {
       type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
       seconds,
@@ -398,6 +423,11 @@ export async function scheduleTestNotification(seconds = 5): Promise<ReminderRes
     },
   });
   return { ok: true };
+}
+
+function testDay(): number {
+  const campaign = getCampaign();
+  return Math.min(campaign.total_days, Math.max(1, rawCampaignDay(new Date(), campaign)));
 }
 
 export async function listScheduledReminders() {

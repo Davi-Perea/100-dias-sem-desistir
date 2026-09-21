@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Alert, View } from 'react-native';
 
 import { recordedEvents } from '@/analytics/analytics';
+import { demoDay } from '@/config/demo';
 import { contentState, getDataset, resetToBundledContent, resetToDevFixtures } from '@/journey/datasetSource';
 import { useJourney } from '@/journey/useJourney';
 import { validateDataset, assertProductionReady } from '@/journey/validator';
@@ -152,6 +153,11 @@ function DevScreen() {
               Dia atual: {journey.officialDay} de {journey.campaign.total_days} (início {journey.campaign.start_date},
               {journey.campaign.timezone})
             </AppText>
+            {demoDay() !== null ? (
+              <AppText variant="muted">
+                Modo demonstração ligado (EXPO_PUBLIC_DEMO_MODE): sem dia escolhido aqui, vale o Dia {demoDay()}.
+              </AppText>
+            ) : null}
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
               {[1, 7, 17, 25, 50, 75, 100].map((day) => (
                 <Button

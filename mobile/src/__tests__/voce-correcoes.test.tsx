@@ -339,8 +339,8 @@ describe('Recusas de permissão anunciadas no iOS (R2-5)', () => {
     reminders.scheduleDailyReminder.mockResolvedValueOnce({ ok: false, reason: 'Permissão de notificações negada.' });
     await seedSettings();
     await render(<ReminderScreen />);
-    await waitFor(() => expect(screen.getByTestId('reminder-morning')).toBeTruthy());
-    await fireEvent.press(screen.getByTestId('reminder-morning'));
+    await waitFor(() => expect(screen.getByTestId('reminder-0700')).toBeTruthy());
+    await fireEvent.press(screen.getByTestId('reminder-0700'));
     await waitFor(() => expect(announce).toHaveBeenCalledWith('Permissão de notificações negada.'));
   });
 });
@@ -356,7 +356,7 @@ describe('Lembrete: ferramentas técnicas só em __DEV__ (R2-13)', () => {
     g.__DEV__ = false;
     await seedSettings();
     await render(<ReminderScreen />);
-    await waitFor(() => expect(screen.getByTestId('reminder-morning')).toBeTruthy());
+    await waitFor(() => expect(screen.getByTestId('reminder-0700')).toBeTruthy());
     expect(screen.queryByTestId('reminder-dev-tools')).toBeNull();
     expect(screen.queryByText(/agendamento|Testar agora/)).toBeNull();
   });

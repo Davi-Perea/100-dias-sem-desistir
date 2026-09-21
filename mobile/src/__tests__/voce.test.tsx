@@ -229,8 +229,8 @@ describe('telas que saem de Você', () => {
     reminders.scheduleDailyReminder.mockResolvedValueOnce({ ok: false, reason: 'Permissão de notificações negada.' });
     await seedSettings();
     await render(<ReminderScreen />);
-    await waitFor(() => expect(screen.getByTestId('reminder-morning')).toBeTruthy());
-    await fireEvent.press(screen.getByTestId('reminder-morning'));
+    await waitFor(() => expect(screen.getByTestId('reminder-0700')).toBeTruthy());
+    await fireEvent.press(screen.getByTestId('reminder-0700'));
     await waitFor(() => expect(screen.getByText('Permissão de notificações negada.')).toBeTruthy());
     expect((await loadSettings()).reminder.slot).toBe('none');
   });

@@ -1,0 +1,50 @@
+import { isDevBuild } from '@/journey/devBuild';
+
+/**
+ * Modo demonstração (pedido do fundador, 2026-09-21): ver o app "como se a
+ * campanha já tivesse começado", sem o painel de desenvolvimento à vista.
+ *
+ * Só existe em build de desenvolvimento. Em release `isDevBuild()` é falso e
+ * nada aqui liga, com qualquer valor nas variáveis. Ligar num development build:
+ *
+ *   mobile/.env.local  (ignorado pelo git)
+ *     EXPO_PUBLIC_DEMO_MODE=true
+ *     EXPO_PUBLIC_DEMO_DAY=3        # opcional; padrão 3
+ *
+ * O que ele faz:
+ * - o dia da campanha vira EXPO_PUBLIC_DEMO_DAY, pelo mesmo caminho do dia
+ *   simulado do painel DEV (useJourney), mas SEM gravar nas preferências: ao
+ *   desligar o modo, o app volta à data real;
+ * - na primeira abertura, sem progresso nenhum, marca os dias 1..(dia − 2) como
+ *   concluídos, para a Jornada parecer em uso (o dia anterior fica em aberto);
+ * - esconde a entrada "Painel de desenvolvimento" do Você.
+ *
+ * NÃO muda a faixa "aguardando autorização": ela é regra do conteúdo.
+ *
+ * O Metro só embute `process.env.EXPO_PUBLIC_*` escrito por extenso, com ponto;
+ * por isso as leituras abaixo não usam acesso dinâmico.
+ */
+
+export const DEMO_DAY_DEFAULT = 3;
+/** O dataset tem 100 dias; o limite superior real vem da campanha no useJourney. */
+const DEMO_DAY_MAX = 100;
+
+export function isDemoMode(): boolean {
+  if (!isDevBuild()) return false;
+  return process.env.EXPO_PUBLIC_DEMO_MODE === 'true';
+}
+
+/** Dia simulado do modo demonstração, ou null quando o modo está desligado. */
+export function demoDay(): number | null {
+  if (!isDemoMode()) return null;
+  const raw = process.env.EXPO_PUBLIC_DEMO_DAY;
+  const n = raw === undefined || raw.trim() === '' ? NaN : Number(raw);
+  return Number.isInteger(n) && n >= 1 && n <= DEMO_DAY_MAX ? n : DEMO_DAY_DEFAULT;
+}
+
+/** Dias que a demonstração marca como concluídos: 1..(dia − 2). Vazio nos dias 1 e 2. */
+export function demoSeedDays(day: number): number[] {
+  const out: number[] = [];
+  for (let d = 1; d <= day - 2; d++) out.push(d);
+  return out;
+}

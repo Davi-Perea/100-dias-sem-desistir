@@ -1,6 +1,7 @@
 import { router } from 'expo-router';
 
 import { SUPPORT_EMAIL } from '@/config/contato';
+import { isDemoMode } from '@/config/demo';
 import { COMMUNITY_ENABLED } from '@/config/features';
 import { fastingKeptCount, useFasting } from '@/fasting/fastingStore';
 import { useJourney } from '@/journey/useJourney';
@@ -130,7 +131,8 @@ export default function YouScreen() {
         {/* Só com a Comunidade ligada e só para quem o servidor diz que modera. */}
         {COMMUNITY_ENABLED ? <ModerationEntry /> : null}
 
-        {__DEV__ ? (
+        {/* Modo demonstração (config/demo.ts): o app aparece como a pessoa o verá, sem o painel. */}
+        {__DEV__ && !isDemoMode() ? (
           <Button title="Painel de desenvolvimento" variant="underline" onPress={() => router.push('/dev')} />
         ) : null}
       </ScreenScroll>

@@ -85,6 +85,16 @@ Analytics: vocabulário de eventos num buffer em memória, **desligado por padr�
 A permissão do sistema só é pedida num **gesto** (escolher horário, escolher ministério, marcar o aviso do altar).
 O hook de fundo (`useReminderSync`) só lê a permissão. Android sem alarme exato, de propósito.
 
+**2026-09-21 (decisão do fundador):** o horário da leitura diária é escolhido num seletor único
+(`ui/lembrete/ReminderTimePicker.tsx`: 6:00, 7:00, 12:00, 19:00, 21:00, "Outro horário" pelo seletor do sistema,
+"Sem lembrete"). O título da leitura diária saiu da D-5: agora é "Hora de ler a Bíblia", com "Leitura de hoje:
+<referência do dia>" no corpo; fora da campanha nada é agendado. Véspera e altar continuam neutros.
+O plugin de config do `@react-native-community/datetimepicker` (só tema do Android) não foi adicionado ao `app.config.ts`.
+
+**Modo demonstração** (`config/demo.ts`, só development build): `EXPO_PUBLIC_DEMO_MODE=true` em `mobile/.env.local`
+simula o Dia `EXPO_PUBLIC_DEMO_DAY` (padrão 3), marca os dias 1..(dia − 2) como concluídos na primeira abertura sem
+progresso (ficam gravados; limpar com "Apagar progresso") e esconde o painel DEV do Você.
+
 ### 1.5 Telas que existem hoje (antes do fim do redesenho)
 
 Abas: **Jornada** (`/`, `(tabs)/index.tsx`, que absorveu o antigo Início) · **Comunidade** (`(tabs)/juntos.tsx`,
