@@ -243,7 +243,6 @@ export default function DayScreen() {
             icon="book"
             title="Leitura bíblica"
             subtitle={readingSubtitle}
-            subtitleLines={2}
             onPress={() => router.push({ pathname: '/reader/[day]', params: { day: String(day) } })}
             testID="day-reading"
             trailing={done ? 'check' : 'chevron'}
@@ -252,7 +251,6 @@ export default function DayScreen() {
             icon="users"
             title="Intercessão do dia"
             subtitle={intercessionSubtitle}
-            subtitleLines={1}
             onPress={() => router.push(intercessionHref(day))}
             testID="day-intercession"
           />

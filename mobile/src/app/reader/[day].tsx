@@ -26,6 +26,7 @@ import {
 import { Icon } from '@/ui/icons';
 import {
   BRAND_YELLOW,
+  BUTTON_HEIGHT,
   MAX_CONTENT_WIDTH,
   MIN_TOUCH,
   fonts,
@@ -59,6 +60,13 @@ export default function ReaderScreen() {
   const [busy, setBusy] = useState(false);
   const [sizeSheet, setSizeSheet] = useState(false);
   const [reloadTick, setReloadTick] = useState(0);
+  /**
+   * Altura real do rodapé. Ele é absoluto sobre o texto, então a rolagem precisa
+   * reservar o espaço dele embaixo — e esse espaço deixou de ser constante quando
+   * o botão passou a crescer com a fonte. Reservar 180 fixo em fonte grande
+   * esconderia o fim do capítulo e o aviso de direitos atrás do rodapé.
+   */
+  const [footerHeight, setFooterHeight] = useState(0);
 
   const dayData = getDay(dayNumber);
   const unlocked = journey.isDayUnlocked(dayNumber);
@@ -231,7 +239,7 @@ export default function ReaderScreen() {
         contentContainerStyle={{
           paddingHorizontal: spacing.xl + 2,
           paddingTop: spacing.xl,
-          paddingBottom: insets.bottom + 180,
+          paddingBottom: (footerHeight || insets.bottom + 180) + spacing.lg,
           gap: spacing.lg,
           width: '100%',
           maxWidth: MAX_CONTENT_WIDTH,
@@ -310,6 +318,7 @@ export default function ReaderScreen() {
 
       {/* ------------------------------------------------------------- rodapé */}
       <View
+        onLayout={(event) => setFooterHeight(Math.round(event.nativeEvent.layout.height))}
         style={{
           position: 'absolute',
           left: 0,
@@ -324,7 +333,9 @@ export default function ReaderScreen() {
           borderTopColor: colors.border,
         }}
       >
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
+        {/* Sem alignItems: o quadrado de capítulo anterior estica junto com o
+            botão ao lado, que é o único par do app com altura casada. */}
+        <View style={{ flexDirection: 'row', gap: spacing.md }}>
           <Pressable
             onPress={() => setChapterIndex((i) => Math.max(0, i - 1))}
             disabled={chapterIndex === 0}
@@ -335,7 +346,7 @@ export default function ReaderScreen() {
             style={({ pressed }) => [
               {
                 width: 56,
-                height: 56,
+                minHeight: BUTTON_HEIGHT,
                 borderRadius: radius.button,
                 borderWidth: 2,
                 borderColor: colors.text,

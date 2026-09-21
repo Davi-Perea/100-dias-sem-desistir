@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { View } from 'react-native';
+import { ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Dove } from '@/ui/brand';
@@ -20,7 +20,12 @@ export default function WelcomeScreen() {
           <AppText style={{ fontFamily: fonts.label, fontSize: 15, color: colors.text }}>Lagoinha</AppText>
         </View>
 
-        <View style={{ flex: 1, justifyContent: 'center', gap: spacing.xl }}>
+        {/* Em fonte grande o título de 56px e o parágrafo não cabem na coluna;
+            sem rolagem, era o TEXTO que sumia. Mesmo padrão de OnboardingStep. */}
+        <ScrollView
+          contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', gap: spacing.xl }}
+          showsVerticalScrollIndicator={false}
+        >
           <AppText variant="display" accessibilityRole="header">
             <Highlight>100 dias.</Highlight>
             {'\n'}Uma igreja.{'\n'}Uma jornada.
@@ -29,7 +34,7 @@ export default function WelcomeScreen() {
             A igreja inteira lê a mesma coisa, no mesmo dia. Você acompanha o seu ritmo sem competir com
             ninguém, e o que você escreve é só seu.
           </AppText>
-        </View>
+        </ScrollView>
 
         <View style={{ gap: spacing.sm, paddingBottom: insets.bottom + 44 }}>
           <Button

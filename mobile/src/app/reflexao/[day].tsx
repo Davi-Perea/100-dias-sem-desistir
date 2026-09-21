@@ -170,24 +170,6 @@ export default function ReflectionScreen() {
               color: colors.text,
             }}
           />
-        </ScrollView>
-
-        {/* ----------------------------------------------------------- rodapé */}
-        <View
-          style={{
-            paddingHorizontal: inset,
-            paddingTop: spacing.md,
-            paddingBottom: insets.bottom + spacing.md,
-            gap: spacing.md,
-            borderTopWidth: 1,
-            borderTopColor: colors.border,
-            backgroundColor: colors.surface,
-          }}
-        >
-          <Cap>
-            {summary ? `${summary.label} · ` : ''}salva neste aparelho
-          </Cap>
-          <Button title="Salvar para mim" onPress={save} loading={busy} testID="reflection-save" />
 
           <Rule />
 
@@ -208,6 +190,31 @@ export default function ReflectionScreen() {
             onPress={() => {}}
             testID="share-insight"
           />
+        </ScrollView>
+
+        {/*
+          Rodapé: só o que precisa estar sempre à mão enquanto se escreve.
+          O teclado come ~336pt da coluna; com o caminho social aqui dentro, a
+          partir de fonte ~1,65× o rodapé sozinho passava do que sobrava e o
+          ScrollView ia a zero — a pessoa digitava num campo de altura nenhuma.
+          O bloco de compartilhar desceu para o fim da rolagem, junto do texto
+          que o explica.
+        */}
+        <View
+          style={{
+            paddingHorizontal: inset,
+            paddingTop: spacing.md,
+            paddingBottom: insets.bottom + spacing.md,
+            gap: spacing.md,
+            borderTopWidth: 1,
+            borderTopColor: colors.border,
+            backgroundColor: colors.surface,
+          }}
+        >
+          <Cap>
+            {summary ? `${summary.label} · ` : ''}salva neste aparelho
+          </Cap>
+          <Button title="Salvar para mim" onPress={save} loading={busy} testID="reflection-save" />
         </View>
       </KeyboardAvoidingView>
     </Screen>

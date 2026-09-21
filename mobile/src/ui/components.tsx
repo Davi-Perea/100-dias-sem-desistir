@@ -8,10 +8,11 @@ import {
   Text,
   type StyleProp,
   type TextStyle,
+  useWindowDimensions,
   View,
   type ViewStyle,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { ContentState } from '@/journey/datasetSource';
 
@@ -387,7 +388,7 @@ export function Button({
   switch (variant) {
     case 'primary':
       container = {
-        height: BUTTON_HEIGHT,
+        minHeight: Math.max(BUTTON_HEIGHT, MIN_TOUCH),
         borderRadius: radius.button,
         backgroundColor: ink,
         paddingHorizontal: spacing.xl,
@@ -396,7 +397,7 @@ export function Button({
       break;
     case 'yellow':
       container = {
-        height: BUTTON_HEIGHT,
+        minHeight: Math.max(BUTTON_HEIGHT, MIN_TOUCH),
         borderRadius: radius.button,
         backgroundColor: BRAND_YELLOW,
         paddingHorizontal: spacing.xl,
@@ -405,7 +406,7 @@ export function Button({
       break;
     case 'outline':
       container = {
-        height: 52,
+        minHeight: Math.max(52, MIN_TOUCH),
         borderRadius: radius.button,
         borderWidth: 2,
         borderColor: ink,
@@ -414,12 +415,12 @@ export function Button({
       labelColor = ink;
       break;
     case 'danger':
-      container = { height: MIN_TOUCH, paddingHorizontal: spacing.sm };
+      container = { minHeight: MIN_TOUCH, paddingHorizontal: spacing.sm };
       labelColor = colors.danger;
       break;
     case 'underline':
     default:
-      container = { height: 44, paddingHorizontal: spacing.xs };
+      container = { minHeight: Math.max(44, MIN_TOUCH), paddingHorizontal: spacing.xs };
       labelColor = ink;
       break;
   }
@@ -437,6 +438,10 @@ export function Button({
       style={({ pressed }) => [
         {
           minHeight: MIN_TOUCH,
+          // O respiro mora na base, não nas variantes: com fonte padrão a caixa
+          // de linha (18,5) mais 24 de respiro cabe nos 56 do handoff, então nada
+          // se move; em fonte grande é ele que deixa a caixa crescer com o rótulo.
+          paddingVertical: spacing.md,
           alignItems: 'center',
           justifyContent: 'center',
           flexDirection: 'row',
@@ -514,7 +519,8 @@ export function Pill({
   const body = (
     <View
       style={{
-        height: 36,
+        minHeight: 36,
+        paddingVertical: spacing.sm,
         minWidth: 72,
         paddingHorizontal: spacing.lg,
         borderRadius: radius.pill,
@@ -625,7 +631,11 @@ export function SettingRow({
       <AppText variant="item" style={{ flex: 1 }}>
         {label}
       </AppText>
-      {value ? <AppText variant="caption">{value}</AppText> : null}
+      {value ? (
+        <AppText variant="caption" style={{ flexShrink: 1 }}>
+          {value}
+        </AppText>
+      ) : null}
       {onPress ? <Icon name="chevron-right" size={18} color={colors.textMuted} /> : null}
     </View>
   );
@@ -875,6 +885,8 @@ export function Sheet({
   testID,
 }: PropsWithChildren<{ visible: boolean; onClose: () => void; title: string; testID?: string }>) {
   const { colors } = useTheme();
+  const { height } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable
@@ -892,8 +904,13 @@ export function Sheet({
           borderTopRightRadius: radius.sheet,
           paddingHorizontal: gutter.sheet + spacing.md,
           paddingTop: spacing.md,
-          paddingBottom: spacing.xxl,
+          paddingBottom: spacing.xxl + insets.bottom,
           gap: spacing.lg,
+          // A folha para em 88% da tela e o conteúdo rola por dentro. Sem isto,
+          // em fonte grande ela cresce para fora da tela levando o botão de
+          // fechar junto — e como a rota não tem header nativo, no iOS não sobra
+          // nenhum jeito de sair. O scrim acima continua fechando ao toque.
+          maxHeight: height * 0.88,
           ...floatShadow,
         }}
       >
@@ -906,10 +923,15 @@ export function Sheet({
             alignSelf: 'center',
           }}
         />
-        <AppText variant="blockTitle" style={{ fontSize: 24, lineHeight: 28 }}>
-          {title}
-        </AppText>
-        {children}
+        <ScrollView
+          contentContainerStyle={{ gap: spacing.lg, paddingBottom: spacing.xs }}
+          showsVerticalScrollIndicator={false}
+        >
+          <AppText variant="blockTitle" style={{ fontSize: 24, lineHeight: 28 }}>
+            {title}
+          </AppText>
+          {children}
+        </ScrollView>
       </View>
     </Modal>
   );

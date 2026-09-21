@@ -130,13 +130,24 @@ export const gutter = { screen: 26, block: 20, sheet: 14 } as const;
 
 export const iconSize = { sm: 18, md: 22, lg: 26 } as const;
 
-/** iOS 44pt / Android 48dp — usamos o maior dos dois. */
+/**
+ * Alturas do handoff. São PISOS de caixa, nunca medidas fixas.
+ *
+ * Consuma-as como `minHeight` com `paddingVertical`; declarar `height` com elas
+ * é o defeito. O texto cresce com o Dynamic Type do sistema — até 3,571× no iOS,
+ * segundo a tabela do próprio React Native — e caixa travada não acompanha: o
+ * rótulo atravessa a borda e, num botão preenchido, sai na cor da própria
+ * superfície, isto é, some (1,00:1). Quem precisa reservar espaço para uma dessas
+ * caixas mede a altura real com `onLayout` em vez de repetir a constante.
+ */
+
+/** iOS 44pt / Android 48dp — usamos o maior dos dois. Piso absoluto de toque. */
 export const MIN_TOUCH = 48;
 
-/** Botão principal do handoff. */
+/** Botão principal do handoff. Piso: a caixa cresce com o rótulo. */
 export const BUTTON_HEIGHT = 56;
 
-/** Tab bar de 86px, vidro. */
+/** Tab bar de 86px, vidro. Piso: quem reserva espaço mede a barra renderizada. */
 export const TAB_BAR_HEIGHT = 86;
 
 /** Medida de leitura confortável; evita parágrafos de ponta a ponta em tablet. */

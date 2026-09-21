@@ -1,4 +1,5 @@
 import { Tabs } from 'expo-router';
+import { useState } from 'react';
 
 import { GlassTabBar } from '@/ui/TabBar';
 import { TAB_BAR_HEIGHT, useTheme } from '@/ui/theme';
@@ -12,13 +13,19 @@ import { TAB_BAR_HEIGHT, useTheme } from '@/ui/theme';
  */
 export default function TabsLayout() {
   const { colors } = useTheme();
+  /**
+   * A barra é medida, não suposta. O token é só o piso: em fonte grande os
+   * rótulos das abas quebram e a barra cresce, e a constante ainda ignorava a
+   * faixa do indicador de home — o fim da Jornada ficava atrás do vidro.
+   */
+  const [barHeight, setBarHeight] = useState(TAB_BAR_HEIGHT);
   return (
     <Tabs
-      tabBar={(props) => <GlassTabBar {...props} />}
+      tabBar={(props) => <GlassTabBar {...props} onHeight={setBarHeight} />}
       screenOptions={{
         headerShown: false,
         // A tab bar flutua sobre o conteúdo; a cena reserva a altura embaixo.
-        sceneStyle: { backgroundColor: colors.background, paddingBottom: TAB_BAR_HEIGHT },
+        sceneStyle: { backgroundColor: colors.background, paddingBottom: barHeight },
       }}
     >
       <Tabs.Screen name="index" options={{ title: 'Início' }} />

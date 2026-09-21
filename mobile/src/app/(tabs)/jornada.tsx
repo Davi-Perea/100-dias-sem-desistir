@@ -6,6 +6,7 @@ import { track } from '@/analytics/analytics';
 import { getDay } from '@/journey/datasetSource';
 import { MILESTONE_DAYS, milestoneForDay } from '@/journey/milestones';
 import { daysForMinistry } from '@/journey/ministries';
+import { journeyRowHeight, type JourneyRow as Row } from '@/journey/journeyRowHeight';
 import { formatDayDate } from '@/journey/officialDay';
 import { SPHERE_LABEL } from '@/journey/spheres';
 import { useJourney, type DayState } from '@/journey/useJourney';
@@ -14,17 +15,15 @@ import { Dove } from '@/ui/brand';
 import { BrandHeader } from '@/ui/Lockup';
 import { AppText, Button, DevContentBanner, Screen, Sheet, StateView } from '@/ui/components';
 import { Icon } from '@/ui/icons';
-import { BRAND_YELLOW, MIN_TOUCH, fonts, spacing, useGutter, useTheme } from '@/ui/theme';
+import { BRAND_YELLOW, fonts, spacing, useGutter, useTheme } from '@/ui/theme';
 
 /** Largura da coluna central do trilho. */
 const RAIL_W = 64;
-const ROW_H = 64;
-const TODAY_ROW_H = 96;
-const GAP_ROW_H = 48;
-/** Linha extra do marcador "Seu ministério conduz o altar" abaixo do rótulo do dia. */
-const MINISTRY_EXTRA_H = 16;
 
-type Row = { kind: 'day'; day: number } | { kind: 'gap'; from: number; to: number };
+/** Linha extra do marcador "Seu ministério conduz o altar" abaixo do rótulo do dia. */
+
+
+
 
 /**
  * Quais dias aparecem no trilho.
@@ -98,13 +97,8 @@ export default function JourneyScreen() {
    * A linha do ministério acrescenta uma linha de texto; a altura acompanha, e a
    * mesma função alimenta o `minHeight` da linha e o `getItemLayout`.
    */
-  const scale = Math.min(Math.max(fontScale, 1), 2);
-  const rowHeight = (row: Row) => {
-    if (row.kind === 'gap') return Math.round(GAP_ROW_H * scale);
-    const base = row.day === journey.officialDay ? TODAY_ROW_H : ROW_H;
-    const extra = ministrySet.has(row.day) ? MINISTRY_EXTRA_H : 0;
-    return Math.round((base + extra) * scale);
-  };
+  const rowHeight = (row: Row) =>
+    journeyRowHeight(row, { officialDay: journey.officialDay, ministryDays: ministrySet }, fontScale);
   const rows = useMemo(
     () => buildRows(journey.officialDay, total, journey.pendingDays, expanded, ministryDays),
     [journey.officialDay, total, journey.pendingDays, expanded, ministryDays],
@@ -127,7 +121,8 @@ export default function JourneyScreen() {
           accessibilityRole="button"
           accessibilityLabel={`Mostrar os dias ${item.from} a ${item.to}`}
           style={({ pressed }) => [
-            { flexDirection: 'row', alignItems: 'center', minHeight: MIN_TOUCH },
+            // O mesmo número que o getItemLayout declara para esta linha.
+            { flexDirection: 'row', alignItems: 'center', minHeight: rowHeight(item) },
             pressed && { opacity: 0.72 },
           ]}
         >

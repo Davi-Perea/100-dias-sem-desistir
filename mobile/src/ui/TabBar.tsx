@@ -17,6 +17,8 @@ type TabBarProps = {
     emit: (event: { type: 'tabPress'; target: string; canPreventDefault: true }) => { defaultPrevented: boolean };
     navigate: (name: string) => void;
   };
+  /** Altura renderizada, para a cena reservar o espaço certo embaixo. */
+  onHeight?: (height: number) => void;
 };
 
 const ICONS: Record<string, IconName> = {
@@ -37,7 +39,7 @@ const ICONS: Record<string, IconName> = {
  * Android recebe superfície sólida com elevação em vez de vidro, como pede o
  * handoff: imitar o material do iOS ali fica errado.
  */
-export function GlassTabBar({ state, descriptors, navigation }: TabBarProps) {
+export function GlassTabBar({ state, descriptors, navigation, onHeight }: TabBarProps) {
   const { colors, isDark } = useTheme();
   const insets = useSafeAreaInsets();
   const useGlass = Platform.OS === 'ios';
@@ -45,7 +47,7 @@ export function GlassTabBar({ state, descriptors, navigation }: TabBarProps) {
   const surface = isDark ? glass.darkLight : glass.light;
 
   const items = (
-    <View style={{ flexDirection: 'row', height: TAB_BAR_HEIGHT, paddingTop: 10 }}>
+    <View style={{ flexDirection: 'row', minHeight: TAB_BAR_HEIGHT, paddingTop: 10 }}>
       {state.routes.map((route, index) => {
         const { options } = descriptors[route.key];
         const label = (options.title ?? route.name) as string;
@@ -88,6 +90,7 @@ export function GlassTabBar({ state, descriptors, navigation }: TabBarProps) {
 
   return (
     <View
+      onLayout={(event) => onHeight?.(Math.round(event.nativeEvent.layout.height))}
       style={{
         position: 'absolute',
         left: 0,

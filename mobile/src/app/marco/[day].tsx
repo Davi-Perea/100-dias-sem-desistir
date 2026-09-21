@@ -35,7 +35,7 @@ export default function MilestoneScreen() {
   const reflections = useReflections(journey.campaign.id);
   const fasting = useFasting(journey.campaign.id);
   const [saved, setSaved] = useState(false);
-  const { width } = useWindowDimensions();
+  const { width, fontScale } = useWindowDimensions();
   const gutter = useGutter();
 
   const day = Number.parseInt(params.day ?? '', 10);
@@ -81,7 +81,12 @@ export default function MilestoneScreen() {
   // Archivo Black tem dígitos largos (~0,72em em média); o tracking de −0,07em desconta um pouco.
   const designSize = isArrival ? 190 : 236;
   const digits = String(day).length;
-  const available = Math.max(200, width - gutter * 2);
+  // A conta precisa conhecer as DUAS coisas que esticam o numeral. Ela já cedia
+  // à largura da tela, mas o Text ainda era multiplicado por até 1,2 depois —
+  // e no Dia 100, com três dígitos, a largura prevista já ocupa 337 de 338px.
+  // Com fonte padrão o divisor é 1 e o numeral fica idêntico ao de hoje.
+  const textScale = Math.min(Math.max(fontScale, 1), 1.2);
+  const available = Math.max(200, width - gutter * 2) / textScale;
   const numeralSize = Math.floor(Math.min(designSize, available / (digits * 0.72 - (digits - 1) * 0.07)));
   const total = journey.campaign.total_days;
   // Só a chegada usa data: 100 leituras implicam ter lido o Dia 100, então ali
@@ -155,15 +160,20 @@ export default function MilestoneScreen() {
           accessibilityLabel={`Régua com os ${journey.completedCount} dias que você já leu, de ${total}.`}
         />
 
-        {/* A história pessoal do Dia 100 vem toda de dados locais reais. */}
+        {/* A história pessoal do Dia 100 vem toda de dados locais reais.
+            Os três números não existem em nenhum outro lugar do app e a tela
+            rola na vertical: o que saísse pela direita seria inalcançável. */}
         {isArrival ? (
-          <View style={{ flexDirection: 'row', gap: spacing.xl, marginTop: spacing.sm }}>
+          <View
+            style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xl, marginTop: spacing.sm }}
+            testID="milestone-stats"
+          >
             {[
               { value: journey.completedCount, label: 'dias lidos' },
               { value: reflectionCount(reflections), label: 'reflexões' },
               { value: fastingKeptCount(fasting), label: 'dias de jejum' },
             ].map((stat) => (
-              <View key={stat.label} style={{ gap: 2 }}>
+              <View key={stat.label} style={{ gap: 2, flexShrink: 1 }}>
                 <AppText style={{ fontFamily: fonts.display, fontSize: 34, lineHeight: 36, color: BRAND_YELLOW }}>
                   {stat.value}
                 </AppText>

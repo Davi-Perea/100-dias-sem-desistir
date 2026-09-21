@@ -71,7 +71,8 @@
     },
     "testPathIgnorePatterns": [
       "/node_modules/",
-      "/dist/"
+      "/dist/",
+      "/__tests__/support/"
     ]
   }
 }

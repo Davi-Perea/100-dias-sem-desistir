@@ -28,7 +28,11 @@ export function SpherePill({
       testID={testID}
       style={{
         alignSelf: 'flex-start',
-        height: 28,
+        // Piso, não altura: "ARTES E ENTRETENIMENTO" quebra em duas linhas em
+        // telas estreitas e a borda cortava o rótulo no meio. O raio é 999, então
+        // a pílula continua pílula em qualquer altura.
+        minHeight: 28,
+        paddingVertical: 4,
         paddingHorizontal: 12,
         borderRadius: radius.pill,
         borderWidth: tone === 'yellow' ? 0 : 1.5,

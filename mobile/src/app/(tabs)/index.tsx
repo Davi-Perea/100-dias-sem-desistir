@@ -333,7 +333,7 @@ export default function StartScreen() {
                 {summary ? `${summary.label} · ` : ''}
                 {preferOwnBible ? 'lido na sua Bíblia' : 'lido aqui no app'} ·{' '}
               </AppText>
-              <Button title="Desfazer" variant="underline" onPress={undo} testID="undo-complete" style={{ height: 24 }} />
+              <Button title="Desfazer" variant="underline" onPress={undo} testID="undo-complete" />
             </View>
 
             <View style={{ gap: spacing.sm }}>

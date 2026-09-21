@@ -1,6 +1,6 @@
 # EXECUTION 04 — revisão adversarial e correções
 
-- **Data:** 2026-09-20 · **Estado:** cinco frentes corrigidas; as três primeiras commitadas em `99eb57b`, os grupos A e H **não commitados**
+- **Data:** 2026-09-20 · **Estado:** oito frentes corrigidas — as três primeiras em `99eb57b`, os grupos A e H em `f4b60f5`, os grupos C e D em `1fa80e4`; o grupo B está na árvore de trabalho
 - **Método:** cinco lentes independentes (design, conteúdo, acessibilidade, correção, completude) produziram
   64 achados; cada achado foi submetido a três refutadores com ângulos distintos (reprodução no código,
   regra escrita que viola, impacto real). Sobrevive o que dois dos três não conseguiram refutar.
@@ -129,6 +129,89 @@ Nenhum dos dois grupos podia ficar só no código: os dois defeitos são invisí
 Os cinco testes de dia futuro e os três de permissão foram conferidos com o defeito reintroduzido: falham
 sem a correção, passam com ela, e os casos de controle passam nos dois estados.
 
+### 1.10 Grupo B — caixa de altura fixa com texto dentro (5 achados + varredura)
+
+Antes de corrigir, seis lentes independentes auditaram o app inteiro em Dynamic Type, com uma sétima
+checando o que as seis não olharam. Elas confirmaram os cinco achados, **derrubaram seis suposições** e
+acharam o mesmo defeito em sete lugares que a revisão não tinha listado.
+
+**A regra que saiu disso, agora escrita nos tokens:** o tamanho do handoff é **piso, nunca teto**. Toda caixa
+com texto cede ao texto (`minHeight: Math.max(altura, MIN_TOUCH)` com `paddingVertical`, nunca `height`), e
+todo número que reserva espaço para uma dessas caixas é **medido** com `onLayout` — nunca uma constante.
+
+| Onde | O que era |
+|---|---|
+| `ui/components.tsx` — Button | As cinco variantes travavam altura (56/56/52/48/44) com ~70 call sites. Em fonte grande o rótulo quebrava e atravessava a borda — e no `primary`/`yellow` a cor do rótulo **é** a cor da superfície, então o pedaço que saía do preenchimento media 1,00:1. O texto não ficava feio: sumia |
+| `ui/components.tsx` — SettingRow | O valor não tinha `flexShrink`, então quem colapsava era o **rótulo**: sumia a palavra que diz o que a linha faz, e o e-mail ficava inteiro |
+| `ui/SpherePill.tsx` | `height: 28` com rótulo da igreja dentro. "ARTES E ENTRETENIMENTO" quebra em duas linhas em tela estreita e a borda cortava o rótulo no meio |
+| `app/reader/[day].tsx` | **Acoplado ao Button:** a rolagem reservava 180px fixos para um rodapé que passou a crescer. Corrigir o botão sozinho trocaria texto cortado por conteúdo inalcançável — o fim do capítulo e o aviso de direitos atrás do rodapé. Agora a reserva é medida, e o quadrado de "capítulo anterior" estica junto com o botão |
+| `ui/TabBar.tsx` + `app/(tabs)/_layout.tsx` | **Acoplado:** a cena reservava `TAB_BAR_HEIGHT` enquanto a barra real mede isso **mais** `insets.bottom`. O fim da Jornada ficava atrás do vidro em qualquer tamanho de fonte. A barra agora se mede e a cena reserva o que ela devolve |
+| `journey/journeyRowHeight.ts` (novo) + Jornada | A reticência declarava `48 × escala` ao `getItemLayout` e desenhava 48: em fonte 1,5× a lista errava 24px por reticência e abria longe do dia da igreja. A altura virou função pura — assim tela e teste comparam dois números calculados de forma independente |
+| `app/marco/[day].tsx` | Duas defesas que se anulavam a 33 linhas de distância: a conta do numeral só conhecia a largura, e o Text era multiplicado por até 1,2 depois. No Dia 100 a largura prevista já ocupava 337 de 338px. E a linha de estatísticas não quebrava: em 1,5× "dias de jejum" saía pela direita numa tela que só rola na vertical |
+| `app/onboarding/index.tsx` e `pronto.tsx` | As duas únicas telas do app sem rolagem — a primeira e a última do onboarding. Em fonte grande, o texto é que era cortado |
+| `app/dia/[day].tsx` | `subtitleLines={1}` num subtítulo "{monte} · {título do dia}": com fonte **padrão**, montes longos já comiam a linha e o título do dia sumia |
+
+### 1.11 Duas armadilhas que a auditoria achou e que são piores que o grupo B
+
+Não são caixa com texto; são gente presa:
+
+- **A folha (`Sheet`) não rolava.** Em fonte 2× a folha de ferramentas de líder pede ~1118px numa tela de
+  844: o botão "Fechar" ficava 274px fora da tela, o scrim ia a 0px e a rota não tem header nativo — no iOS,
+  nenhum controle de fechamento alcançável. Agora a folha para em 88% da tela e o conteúdo rola por dentro.
+- **A reflexão com o teclado aberto.** A partir de ~1,65× o rodapé e a barra excediam a coluna e o
+  `ScrollView` ia a zero: a pessoa digitava num campo de altura nenhuma, e `autoFocus` abre o teclado sozinho
+  numa reflexão nova. O caminho social desceu para o fim da rolagem, junto do texto que o explica; o rodapé
+  fixo ficou só com o que precisa estar à mão enquanto se escreve.
+
+### 1.12 O que a auditoria derrubou
+
+Seis suposições não se reproduzem, e registrá-las evita que voltem como "correção":
+
+- **`lineHeight` fixo não é defeito de Dynamic Type.** O RN multiplica `lineHeight` pelo fator de fonte
+  (`RCTTextAttributes.mm`). O que quebra são as caixas.
+- **O `height: 24` do "Desfazer" nunca teve efeito** — mas não pelo motivo que eu disse antes: ele vence o
+  `height: 44` da variante; quem o anula é o `minHeight: 48` da base, aplicado como piso pelo Yoga. O botão
+  já media 48. Apagar o override é higiene: ele mentia sobre o que acontecia.
+- **O `height: 44` do underline nunca rebaixou alvo de toque nenhum**, pelo mesmo piso. O perigo era ele
+  **virar** real depois do refactor: `container` entra depois da base no array, então um `minHeight: 44` ali
+  apagaria o piso de 48 em todo botão de texto do app. É por isso que cada variante usa `Math.max`.
+- **Checkbox e ChoiceRow não são caixas com texto** — o filho é um ícone SVG, sem fontScale no caminho.
+- **Pares de botões lado a lado não desalinham** com `minHeight`: os pais são `row` sem `alignItems`, e o
+  stretch do Yoga iguala as alturas. O único par com requisito real era o do rodapé do leitor.
+- **O teto de escala deste build não é 3,12×, é 3,571×** (tabela do `RCTAccessibilityManager`). O 3,12 é a
+  razão de corpo do iOS; o RN é mais agressivo. As contas e os testes usam 3,571.
+
+### 1.13 O que os testes do grupo B garantem — e o que eles não podem garantir
+
+O achado mais desconfortável da auditoria não é um defeito de tela: **o viewport padrão de todo teste deste
+repositório é 750×1334 com fontScale 2**. A suíte inteira já rodava na meta de 200% e passava, porque nenhum
+teste olhava geometria. "Os testes passam" nunca foi evidência de que a meta do `ARCHITECTURE_V0` §12 estava
+cumprida — e isso vale para tudo o que foi verificado antes desta rodada.
+
+O novo `support/viewport.ts` fixa telefone e escala, e o meta-teste afirma o padrão do harness para que esse
+fato pare de ser invisível. Sobre ele, 14 testes: o Button não declara altura e nunca desce do alvo de toque
+em 1×, 2× e 3,571×; com fonte padrão os pisos são exatamente os do handoff; a pílula idem; a reticência da
+Jornada renderiza o mesmo número que o `getItemLayout` declara; a linha de hoje cresce com a fonte e para no
+teto; o numeral do Dia 100 é idêntico ao de hoje em fonte padrão e menor em fonte grande. Conferidos com os
+defeitos reintroduzidos: 10 dos 14 falham sem a correção.
+
+**Limite honesto:** nenhum teste deste repositório pode afirmar que um texto coube. O
+`react-test-renderer` não roda Yoga, `onLayout` nunca dispara e não há métrica de glifo. Os números de
+transbordo da auditoria são aritmética sobre os TTFs do projeto; os testes são **contrato de estilo**, e a
+prova de layout é aparelho real com AX5 ligado — que ainda não foi feita.
+
+### 1.14 Dívidas assumidas no grupo B
+
+- **O teto de 2× da Jornada fica.** Acima dele as linhas param de crescer enquanto o texto continua. Subir o
+  teto sozinho não resolve: a altura multiplica constantes em vez de contar linhas, então o desvio troca de
+  sinal em vez de sumir. Com a reticência fixa, todo desvio restante é negativo — a lista rola de menos e o
+  dia da igreja fica abaixo da dobra, nunca acima. Erro de sinal único é corrigível; de sinal misto, não.
+- **O rodapé do leitor é a caixa mais apertada do app.** Acima de ~2,9× a palavra "Concluir" não cabe nem
+  sozinha: é transbordo horizontal, que nenhum `minHeight` resolve. Empilhar o rodapé é decisão de desenho.
+- **Três itens são de produto, não de código:** encurtar os rótulos de `index.tsx` (que já quebram em duas
+  linhas com fonte padrão), empilhar ou não as estatísticas do Dia 100 acima de um limiar, e a frase "texto
+  segue o tamanho do sistema" no leitor — que é falsa enquanto o texto estiver capado em 1,8×.
+
 ---
 
 ## 2. Verificação
@@ -136,31 +219,37 @@ sem a correção, passam com ela, e os casos de controle passam nos dois estados
 | Checagem | Resultado |
 |---|---|
 | `tsc --noEmit` · `expo lint` | limpos |
-| `jest` | **323 testes, 19 suítes** |
+| `jest` | **337 testes, 20 suítes** |
 | `content:check` | dataset e propósito conferem com as fontes |
 | Navegador, tema claro | citação atribuída; marco por leituras com a régua real; Dia 100 intacto; sem nomes; marca e marcas de seleção no desenho do handoff |
 | Navegador, tema escuro | check, caixa, opção, números de passo e a pomba visíveis; nenhuma superfície invertida perdida |
 | Navegador, rotas diretas | `/reader/40` e `/reflexao/40` mostram o bloqueio sem revelar a leitura; `/reader/17` e `/reflexao/17` intactos; nenhum erro no console |
 | Navegador, aviso do altar | marcar a caixa na web devolve o motivo na própria linha e a caixa volta a desligada |
+| Navegador, folha em tela curta | em 375×300 a folha para em 88% da altura e rola por dentro: o botão de fechar continua alcançável |
+| Navegador, telas estreitas | em 300px as três estatísticas do Dia 100 continuam inteiras e o numeral cede; nenhum erro no console |
+| Navegador, onboarding curto | em 375×480 a primeira tela rola e o parágrafo inteiro é alcançável, com os botões fixos |
 
 ---
 
 ## 3. Os achados confirmados que continuam abertos
 
-Os grupos A, H, C e D saíram desta tabela: foram corrigidos (seções 1.4 a 1.9). Restam 34.
+Os grupos A, H, C, D e B saíram desta tabela: foram corrigidos (seções 1.4 a 1.14). Restam 28.
 
 Agrupados por trabalho, não por arquivo.
 
 | # | Tema | Achados | Severidade | Por que importa |
 |---|---|---|---|---|
-| B | **Dynamic Type quebra caixas de altura fixa** (`Button`, `SpherePill`, estatísticas do Dia 100, `getItemLayout` da Jornada) | 6 | 3 médios | Texto transborda ou é cortado a partir de ~1,4× de fonte; no iOS a escala chega a 3,12× |
 | E | **Leitor de tela** (estado "concluído" não anunciado, rótulos com "~" e "·", cabeçalhos não marcados, anúncio triplicado no modo altar) | 7 | 1 médio | |
 | F | **Cópia e consistência** (altar descrito de três jeitos; "hoje" em dia que não é hoje; "Tema" onde a igreja diz "Ênfase"; enum `pending_authorization` exposto) | 6 | 2 médios | |
 | G | **Jejum** (continua como "propósito" da campanha e ganhou superfície nova, sem a confirmação da igreja) | 2 | 1 médio | Depende de resposta da igreja, não de código |
 | I | **Tokens e higiene** (cores literais fora de `theme.ts`, `gutter.block` sem uso, código sem consumidor, teste tautológico, marco gravado duas vezes) | 14 | baixos | |
 
-**Recomendação de ordem:** B antes de qualquer teste em aparelho; E e F como um passe único de cópia e
-acessibilidade; G quando a igreja responder; I por último.
+**Recomendação de ordem:** E e F como um passe único de cópia e acessibilidade; G quando a igreja responder;
+I por último. Antes de qualquer um deles, o passe de acessibilidade que a auditoria do grupo B abriu e que
+ainda não foi feito: suporte a Texto em Negrito do sistema (hoje zero), título nativo do header congelado em
+17px, `StateView` com `flex: 1` dentro de rolagem, prévia de tamanho que mente na tela de Aparência, botão
+sem nome acessível enquanto carrega, e o contraste real dos estados com `opacity` — que o `contrast.test.ts`
+não enxerga.
 
 ---
 

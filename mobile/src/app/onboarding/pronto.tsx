@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { View } from 'react-native';
+import { ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { track } from '@/analytics/analytics';
@@ -62,7 +62,12 @@ export default function ReadyScreen() {
       >
         <Dove width={96} role="signature" />
 
-        <View style={{ flex: 1, gap: spacing.lg }}>
+        {/* A pessoa confirma aqui o que escolheu no onboarding: em fonte grande
+            essas linhas precisam ser alcançáveis, não espremidas. */}
+        <ScrollView
+          contentContainerStyle={{ flexGrow: 1, gap: spacing.lg }}
+          showsVerticalScrollIndicator={false}
+        >
           <AppText variant="display" accessibilityRole="header">
             Tudo pronto.
           </AppText>
@@ -86,7 +91,7 @@ export default function ReadyScreen() {
               </View>
             ))}
           </View>
-        </View>
+        </ScrollView>
 
         <Button
           title={started ? `Começar o Dia ${journey.officialDay}` : 'Ir para o Início'}
