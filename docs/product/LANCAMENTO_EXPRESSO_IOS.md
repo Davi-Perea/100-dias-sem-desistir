@@ -7,6 +7,11 @@
   identificador `com.cemdiassemdesistir.app`; V1 **sem Comunidade** (aba escondida); nuvem desligada; o app **não
   envia dado nenhum**. Isso substitui, para o iPhone, o caminho "Organização + D-U-N-S" do `PLANO_DE_LANCAMENTO.md`
   (que continua valendo para a conta definitiva e para a transferência depois).
+- **Atualização (fundador, 21/09, `DECISOES_DO_FUNDADOR.md`):** Gate 1 decidido pela **Bíblia Livre dentro do app**
+  (aba **Bíblia**, CC BY 4.0, texto empacotado, funciona offline), **se ficar pronta e testada** até o build; senão
+  entra na primeira atualização. Comunidade continua fora da V1 (vem como atualização) e, quando vier, **sem mensagem
+  privada**. Os textos do §4 têm duas variantes: **[COM ABA BÍBLIA]** e **[SEM ABA BÍBLIA]**. Use a que bater com o
+  build enviado.
 - **Etiquetas:** **FATO** (fonte oficial, acessada em 21/09/2026, lista no fim) · **INFERÊNCIA** (conclusão minha)
   · **NÃO CONFIRMADO** (procurei e não achei fonte oficial).
 - **Senhas, pagamento, código de duas etapas e aceites de contrato são seus.** Eu não digito nenhum deles.
@@ -98,7 +103,9 @@ npx eas-cli@latest init         # cria o projeto "biblia-app" e IMPRIME um id
       Com config dinâmico o `eas init` não grava sozinho.
 - [ ] **6. Vídeo para o revisor:** grave no Expo Go, no seu iPhone, 1 a 2 minutos: abrir o app, onboarding, a contagem
       e o propósito, e (se der) um dia aberto pelo painel DEV. Suba como **não listado** (YouTube ou Google Drive com
-      link aberto) e guarde o link para as notas (§4.10). Não mostre nome de líder nem texto bíblico.
+      link aberto) e guarde o link para as notas (§4.10). Não mostre nome de líder. **[COM ABA BÍBLIA]** mostre
+      também a aba Bíblia abrindo um capítulo e a tela de créditos da Bíblia Livre (é o que prova conteúdo real antes
+      de 23/09, §5). **[SEM ABA BÍBLIA]** não mostre texto bíblico.
 
 **Terça de manhã (com a inscrição aprovada e a autorização em mãos)**
 
@@ -125,7 +132,8 @@ npx eas-cli@latest submit -p ios --latest
       Em paralelo, siga para o 12: a revisão da Apple e a do seu pai correm juntas.
 - [ ] **12. Preencher a ficha** com os textos do §4: descrição, palavras-chave, URLs, categoria, classificação
       etária, privacidade do app, direitos de conteúdo, preço **Grátis**, disponibilidade **só Brasil**, capturas.
-      **Capturas:** tire no seu iPhone pelo TestFlight (dia aberto, intercessão, modo altar, jornada, lembrete).
+      **Capturas:** tire no seu iPhone pelo TestFlight (dia aberto, intercessão, modo altar, jornada, lembrete; e,
+      **[COM ABA BÍBLIA]**, um capítulo aberto na aba Bíblia, sem nenhuma outra tradução na tela).
       A Apple aceita o tamanho de 6,9" (1320 × 2868) ou 6,5" (1284 × 2778). Se o seu iPhone for menor, as capturas têm
       a mesma proporção; amplie para 1290 × 2796 ou 1320 × 2868 antes de subir (me mande que eu confiro).
 - [ ] **13. Lançamento manual:** em "Lançamento desta versão", marque **"Lançar esta versão manualmente"**. Assim,
@@ -175,6 +183,7 @@ Todo dia o app mostra, num lugar só:
 • Modo altar: letra grande, passo a passo, para orar sozinho, em família ou no altar.
 • Lembrete diário: na hora que você escolher. Um por dia.
 • Meu ministério: escolha o seu e veja os dias em que ele conduz o altar.
+• [SÓ COM ABA BÍBLIA] A Bíblia no app: leia qualquer livro e capítulo na Bíblia Livre, sem internet.
 
 Entrou depois do começo? Tudo bem. O app começa no dia de hoje, e os dias que ficaram para trás continuam abertos para você fazer no seu ritmo.
 
@@ -186,11 +195,24 @@ Respeita o tamanho de letra do seu celular e o modo escuro.
 
 O conteúdo do guia é da [NOME DA IGREJA] e é usado com autorização dela.
 
+[SÓ COM ABA BÍBLIA] Texto bíblico: Bíblia Livre (BLIVRE), © Diego Santos, Mario Sérgio e Marco Teles, licença Creative Commons Atribuição 4.0 (CC BY 4.0), obtida em ebible.org. Créditos completos dentro do app.
+
 Dúvidas: [E-MAIL DE SUPORTE]
 ```
 
-Não escrever: "Bíblia completa", nome de tradução, "comunidade", "compartilhe", "grátis", "nº 1", "para crianças"
-(motivos em `FICHA_DE_LOJA_rascunho.md` §4).
+Apague as linhas marcadas **[SÓ COM ABA BÍBLIA]** (e o marcador) se a aba não estiver no build. Com a aba, a linha
+"A leitura do dia" pode continuar dizendo "Leia na sua Bíblia" (a pessoa escolhe onde ler); não trocar por "leia no
+app" se o leitor do dia ainda não abrir o capítulo direto na aba Bíblia.
+
+Não escrever: "comunidade", "compartilhe", "grátis", "nº 1", "para crianças", nome de **outra** tradução (NVI, ARA,
+NAA, NTLH…). **Sem a aba Bíblia**, também não escrever "Bíblia completa" nem "Bíblia Livre". **Com a aba**, "Bíblia
+Livre" pode e deve aparecer; "Bíblia completa" só depois de conferir no build que os 66 livros abrem (motivos em
+`FICHA_DE_LOJA_rascunho.md` §4).
+
+**Atribuição na ficha (INFERÊNCIA):** a CC BY exige crédito "razoável ao meio" onde o texto é distribuído, isto é,
+**dentro do app** (tela de créditos). A ficha não distribui o texto, então a linha de crédito na descrição não é
+exigida pela licença; está aqui porque é barata, é honesta e mostra ao revisor a origem legal do texto (diretriz
+5.2.1).
 
 **4.6 Categoria:** principal **Referência**; secundária **Estilo de vida**. Nunca "Crianças".
 
@@ -214,12 +236,14 @@ violência, sexo, palavrões, drogas, álcool, jogos de azar, temas médicos **N
   (INFERÊNCIA: o e-mail que a pessoa decide mandar sai pelo app de e-mail dela, não por este app).
 
 A regra da Apple: "coletar" = transmitir para fora do aparelho (FATO [A8]). Condição: o build de loja é gerado **sem**
-as variáveis `EXPO_PUBLIC_SUPABASE_*`. Se um dia entrar SDK de estatística ou conta, esta resposta muda **antes**.
+as variáveis `EXPO_PUBLIC_SUPABASE_*`. **[COM ABA BÍBLIA]** a resposta continua a mesma **desde que** o texto vá
+empacotado no binário (nada baixado em tempo de execução) e a posição de leitura, se guardada, fique só no aparelho. Se um dia entrar SDK de estatística ou conta, esta resposta muda **antes**.
 
 **4.9 URLs:** Suporte: **[URL DE SUPORTE]** · Política de privacidade: **[URL DA POLÍTICA]** · Marketing: opcional,
 deixe vazio. **Faltam as duas primeiras** (checklist item 3). **Copyright:** `2026 [NOME DO FUNDADOR]`.
 **Direitos de conteúdo:** "O app contém conteúdo de terceiros?" **Sim**; "tem os direitos necessários?" **Sim**, só
-depois da autorização da §2.
+depois da autorização da §2. **[COM ABA BÍBLIA]** o terceiro inclui a Bíblia Livre, cujo direito vem da licença CC BY
+4.0 (pública; cumprida com a tela de créditos). Não precisa de carta.
 
 **4.10 Notas para o revisor** (App Review Information → Notes; em inglês, que é o que o revisor lê mais rápido):
 
@@ -231,7 +255,8 @@ How the app works:
 - Each campaign day unlocks at 00:00 São Paulo time (UTC-3) on its date. Day 1 unlocks on September 23, 2026.
 - Before September 23, the app shows the countdown to Day 1 and the purpose of the campaign. This is intentional: the church asked that no day be opened early.
 - From September 23 on, the Today screen shows the day's reading, the prayer guide, altar mode and reminders.
-- The app does not display Bible text; it shows chapter references for people to read in their own Bible.
+- [WITHOUT BIBLE TAB] The app does not display Bible text; it shows chapter references for people to read in their own Bible.
+- [WITH BIBLE TAB] The Bible tab is available at any time, including before September 23: it contains the full text of the Bíblia Livre (Portuguese, CC BY 4.0, from ebible.org), bundled in the app and readable offline. Credits and license are in the app. Reading in the Bible tab does not unlock or complete campaign days.
 
 Demo video of the full daily flow (Day 1 open): [VIDEO LINK]
 
@@ -256,6 +281,14 @@ na terça (só contagem) quanto na quarta (dia 1 aberto).
 
 **O que já reduz o risco:** as notas do §4.10 explicam a data; o vídeo mostra o dia aberto; o pedido de revisão
 acelerada amarra o app ao evento da data.
+
+**Nota de 2026-09-21 — a aba Bíblia reduz o risco 4.2 (INFERÊNCIA):** com a Bíblia Livre no build, o revisor que
+abrir o app antes de 23/09 **não vê só a contagem**: tem uma aba inteira de leitura, funcional e offline, fora do
+calendário da campanha. Isso ataca direto o motivo "funcionalidade mínima" (4.2) e "incompleto" (2.1). Não zera o
+risco: (i) a diretriz **4.3** (muitos apps de Bíblia parecidos) passa a ser a pergunta provável, e a resposta é o
+que só este app tem: o guia diário da igreja, o modo altar, a escala do ministério; (ii) a aba só ajuda se estiver
+**pronta e testada** no build: aba quebrada ou meio vazia piora a revisão (2.1). **Sem a aba**, este §5 vale como
+estava. Mesmo com a aba, **não** abrir dias da campanha antes da data para o revisor (item 5 abaixo).
 
 **Se rejeitar:**
 

@@ -1,6 +1,16 @@
 # Gate 1 — o que o leitor mostra na V1 (decisão até sexta, 25/09/2026)
 
-- **Status:** PROPOSTA para decisão do fundador. Escrito em 2026-09-21.
+- **Status:** **DECIDIDO em 2026-09-21 pelo fundador: opção (b1), Bíblia Livre empacotada** (ver
+  `DECISOES_DO_FUNDADOR.md`, D-2026-09-21-1). A recomendação (a) do §5 fica como histórico, **superada**. Escrito em
+  2026-09-21 como PROPOSTA.
+
+> **Nota de 2026-09-21 (decisão):** o fundador escolheu **b1**: a Bíblia Livre (eBible `porbr2018`, USFM, CC BY 4.0)
+> entra dentro do app numa aba **Bíblia**, na V1 se ficar pronta e testada, senão na primeira atualização. O download
+> de `https://ebible.org/Scriptures/porbr2018_usfm.zip` (1,4 MB) foi autorizado por ele. Continuam valendo: atribuição
+> completa (§2.1) citando a licença **do arquivo empacotado** (a do eBible, CC BY 4.0) e a data da versão; indicar
+> alterações se a conversão mudar algo além da formatação; texto **sem cifragem**; tela de licenças. O Gate 2 segue
+> independente. A pergunta à igreja "a Bíblia Livre serve para vocês?" (§2.2) continua aberta, mas não bloqueia.
+> A leitura livre na aba Bíblia não conclui dias nem revela conteúdo da igreja de dias futuros.
 - **Referências:** `PLANO_DE_LANCAMENTO.md` §0 item 6, D7 e §5 item 8; `../research/BIBLE_CONTENT_OPTIONS.md`;
   `../research/OPEN_PT_BIBLE_TEXTS.md`; leitor atual `mobile/src/app/reader/[day].tsx` (lido, não alterado).
 - **Classificação:** FATO (fonte primária + data de acesso) · INFERÊNCIA · HIPÓTESE · RECOMENDAÇÃO.
@@ -123,6 +133,8 @@ TB 1917 (sem arquivo oficial), qualquer fonte da lista de bloqueio.
 
 ## 5. RECOMENDAÇÃO
 
+> **SUPERADA em 2026-09-21:** o fundador decidiu **(b1)**. O texto abaixo fica como registro do que foi recomendado.
+
 **RECOMENDAÇÃO: opção (a) na V1, e mandar a carta da opção (c) esta semana, em paralelo.**
 
 - É a única que não mexe no prazo com a campanha já começando; o leitor fica pronto para receber texto depois.
@@ -137,7 +149,7 @@ TB 1917 (sem arquivo oficial), qualquer fonte da lista de bloqueio.
 
 ---
 
-**O que o fundador responde:** "(a), (b1), (b2) ou (a+b)?" — e, da igreja: "qual tradução o altar usa?" e "posso mandar
+**Respondido em 2026-09-21: (b1).** Pergunta original — **O que o fundador responde:** "(a), (b1), (b2) ou (a+b)?" — e, da igreja: "qual tradução o altar usa?" e "posso mandar
 a carta à SBB/Biblica em nome da igreja?".
 
 ---

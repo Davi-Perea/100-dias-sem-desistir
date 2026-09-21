@@ -37,14 +37,21 @@ conta da igreja depois. Os textos prontos para colar estão em **`docs/product/L
    capturas de iPhone.
 8. **Android:** fora desta semana (conta pessoal nova: teste fechado de 12 pessoas por 14 dias). A parte Google desta
    ficha continua valendo para meados de outubro.
+9. **Gate 1 decidido (fundador, 21/09, `DECISOES_DO_FUNDADOR.md` D-2026-09-21-1):** a **Bíblia Livre** entra dentro
+   do app numa aba **Bíblia** (CC BY 4.0, empacotada, offline), na V1 se ficar pronta e testada. Com a aba no build,
+   a descrição (§3.3) ganha a linha da Bíblia e a linha de crédito, a tabela do §4 muda e entra uma captura (§8.2).
+   Sem a aba, tudo abaixo vale como estava. As linhas que dependem disso estão marcadas **[SÓ COM ABA BÍBLIA]**.
+10. **Comunidade:** vem como atualização (~2 semanas, meta do fundador), **sem mensagem privada**: "chegar na pessoa"
+   é comentar no post dela e Amém. A versão B (§6) só vale nessa atualização; "Mensagens e chat" continua sendo
+   pergunta a responder olhando o formulário, porque a Apple inclui "public posting" nessa definição.
 
 ---
 
 ## 0. Resumo em oito linhas
 
 1. A ficha tem que descrever **o app que existe no dia do envio**, não o que ele vai virar.
-2. Hoje o app **não mostra texto bíblico** (Gate 1 aberto): ele indica os capítulos do dia e a direção de oração.
-   A ficha não pode dizer "leia a Bíblia no app" nem citar tradução (NVI, ARA, NAA…).
+2. Gate 1 **decidido em 21/09: Bíblia Livre dentro do app** (aba Bíblia). A ficha só fala nela **se a aba estiver
+   no build enviado**; sem a aba, não diz "leia a Bíblia no app". Nunca cita outra tradução (NVI, ARA, NAA…).
 3. Hoje **não existe Comunidade.** A ficha não pode falar em feed, amigos, grupos que conversam, "compartilhe".
 4. O conteúdo é da igreja e só pode ser publicado com a **autorização escrita** dela (Gate 2). Sem ela, não há ficha.
 5. Limites: nome e subtítulo da Apple **30 caracteres**; palavras-chave **100 bytes**; na Google Play, nome **30**,
@@ -121,7 +128,7 @@ NAA, NTLH, ACF), nomes de pessoas, "grátis". A Apple rejeita metadado com nomes
 | Principal | **Referência (Reference)** | FATO: a Apple cita "religion" entre os exemplos de Referência ("Choosing a category", acesso 2026-09-21). |
 | Secundária | **Estilo de vida (Lifestyle)** | Opção comum para apps de fé; é "general-interest subject matter". |
 | **Nunca** | **Crianças (Kids)** | Categoria Kids tem regras próprias (sem analytics de terceiros, portões para pais etc.) e o app não foi feito para ela. Também não sugerir público infantil fora dela (Apple 2.3.8 / 5.1.4, ver `MOBILE_STORE_REQUIREMENTS.md`). |
-| Não usar | Livros (Books) | Pela definição da Apple, Books é para conteúdo de livro com interatividade — e o app não mostra o texto. Reforça o risco da regra 4.2 ("app que é só um livro"). |
+| Não usar | Livros (Books) | Pela definição da Apple, Books é para conteúdo de livro com interatividade — e o app não mostra o texto. Reforça o risco da regra 4.2 ("app que é só um livro"). **Nota 21/09:** mesmo com a aba Bíblia, continua Referência: o centro é o guia da campanha, e Books reforçaria a leitura "só um livro". |
 | Só se a Comunidade existir | Redes sociais (Social Networking) | Não recomendado nem assim: o centro do produto continua sendo a jornada. |
 
 ---
@@ -157,6 +164,7 @@ Proposta (≈1.400 caracteres com os campos ainda vazios; cabe nas duas lojas). 
 > • **Sua reflexão** — um espaço para escrever o que Deus falou com você. Fica só no seu celular.
 > • **Lembrete diário** — na hora que você escolher. Um por dia, sem insistência.
 > • **Meu ministério** — escolha o seu e veja os dias em que ele conduz o altar.
+> • **[SÓ COM ABA BÍBLIA] A Bíblia no app** — leia qualquer livro e capítulo na Bíblia Livre, sem internet.
 >
 > **Entrou depois do começo?** Tudo bem. O app começa no dia de hoje, sem cobrança pelos dias que passaram.
 >
@@ -167,7 +175,17 @@ Proposta (≈1.400 caracteres com os campos ainda vazios; cabe nas duas lojas). 
 >
 > O conteúdo do guia é da [CAMPO: nome da igreja] e é usado com autorização dela.
 >
+> **[SÓ COM ABA BÍBLIA]** Texto bíblico: Bíblia Livre (BLIVRE), © Diego Santos, Mario Sérgio e Marco Teles, licença
+> Creative Commons Atribuição 4.0 (CC BY 4.0), obtida em ebible.org. Créditos completos dentro do app.
+>
 > Dúvidas: [CAMPO: e-mail de suporte]. Privacidade: [CAMPO: URL da política].
+
+**Atribuição CC BY na ficha — a licença pede? (INFERÊNCIA, não parecer):** a CC BY 4.0 (§3(a)) exige o crédito
+quando o material é **compartilhado**, "de forma razoável ao meio". Quem distribui o texto é o **app**, então o
+crédito obrigatório fica **dentro do app** (tela de créditos com título, titulares, licença com link, fonte, data da
+versão e aviso de alteração, se houver). A ficha não reproduz o texto, então a licença **não exige** a linha na
+descrição; ela entra mesmo assim porque é curta, é correta e mostra ao revisor de onde vem o texto (Apple 5.2.1).
+Se alguma captura mostrar versículos, o crédito "BLIVRE" deve estar visível na própria captura ou na legenda.
 
 Antes de enviar, conferir cada item contra o app real do envio: se "Meu ministério", "Modo altar" ou o lembrete não
 estiverem na versão, a linha sai. Se o passo de jejum for mantido (pergunta 5 do `PLANO_FASE_FINAL_100_DIAS.md`),
@@ -189,7 +207,8 @@ entra uma linha; se não, não entra.
 
 | Dizer | NÃO dizer (enquanto for verdade o motivo) | Motivo |
 |---|---|---|
-| "a leitura do dia", "quais capítulos ler hoje", "leia na sua Bíblia" | "leia a Bíblia no app", "Bíblia completa", "Bíblia offline", "áudio da Bíblia", "versão NVI/ARA/NAA…" | **Gate 1**: o app não mostra texto bíblico. Prometer o que o app não faz é metadado enganoso (Apple 2.3.1/2.3.7; política de metadados do Google). |
+| "a leitura do dia", "quais capítulos ler hoje", "leia na sua Bíblia" | "leia a Bíblia no app", "Bíblia completa", "Bíblia offline", "áudio da Bíblia", "versão NVI/ARA/NAA…" | **Gate 1** (sem a aba Bíblia no build): o app não mostra texto bíblico. Prometer o que o app não faz é metadado enganoso (Apple 2.3.1/2.3.7; política de metadados do Google). |
+| **[SÓ COM ABA BÍBLIA]** "a Bíblia Livre no app", "sem internet", "qualquer livro e capítulo" | "áudio da Bíblia", "várias versões", qualquer outra tradução pelo nome; "Bíblia completa" antes de conferir no build que os 66 livros abrem | Gate 1 decidido em 21/09 (b1). Dizer o nome da tradução que o app **tem** é informação, não marca de terceiro. Ler na aba **não** conclui dias: não sugerir que ler lá "cumpre o plano". |
 | "o guia de intercessão da igreja", "material da igreja, usado com autorização" | qualquer frase antes de existir a **autorização escrita** (Gate 2) | Sem ela, o build de release nem abre. |
 | "você não caminha sozinho", "a igreja inteira no mesmo dia" (sentido de campanha) | "comunidade", "feed", "compartilhe", "converse", "amigos", "grupos", "curta", "Amém dos irmãos" | **Comunidade não existe.** Só entra na ficha na mesma versão em que ela for ao ar. |
 | "sem cadastro", "funciona offline", "fica no seu celular" | "100% seguro", "nunca coletamos nada" | Verdadeiro hoje; frase absoluta vira problema quando houver conta/servidor. Revisar a cada versão. |
@@ -329,7 +348,8 @@ demonstração e servidor ligado** na revisão (`01-lojas.md` [A1] §2.1): **[CA
 | 1 | **Início** do dia (monte, ênfase, leitura do dia, versículo-base) | "Cada dia, o que ler e por que orar." | Usar um dia **real do dataset**, já passado ou o de hoje. Sem nome de líder. |
 | 2 | **Intercessão do dia** (os 5 passos) | "A direção de oração da igreja, passo a passo." | Texto do guia **exatamente** como está no dataset. |
 | 3 | **Modo altar** | "Letra grande para orar em família ou no altar." | Mostra acessibilidade de verdade. |
-| 4 | **Leitura do dia** (capítulos, marcar como lido) | "Leia na sua Bíblia e marque como lido." | **Não mostrar** a faixa "texto ainda não liberado" como se fosse defeito, nem texto bíblico de qualquer tradução. Se o Gate 1 fechar antes, refazer. |
+| 4 | **Leitura do dia** (capítulos, marcar como lido) | "Leia na sua Bíblia e marque como lido." | **Não mostrar** a faixa "texto ainda não liberado" como se fosse defeito, nem texto bíblico de qualquer tradução. Se o Gate 1 fechar antes, refazer. **(21/09: Gate 1 fechado em b1; refazer conforme o leitor do build.)** |
+| 4b | **[SÓ COM ABA BÍBLIA] Aba Bíblia** com um capítulo aberto | "A Bíblia Livre no seu celular, sem internet." | Só texto da Bíblia Livre; crédito "BLIVRE" visível na tela ou na legenda. Nenhuma outra tradução, nenhum logo de terceiro. |
 | 5 | **Jornada / régua dos 100 dias** | "Entrou depois? Comece de hoje." | Progresso de exemplo; dias futuros fechados, como no app. |
 | 6 | **Reflexão** | "Escreva o que Deus falou. Fica só no seu celular." | Texto de exemplo neutro, escrito pela equipe — **nunca** reflexão de pessoa real. |
 | 7 | **Lembrete** | "Um lembrete por dia, na hora que você escolher." | |

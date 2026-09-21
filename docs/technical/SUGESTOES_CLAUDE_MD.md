@@ -199,3 +199,33 @@ nem Supabase CLI"); `V1_BUILD_STATUS.md` §7.
   `PROBLEMA → EVIDÊNCIA → IMPACTO → ALTERNATIVAS → RECOMENDAÇÃO`.
 - Todas as "Regras invioláveis do conteúdo" além do ajuste do item 9: continuam exatas.
 - As regras de engenharia 1 a 7.
+
+---
+
+## 13. Decisões do fundador de 2026-09-21 (acrescentado em 2026-09-21)
+
+Registro completo em `docs/product/DECISOES_DO_FUNDADOR.md`. O `CLAUDE.md` **não foi alterado**; abaixo, o que o
+fundador pode colar.
+
+**13.1 "Hipóteses NÃO aprovadas"** — tirar feed, comunidade, comentários e reações da lista e acrescentar:
+> **Decidido pelo fundador em 2026-09-21, no lugar da ratificação do Product Brain:** Comunidade (feed da igreja,
+> comentário no post, "Amém" sem contador), como **atualização depois da V1**. **Sem mensagem privada** na primeira
+> Comunidade. As regras de loja e lei da Comunidade (`design_handoff_100_dias/REGRAS.md` §3) continuam bloqueantes.
+
+Isso substitui, para esses itens, a sugestão do §5 acima ("aguardando ratificação").
+
+**13.2 "Regras invioláveis do conteúdo" — Gate 1** (substitui "Licença da tradução bíblica (Gate 1) continua um
+problema independente: o material só traz referências, nunca texto"):
+> **Gate 1 decidido em 2026-09-21 (opção b1):** a **Bíblia Livre** (eBible `porbr2018`, CC BY 4.0) vai empacotada numa
+> aba Bíblia, com atribuição, aviso de alteração quando houver e sem cifragem. O material da igreja continua só com
+> referências. Ler na aba Bíblia **não conclui dias** nem revela conteúdo da igreja de dias futuros. Outras traduções
+> só por contrato. Gate 1 segue independente do Gate 2.
+
+Isso substitui a sugestão do §8 acima.
+
+**13.3 "Decisões vigentes" — Conteúdo:** trocar "Bíblia Livre CC BY como padrão provisório; … ONBV como 'leitura
+fácil'" por "Bíblia Livre empacotada (decidido 2026-09-21); ONBV não entra na V1".
+
+**13.4 "Estado atual":** acrescentar
+> V1 vai à App Store (conta pessoal do fundador, caminho expresso) **sem Comunidade**; Comunidade vem como atualização
+> (`docs/product/LANCAMENTO_EXPRESSO_IOS.md`, `docs/product/DECISOES_DO_FUNDADOR.md`).
