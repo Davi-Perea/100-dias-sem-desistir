@@ -1,0 +1,348 @@
+{
+  "traducao": "Bíblia Livre",
+  "sigla": "BLIVRE",
+  "fonte": {
+    "arquivo": "source/porbr2018_usfm.zip",
+    "url": "https://ebible.org/Scriptures/porbr2018_usfm.zip",
+    "sha256": "f8b806c312e07c283baadb2394fe9fdc2d9a2fbe48410fd5298358511af8ae57"
+  },
+  "licenca": "CC BY 4.0 Brasil (https://creativecommons.org/licenses/by/4.0/br/)",
+  "alteracoes": "Notas de rodapé (\\f), referências cruzadas (\\x) e referências de citação (\\rq) removidas; marcadores de caractere removidos mantendo o texto.",
+  "totais": {
+    "livros": 66,
+    "capitulos": 1189,
+    "versiculos": 31102
+  },
+  "livros": [
+    {
+      "livro": "GEN",
+      "capitulos": 50,
+      "versiculos": 1533
+    },
+    {
+      "livro": "EXO",
+      "capitulos": 40,
+      "versiculos": 1213
+    },
+    {
+      "livro": "LEV",
+      "capitulos": 27,
+      "versiculos": 859
+    },
+    {
+      "livro": "NUM",
+      "capitulos": 36,
+      "versiculos": 1288
+    },
+    {
+      "livro": "DEU",
+      "capitulos": 34,
+      "versiculos": 959
+    },
+    {
+      "livro": "JOS",
+      "capitulos": 24,
+      "versiculos": 658
+    },
+    {
+      "livro": "JDG",
+      "capitulos": 21,
+      "versiculos": 618
+    },
+    {
+      "livro": "RUT",
+      "capitulos": 4,
+      "versiculos": 85
+    },
+    {
+      "livro": "1SA",
+      "capitulos": 31,
+      "versiculos": 810
+    },
+    {
+      "livro": "2SA",
+      "capitulos": 24,
+      "versiculos": 695
+    },
+    {
+      "livro": "1KI",
+      "capitulos": 22,
+      "versiculos": 816
+    },
+    {
+      "livro": "2KI",
+      "capitulos": 25,
+      "versiculos": 719
+    },
+    {
+      "livro": "1CH",
+      "capitulos": 29,
+      "versiculos": 942
+    },
+    {
+      "livro": "2CH",
+      "capitulos": 36,
+      "versiculos": 822
+    },
+    {
+      "livro": "EZR",
+      "capitulos": 10,
+      "versiculos": 280
+    },
+    {
+      "livro": "NEH",
+      "capitulos": 13,
+      "versiculos": 406
+    },
+    {
+      "livro": "EST",
+      "capitulos": 10,
+      "versiculos": 167
+    },
+    {
+      "livro": "JOB",
+      "capitulos": 42,
+      "versiculos": 1070
+    },
+    {
+      "livro": "PSA",
+      "capitulos": 150,
+      "versiculos": 2461
+    },
+    {
+      "livro": "PRO",
+      "capitulos": 31,
+      "versiculos": 915
+    },
+    {
+      "livro": "ECC",
+      "capitulos": 12,
+      "versiculos": 222
+    },
+    {
+      "livro": "SNG",
+      "capitulos": 8,
+      "versiculos": 117
+    },
+    {
+      "livro": "ISA",
+      "capitulos": 66,
+      "versiculos": 1292
+    },
+    {
+      "livro": "JER",
+      "capitulos": 52,
+      "versiculos": 1364
+    },
+    {
+      "livro": "LAM",
+      "capitulos": 5,
+      "versiculos": 154
+    },
+    {
+      "livro": "EZK",
+      "capitulos": 48,
+      "versiculos": 1273
+    },
+    {
+      "livro": "DAN",
+      "capitulos": 12,
+      "versiculos": 357
+    },
+    {
+      "livro": "HOS",
+      "capitulos": 14,
+      "versiculos": 197
+    },
+    {
+      "livro": "JOL",
+      "capitulos": 3,
+      "versiculos": 73
+    },
+    {
+      "livro": "AMO",
+      "capitulos": 9,
+      "versiculos": 146
+    },
+    {
+      "livro": "OBA",
+      "capitulos": 1,
+      "versiculos": 21
+    },
+    {
+      "livro": "JON",
+      "capitulos": 4,
+      "versiculos": 48
+    },
+    {
+      "livro": "MIC",
+      "capitulos": 7,
+      "versiculos": 105
+    },
+    {
+      "livro": "NAM",
+      "capitulos": 3,
+      "versiculos": 47
+    },
+    {
+      "livro": "HAB",
+      "capitulos": 3,
+      "versiculos": 56
+    },
+    {
+      "livro": "ZEP",
+      "capitulos": 3,
+      "versiculos": 53
+    },
+    {
+      "livro": "HAG",
+      "capitulos": 2,
+      "versiculos": 38
+    },
+    {
+      "livro": "ZEC",
+      "capitulos": 14,
+      "versiculos": 211
+    },
+    {
+      "livro": "MAL",
+      "capitulos": 4,
+      "versiculos": 55
+    },
+    {
+      "livro": "MAT",
+      "capitulos": 28,
+      "versiculos": 1071
+    },
+    {
+      "livro": "MRK",
+      "capitulos": 16,
+      "versiculos": 678
+    },
+    {
+      "livro": "LUK",
+      "capitulos": 24,
+      "versiculos": 1151
+    },
+    {
+      "livro": "JHN",
+      "capitulos": 21,
+      "versiculos": 879
+    },
+    {
+      "livro": "ACT",
+      "capitulos": 28,
+      "versiculos": 1007
+    },
+    {
+      "livro": "ROM",
+      "capitulos": 16,
+      "versiculos": 433
+    },
+    {
+      "livro": "1CO",
+      "capitulos": 16,
+      "versiculos": 437
+    },
+    {
+      "livro": "2CO",
+      "capitulos": 13,
+      "versiculos": 257
+    },
+    {
+      "livro": "GAL",
+      "capitulos": 6,
+      "versiculos": 149
+    },
+    {
+      "livro": "EPH",
+      "capitulos": 6,
+      "versiculos": 155
+    },
+    {
+      "livro": "PHP",
+      "capitulos": 4,
+      "versiculos": 104
+    },
+    {
+      "livro": "COL",
+      "capitulos": 4,
+      "versiculos": 95
+    },
+    {
+      "livro": "1TH",
+      "capitulos": 5,
+      "versiculos": 89
+    },
+    {
+      "livro": "2TH",
+      "capitulos": 3,
+      "versiculos": 47
+    },
+    {
+      "livro": "1TI",
+      "capitulos": 6,
+      "versiculos": 113
+    },
+    {
+      "livro": "2TI",
+      "capitulos": 4,
+      "versiculos": 83
+    },
+    {
+      "livro": "TIT",
+      "capitulos": 3,
+      "versiculos": 46
+    },
+    {
+      "livro": "PHM",
+      "capitulos": 1,
+      "versiculos": 25
+    },
+    {
+      "livro": "HEB",
+      "capitulos": 13,
+      "versiculos": 303
+    },
+    {
+      "livro": "JAS",
+      "capitulos": 5,
+      "versiculos": 108
+    },
+    {
+      "livro": "1PE",
+      "capitulos": 5,
+      "versiculos": 105
+    },
+    {
+      "livro": "2PE",
+      "capitulos": 3,
+      "versiculos": 61
+    },
+    {
+      "livro": "1JN",
+      "capitulos": 5,
+      "versiculos": 105
+    },
+    {
+      "livro": "2JN",
+      "capitulos": 1,
+      "versiculos": 13
+    },
+    {
+      "livro": "3JN",
+      "capitulos": 1,
+      "versiculos": 14
+    },
+    {
+      "livro": "JUD",
+      "capitulos": 1,
+      "versiculos": 25
+    },
+    {
+      "livro": "REV",
+      "capitulos": 22,
+      "versiculos": 404
+    }
+  ]
+}

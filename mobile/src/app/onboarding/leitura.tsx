@@ -6,12 +6,12 @@ import { Button, ChoiceRow } from '@/ui/components';
 import { OnboardingStep, StepSupport } from '@/ui/OnboardingStep';
 
 /**
- * Rótulos do F2. As descrições de antes saíram com o desenho. "Ler aqui no app"
- * virou "Seguir o guia no app" (2026-09-21): sem tradução licenciada (Gate 1) o
- * app não mostra o texto bíblico, e o rótulo prometia isso.
+ * Rótulos do F2. As descrições de antes saíram com o desenho. "Seguir o guia no
+ * app" (sem texto licenciado) voltou a ser "Ler no app" em 2026-09-21: a Bíblia
+ * Livre está empacotada e o leitor mostra o texto.
  */
 const OPTIONS: { mode: ReadingMode; label: string }[] = [
-  { mode: 'in_app', label: 'Seguir o guia no app' },
+  { mode: 'in_app', label: 'Ler no app' },
   { mode: 'own_bible', label: 'Usar a minha Bíblia' },
   { mode: 'both', label: 'Vou alternar' },
 ];

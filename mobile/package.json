@@ -59,7 +59,9 @@
     "typecheck": "tsc --noEmit",
     "doctor": "expo-doctor",
     "content:convert": "node scripts/convert-100-dias.mjs",
-    "content:check": "node scripts/convert-100-dias.mjs --check"
+    "content:check": "node scripts/convert-100-dias.mjs --check",
+    "bible:convert": "node scripts/convert-biblia-livre.mjs",
+    "bible:check": "node scripts/convert-biblia-livre.mjs --check"
   },
   "private": true,
   "jest": {

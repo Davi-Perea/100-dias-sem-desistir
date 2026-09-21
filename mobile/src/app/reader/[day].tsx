@@ -1,7 +1,7 @@
 import * as Haptics from 'expo-haptics';
 import { useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { AccessibilityInfo, Platform, ScrollView, Text, View } from 'react-native';
+import { AccessibilityInfo, Platform, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { track } from '@/analytics/analytics';
@@ -11,18 +11,19 @@ import { formatDayDate } from '@/journey/officialDay';
 import { useJourney } from '@/journey/useJourney';
 import { isDayCompleted, setDayCompleted } from '@/progress/completionsStore';
 import { getBibleProvider, type Passage } from '@/reader/provider';
-import { normalizeReaderFontSize, readLineHeight, stepReaderFontSize } from '@/reader/readerFontSize';
+import { normalizeReaderFontSize, stepReaderFontSize } from '@/reader/readerFontSize';
 import { loadReaderPosition, saveReaderPosition } from '@/reader/readerPosition';
 import { updateSettings, useSettings } from '@/settings/settingsStore';
 import { goBackOrHome } from '@/ui/BackBar';
 import { LockedDayScreen } from '@/ui/LockSheet';
-import { AppText, Button, Cap, DevContentBanner, Screen, StateView, useFace } from '@/ui/components';
+import { ChapterText } from '@/ui/biblia/ChapterText';
+import { AppText, Button, Cap, DevContentBanner, Screen, StateView } from '@/ui/components';
 import { ErrorState } from '@/ui/entrada/States';
 import { ReaderFooter, type ReaderPrimary } from '@/ui/leitor/ReaderFooter';
 import { ReaderGuide } from '@/ui/leitor/ReaderGuide';
 import { ReaderTopBar } from '@/ui/leitor/ReaderTopBar';
 import { TextSizeSheet } from '@/ui/leitor/TextSizeSheet';
-import { MAX_CONTENT_WIDTH, MIN_TOUCH, faces, spacing, useTheme } from '@/ui/theme';
+import { MAX_CONTENT_WIDTH, MIN_TOUCH, spacing } from '@/ui/theme';
 
 /** Calha do corpo do leitor (TELAS B1). */
 const READER_GUTTER = 26;
@@ -49,8 +50,6 @@ export default function ReaderScreen() {
   const { day } = useLocalSearchParams<{ day: string }>();
   const dayNumber = Number(day);
   const insets = useSafeAreaInsets();
-  const { colors } = useTheme();
-  const face = useFace();
   const settings = useSettings();
   const journey = useJourney();
   const scrollRef = useRef<ScrollView>(null);
@@ -320,25 +319,9 @@ export default function ReaderScreen() {
               <StateView kind="loading" />
             ) : (
               <>
-                {passage.verses.map((verse) => (
-                  // Sem `maxFontSizeMultiplier`: o texto cresce com a fonte do
-                  // sistema sem teto, que é o que a folha B3 promete.
-                  <Text
-                    key={verse.verse}
-                    accessibilityLabel={`Versículo ${verse.verse}. ${verse.text}`}
-                    style={{
-                      fontFamily: face(faces.ss400),
-                      fontSize,
-                      lineHeight: readLineHeight(fontSize),
-                      color: colors.text,
-                    }}
-                  >
-                    <Text style={{ fontSize: Math.round((12 * fontSize) / 19), color: colors.textMuted }}>
-                      {verse.verse}{' '}
-                    </Text>
-                    {verse.text}
-                  </Text>
-                ))}
+                {/* Mesma composição da aba Bíblia (ChapterText), com o título de
+                    salmo (Passage.heading) antes do versículo 1. */}
+                <ChapterText verses={passage.verses} heading={passage.heading} fontSize={fontSize} />
                 {/* PROVISÓRIO (LACUNAS C29): atribuição exigida pela licença, no
                     fim do capítulo e acima do rodapé medido. */}
                 <AppText variant="caption" style={{ marginTop: spacing.lg }} testID="reader-attribution">

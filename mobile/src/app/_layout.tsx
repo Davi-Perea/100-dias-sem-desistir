@@ -4,7 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect, useMemo, useState } from 'react';
 
 import { setAnalyticsEnabled } from '@/analytics/analytics';
-import { devBibleProvider } from '@/reader/devProvider';
+import { bibliaLivreProvider } from '@/reader/bibliaLivreProvider';
 import { setBibleProvider } from '@/reader/provider';
 import { setupNotificationHandler } from '@/reminders/reminders';
 import { useReminderSync } from '@/reminders/useReminderSync';
@@ -13,8 +13,8 @@ import { ErrorBoundaryScreen } from '@/ui/entrada/ErrorBoundaryScreen';
 import { useAppFonts } from '@/ui/fonts';
 import { MOTION_MS, fonts, useReducedMotion, useTheme } from '@/ui/theme';
 
-// Provider de texto de desenvolvimento até o Gate 1 (licença de tradução).
-setBibleProvider(devBibleProvider);
+// Bíblia Livre empacotada (CC BY 4.0 BR; decisão do fundador, 2026-09-21). O devBibleProvider fica só nos testes.
+setBibleProvider(bibliaLivreProvider);
 setupNotificationHandler();
 SplashScreen.preventAutoHideAsync().catch(() => {
   // Splash já escondida (recarga de desenvolvimento): não é erro.
@@ -133,6 +133,8 @@ export default function RootLayout() {
         <Stack.Screen name="ministerio" options={{ headerShown: false }} />
         <Stack.Screen name="proposito" options={{ headerShown: false }} />
         <Stack.Screen name="reader/[day]" options={{ headerShown: false }} />
+        <Stack.Screen name="biblia/[livro]/index" options={{ headerShown: false }} />
+        <Stack.Screen name="biblia/[livro]/[capitulo]" options={{ headerShown: false }} />
         <Stack.Screen
           name="reflexao/[day]"
           options={{ headerShown: false, presentation: 'modal' }}

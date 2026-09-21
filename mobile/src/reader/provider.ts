@@ -1,8 +1,9 @@
 import type { CanonicalReference } from '@/bible/references';
 
 /**
- * Costura do texto bíblico (spec §7). Existe para trocar o provider quando a licença
- * de tradução for resolvida (Gate 1) sem tocar nas telas. Não é framework universal:
+ * Costura do texto bíblico (spec §7). Existe para trocar o provider sem tocar nas
+ * telas. Em produção: a Bíblia Livre empacotada (bibliaLivreProvider.ts, decisão do
+ * fundador de 2026-09-21); o devProvider fica só para os testes que o usam. Não é framework universal:
  * quatro capacidades apenas — passagem, metadados, copyright, política de cache.
  */
 
@@ -13,6 +14,11 @@ export type Passage = {
   book: string;
   bookName: string;
   chapter: number;
+  /**
+   * Título que a tradução põe antes do versículo 1 (ex.: título do salmo). Não é
+   * versículo nem nota; opcional porque nem todo provedor tem.
+   */
+  heading?: string | null;
   verses: Verse[];
 };
 

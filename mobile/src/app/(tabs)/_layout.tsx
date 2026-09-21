@@ -3,11 +3,12 @@ import { type ComponentProps, useState } from 'react';
 
 import { COMMUNITY_ENABLED } from '@/config/features';
 import { useMilestoneTrigger } from '@/journey/useMilestoneTrigger';
+import { bibleTabVisible } from '@/ui/biblia/visibility';
 import { GlassTabBar } from '@/ui/TabBar';
 import { TABBAR_MIN_HEIGHT, useTheme } from '@/ui/theme';
 
 /**
- * Três destinos (TELAS): Jornada (casa) · Comunidade · Você. Não existe mais a
+ * Destinos (TELAS): Jornada (casa) · Comunidade · Bíblia · Você. Não existe mais a
  * aba "Início": ela e a Jornada mostravam o mesmo dia de dois jeitos e viraram
  * uma só, a casa em "/". O leitor, o dia e a intercessão são rotas contextuais,
  * sem barra.
@@ -18,7 +19,7 @@ import { TABBAR_MIN_HEIGHT, useTheme } from '@/ui/theme';
  *
  * PROVISÓRIO (decisão do engenheiro, 2026-09-21: sem servidor na V1, uma aba
  * "em breve" é rejeição na Apple, guideline 2.1): com `COMMUNITY_ENABLED`
- * desligado a aba sai da barra (`href: null`), que fica Jornada · Você. A rota
+ * desligado a aba sai da barra (`href: null`), que fica Jornada · Bíblia · Você. A rota
  * continua registrada para o trabalho futuro.
  *
  * Cada tela desenha o próprio cabeçalho, por isso não há header de navegação.
@@ -45,6 +46,9 @@ export default function TabsLayout() {
     >
       <Tabs.Screen name="index" options={{ title: 'Jornada' }} />
       <Tabs.Screen name="juntos" options={{ title: 'Comunidade', href: COMMUNITY_ENABLED ? undefined : null }} />
+      {/* Leitura livre (decisão do fundador, 2026-09-21: a Bíblia Livre dentro do
+          app). Entre Jornada e Você; em release só aparece com texto de verdade. */}
+      <Tabs.Screen name="biblia" options={{ title: 'Bíblia', href: bibleTabVisible() ? undefined : null }} />
       <Tabs.Screen name="voce" options={{ title: 'Você' }} />
     </Tabs>
   );

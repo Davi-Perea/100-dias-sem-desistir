@@ -12,7 +12,7 @@ import { ProgressBlock } from '@/ui/voce/ProgressBlock';
 import { RowGroup } from '@/ui/voce/SubScreen';
 
 const READING_MODE_LABEL: Record<string, string> = {
-  in_app: 'Guia no app',
+  in_app: 'No app',
   own_bible: 'Minha Bíblia',
   both: 'Vou alternar',
 };

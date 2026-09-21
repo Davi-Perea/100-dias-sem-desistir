@@ -39,6 +39,8 @@ const ICONS: Record<string, IconName> = {
   jornada: 'journey',
   juntos: 'community',
   comunidade: 'community',
+  // Livro aberto, traço 2 como os outros ícones da barra.
+  biblia: 'book',
   voce: 'you',
 };
 

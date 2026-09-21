@@ -198,7 +198,7 @@ describe('D1 · Você', () => {
     await seedSettings();
     await render(<YouScreen />);
     await waitFor(() => expect(screen.getByTestId('row-reading')).toBeTruthy());
-    expect(screen.getByTestId('row-reading').props.accessibilityLabel).toBe('Leitura, Guia no app');
+    expect(screen.getByTestId('row-reading').props.accessibilityLabel).toBe('Leitura, No app');
     await fireEvent.press(screen.getByTestId('row-reading'));
     expect(mockRouter.push).toHaveBeenLastCalledWith({ pathname: '/aparencia', params: { secao: 'leitura' } });
     expect(screen.queryByText(/dados de uso/)).toBeNull();
@@ -217,7 +217,7 @@ describe('Tamanho da letra / Como eu leio', () => {
     await seedSettings();
     await render(<AppearanceScreen />);
     await waitFor(() => expect(screen.getByTestId('mode-in_app')).toBeTruthy());
-    expect(within(screen.getByTestId('mode-in_app')).getByText('Seguir o guia no app')).toBeTruthy();
+    expect(within(screen.getByTestId('mode-in_app')).getByText('Ler no app')).toBeTruthy();
     expect(within(screen.getByTestId('mode-own_bible')).getByText('Usar a minha Bíblia')).toBeTruthy();
     expect(within(screen.getByTestId('mode-both')).getByText('Vou alternar')).toBeTruthy();
     expect(screen.queryByText(/tela de hoje|marca o dia|Depende do dia/)).toBeNull();

@@ -19,10 +19,10 @@ import { SubScreen } from '@/ui/voce/SubScreen';
  * Os três rótulos exatos do F2 (onboarding/leitura.tsx), sem descrição: a antiga
  * prometia texto na "tela de hoje" (que não existe e, com o Gate 1 aberto, não
  * mostra texto) e uma marcação cujo lugar ainda é a pergunta 2 ao designer.
- * "Seguir o guia no app" pelo mesmo motivo (2026-09-21): o leitor é um guia.
+ * "Ler no app" desde 2026-09-21: com a Bíblia Livre empacotada o leitor mostra o texto.
  */
 const MODES: { mode: ReadingMode; label: string }[] = [
-  { mode: 'in_app', label: 'Seguir o guia no app' },
+  { mode: 'in_app', label: 'Ler no app' },
   { mode: 'own_bible', label: 'Usar a minha Bíblia' },
   { mode: 'both', label: 'Vou alternar' },
 ];
