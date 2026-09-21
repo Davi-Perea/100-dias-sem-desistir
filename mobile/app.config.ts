@@ -103,10 +103,41 @@ export function assertRightsForStore(projectRoot: string): void {
   }
 }
 
+/**
+ * Contato e política na geração do build de loja. A App Store pede contato
+ * alcançável no app (1.5) e a política de privacidade acessível de dentro dele
+ * (5.1.1(i)). Enquanto SUPPORT_EMAIL ou PRIVACY_URL (src/config/contato.ts)
+ * forem null, as telas escondem a linha (nunca um link quebrado) e a variante
+ * production é recusada aqui. Lê o arquivo como texto para não depender de o
+ * carregador do Expo resolver imports TypeScript do app.
+ */
+export function assertContactForStore(projectRoot: string): void {
+  const source = fs.readFileSync(path.join(projectRoot, 'src', 'config', 'contato.ts'), 'utf8');
+  const read = (name: string): string | null => {
+    const match = new RegExp(`export const ${name}: string \\| null = (null|'([^']*)'|"([^"]*)");`).exec(source);
+    if (!match) throw new Error(`Variante production bloqueada: ${name} não encontrado em src/config/contato.ts.`);
+    return match[1] === 'null' ? null : (match[2] ?? match[3] ?? '').trim() || null;
+  };
+  const email = read('SUPPORT_EMAIL');
+  const url = read('PRIVACY_URL');
+  const missing: string[] = [];
+  if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) missing.push('SUPPORT_EMAIL (e-mail válido)');
+  if (!url || !/^https:\/\/\S+$/.test(url)) missing.push('PRIVACY_URL (https)');
+  if (missing.length > 0) {
+    throw new Error(
+      `Variante production bloqueada: preencha ${missing.join(' e ')} em src/config/contato.ts ` +
+        '(App Store 1.5 e 5.1.1(i): contato e política de privacidade dentro do app).',
+    );
+  }
+}
+
 export default ({ config, projectRoot }: ConfigContext): ExpoConfig => {
   const variant = readVariant();
   const identifier = identifierFor(variant);
-  if (variant === 'production') assertRightsForStore(projectRoot);
+  if (variant === 'production') {
+    assertRightsForStore(projectRoot);
+    assertContactForStore(projectRoot);
+  }
 
   return {
     ...config,
