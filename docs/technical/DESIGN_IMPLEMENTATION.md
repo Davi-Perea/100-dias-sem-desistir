@@ -144,6 +144,16 @@ Quando a agregação existir no servidor, o único arquivo que muda é
 2. **Teste em aparelho.** O vidro da tab bar (iOS) e a superfície sólida com
    elevação (Android) só foram verificados no bundle e no navegador; não há Mac nem
    SDK Android nesta máquina.
-3. **Conteúdo.** Tudo continua rodando sobre fixtures DEV. Os Launch Gates 1
+3. **Conteúdo.** ~~Tudo continua rodando sobre fixtures DEV. Os Launch Gates 1
    (licença de tradução) e 2 (autorização do plano 42360) seguem abertos, e o
-   validador de produção continua recusando fixtures.
+   validador de produção continua recusando fixtures.~~
+
+   **Vencido em 2026-09-19.** O material real da igreja chegou e o app passou a
+   embarcá-lo com `rights_status = pending_authorization`; o plano 42360 do
+   YouVersion está **superado** e não é mais referência. O **Launch Gate 2** deixou
+   de ser "autorização do plano 42360" e passou a ser a **autorização escrita da
+   própria igreja** para publicar o guia e a escala, com os nomes de líderes
+   dependendo de autorização separada. O Gate 1 (licença de tradução bíblica)
+   continua aberto e independente. Ver `CLAUDE.md` e
+   `docs/technical/EXECUTION_04_REVISAO.md`. As fixtures DEV continuam existindo
+   só para testes e painel DEV.

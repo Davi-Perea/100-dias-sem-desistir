@@ -1,0 +1,394 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Sistema visual — 100 Dias</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800;900&family=Literata:ital,wght@0,400;0,600;1,400&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        color-scheme: light dark;
+        --page: #faf9f6;
+        --card: #ffffff;
+        --ink: #111111;
+        --ink-2: #3f3d38;
+        --ink-3: #5c5a54;
+        --line: #e6e3dc;
+        --line-strong: #d9d6cf;
+        --brand: #ffd100;
+        --ok: #2f6b4f;
+        --bad: #9e3b33;
+        --gutter: 26px;
+      }
+      :root:not([data-theme='light']) {
+        @media (prefers-color-scheme: dark) {
+          --page: #131312;
+          --card: #1a1a19;
+          --ink: #ffffff;
+          --ink-2: #c7c4bd;
+          --ink-3: #a6a29a;
+          --line: #2e2c29;
+          --line-strong: #3d3a36;
+          --ok: #6bbf92;
+          --bad: #e0817a;
+        }
+      }
+      :root[data-theme='dark'] {
+        --page: #131312;
+        --card: #1a1a19;
+        --ink: #ffffff;
+        --ink-2: #c7c4bd;
+        --ink-3: #a6a29a;
+        --line: #2e2c29;
+        --line-strong: #3d3a36;
+        --ok: #6bbf92;
+        --bad: #e0817a;
+      }
+
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background: var(--page);
+        color: var(--ink);
+        font-family: Archivo, system-ui, sans-serif;
+        font-weight: 500;
+        line-height: 1.55;
+        -webkit-font-smoothing: antialiased;
+      }
+      .wrap { max-width: 1080px; margin: 0 auto; padding: 48px var(--gutter) 96px; }
+      header.top { border-bottom: 2px solid var(--ink); padding-bottom: 24px; margin-bottom: 40px; }
+      .eyebrow {
+        font-weight: 700; font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase;
+        color: var(--ink-3); margin: 0 0 12px;
+      }
+      h1 { font-weight: 900; font-size: clamp(34px, 7vw, 56px); line-height: 0.98; letter-spacing: -0.04em; margin: 0 0 16px; }
+      h2 {
+        font-weight: 800; font-size: clamp(22px, 4vw, 30px); line-height: 1.12; letter-spacing: -0.02em;
+        margin: 64px 0 8px; padding-top: 24px; border-top: 1px solid var(--line);
+      }
+      h3 { font-weight: 700; font-size: 17px; margin: 32px 0 10px; }
+      p { color: var(--ink-2); margin: 0 0 14px; max-width: 68ch; }
+      .lede { font-size: 18px; color: var(--ink-2); }
+      code, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.87em; }
+      mark { background: var(--brand); color: #111111; padding: 0 0.18em; }
+
+      .rule-card {
+        background: #111111; color: #ffffff; border-radius: 22px; padding: 28px;
+        margin: 28px 0; font-size: 18px; line-height: 1.45;
+      }
+      .rule-card strong { color: var(--brand); font-weight: 800; }
+
+      .grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); }
+      .sw { border: 1px solid var(--line); border-radius: 14px; overflow: hidden; background: var(--card); }
+      .sw .chip { height: 66px; border-bottom: 1px solid var(--line); }
+      .sw .meta { padding: 10px 12px 12px; }
+      .sw .name { font-weight: 700; font-size: 13px; }
+      .sw .hex { font-family: ui-monospace, monospace; font-size: 11.5px; color: var(--ink-3); text-transform: uppercase; }
+      .sw .role { font-size: 12px; color: var(--ink-3); margin-top: 6px; line-height: 1.35; }
+
+      table { width: 100%; border-collapse: collapse; margin: 16px 0 8px; font-size: 14px; }
+      th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+      th { font-weight: 700; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); }
+      td.num { font-family: ui-monospace, monospace; white-space: nowrap; }
+      .pass { color: var(--ok); font-weight: 700; }
+      .fail { color: var(--bad); font-weight: 700; }
+      .scroll { overflow-x: auto; }
+
+      .spec { display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px 18px; padding: 16px 0; border-bottom: 1px solid var(--line); }
+      .spec .sample { flex: 1 1 420px; min-width: 0; color: var(--ink); }
+      .spec .facts { font-family: ui-monospace, monospace; font-size: 11.5px; color: var(--ink-3); flex: 0 0 auto; }
+
+      .stack { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; margin: 12px 0 4px; }
+      .bar { background: var(--brand); border-radius: 4px; }
+      .bar + .lbl { font-family: ui-monospace, monospace; font-size: 11px; color: var(--ink-3); }
+      .unit { text-align: center; }
+
+      ul { color: var(--ink-2); padding-left: 20px; margin: 0 0 14px; max-width: 68ch; }
+      li { margin-bottom: 7px; }
+      .note { border-left: 3px solid var(--brand); padding: 4px 0 4px 16px; margin: 18px 0; }
+      .warn { border-left: 3px solid var(--bad); padding: 4px 0 4px 16px; margin: 18px 0; }
+      footer { margin-top: 72px; padding-top: 20px; border-top: 1px solid var(--line); font-size: 13px; color: var(--ink-3); }
+
+      @media (max-width: 640px) {
+        .wrap { padding: 32px 16px 64px; }
+        .spec .facts { flex-basis: 100%; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <header class="top">
+        <p class="eyebrow">Pacote de design · uso interno</p>
+        <h1>Sistema visual<br />100 Dias</h1>
+        <p class="lede">
+          O estado real do app hoje, extraído do código, não de uma intenção. Todo hex, tamanho e razão de
+          contraste desta página sai de <code>mobile/src/ui/theme.ts</code> e
+          <code>mobile/src/ui/components.tsx</code>; as razões são calculadas na hora, pela fórmula da WCAG
+          2.1, a partir dos valores abaixo.
+        </p>
+      </header>
+
+      <div class="rule-card">
+        O amarelo <strong>#FFD100</strong> é preenchimento e realce — <strong>nunca cor de texto</strong>. A
+        tinta é <strong>#111111</strong>. No tema escuro os dois trocam de papel com a superfície: tinta com
+        amarelo vira amarelo com tinta. Nenhuma das duas é decoração: são o idioma da marca.
+      </div>
+
+      <h2>Paletas</h2>
+      <p>
+        Dois temas. O claro é o do handoff; o escuro foi derivado da própria tela do Dia 100 (fundo de tinta,
+        amarelo e branco). As relações de marca são as mesmas nos dois.
+      </p>
+
+      <h3>Tema claro</h3>
+      <div class="grid" id="pal-light"></div>
+
+      <h3>Tema escuro</h3>
+      <div class="grid" id="pal-dark"></div>
+
+      <h2>Contraste medido</h2>
+      <p>
+        Mínimos da WCAG 2.1: <strong>4,5:1</strong> para texto e <strong>3:1</strong> para elemento
+        não-textual (borda de controle, ícone que carrega informação, faixa). Os números abaixo são
+        calculados nesta página a partir dos hex acima — se alguém mudar uma cor, a tabela muda junto.
+      </p>
+      <div class="scroll"><table id="contrast"></table></div>
+      <div class="note">
+        <p>
+          <strong>Dois desvios deliberados do handoff</strong>, ambos por contraste medido: a borda de
+          controle não selecionado passou de <code>#A9A69E</code> (2,43:1, reprovado) para
+          <code>#8A877F</code>, e no tema escuro o texto sobre vermelho é tinta, não branco (branco daria
+          2,77:1). Nenhuma outra cor foi alterada.
+        </p>
+      </div>
+      <div class="warn">
+        <p>
+          <strong>O que esta tabela não enxerga:</strong> estados com <code>opacity</code> (botão inativo a
+          0,45; lista de ferramentas a 0,5; "Excluir" a 0,4) e as superfícies de vidro da tab bar e das
+          barras de topo. Um desenho novo não pode assumir que um par aprovado aqui continua aprovado
+          quando recebe transparência.
+        </p>
+      </div>
+
+      <h2>Tipografia</h2>
+      <p>
+        Duas famílias, empacotadas no app sob licença OFL: <strong>Archivo</strong> para interface e
+        <strong>Literata</strong> para leitura. O peso vem da <em>família</em>, nunca de
+        <code>font-weight</code> — em React Native combinar os dois faz o Android sintetizar negrito sobre
+        uma face que já é negra.
+      </p>
+      <div id="type"></div>
+
+      <h2>Espaço, raio e alvo</h2>
+      <p>Escala de espaçamento do handoff: 4 · 8 · 12 · 16 · 24 · 32.</p>
+      <div class="stack" id="spacing"></div>
+
+      <h3>Raios</h3>
+      <div class="stack" id="radius"></div>
+
+      <h3>Alturas de referência</h3>
+      <div class="rule-card">
+        Estes números são <strong>pisos, nunca medidas fixas</strong>. Toda caixa que contém texto cede ao
+        texto: <code style="color: #ffd100">minHeight</code> com respiro, jamais
+        <code style="color: #ffd100">height</code>. O texto cresce com o Dynamic Type do sistema — até
+        <strong>3,571×</strong> neste build — e caixa travada não acompanha: o rótulo atravessa a borda e,
+        num botão preenchido, sai na cor da própria superfície, isto é, desaparece.
+      </div>
+      <div class="scroll">
+        <table>
+          <tr><th>Token</th><th>Valor</th><th>Papel</th></tr>
+          <tr><td class="mono">MIN_TOUCH</td><td class="num">48</td><td>Piso absoluto de alvo de toque (iOS 44pt / Android 48dp — usamos o maior)</td></tr>
+          <tr><td class="mono">BUTTON_HEIGHT</td><td class="num">56</td><td>Botão principal</td></tr>
+          <tr><td class="mono">TAB_BAR_HEIGHT</td><td class="num">86</td><td>Tab bar de vidro; quem reserva espaço mede a barra renderizada</td></tr>
+          <tr><td class="mono">MAX_CONTENT_WIDTH</td><td class="num">640</td><td>Medida de leitura confortável em tablet</td></tr>
+          <tr><td class="mono">gutter.screen</td><td class="num">26</td><td>Calha de listas e texto (20 em blocos largos, 14 em folhas)</td></tr>
+          <tr><td class="mono">MOTION_MS</td><td class="num">220</td><td>Transição de navegação, ease-out; respeita "reduzir movimento"</td></tr>
+        </table>
+      </div>
+
+      <h2>O que já existe</h2>
+      <p>
+        Antes de desenhar um componente novo, vale saber o que o app já tem. Estes primitivos vivem em
+        <code>mobile/src/ui/components.tsx</code> e são usados em todas as telas.
+      </p>
+      <div class="scroll">
+        <table>
+          <tr><th>Primitivo</th><th>Variantes</th><th>Regra que ele impõe</th></tr>
+          <tr><td class="mono">AppText</td><td>18 variantes (abaixo)</td><td>Toda tipografia passa por aqui; cor vem do tema</td></tr>
+          <tr><td class="mono">Button</td><td>primary · yellow · outline · danger · underline</td><td>Pisos 56/56/52/48/48, nunca abaixo de 48; a caixa cresce com o rótulo</td></tr>
+          <tr><td class="mono">Block</td><td>com e sem toque</td><td>Bloco de conteúdo com raio 20–22 e borda de 1px translúcida</td></tr>
+          <tr><td class="mono">Sheet</td><td>—</td><td>Folha inferior; para em 88% da tela e rola por dentro</td></tr>
+          <tr><td class="mono">SettingRow</td><td>com e sem valor</td><td>Linha de lista com filete; o valor encolhe antes do rótulo</td></tr>
+          <tr><td class="mono">Pill · Checkbox · ChoiceRow · Avatar</td><td>ativo/inativo</td><td>Usam o par invertido da marca (markSurface/onMark)</td></tr>
+          <tr><td class="mono">StateView</td><td>loading · empty · error</td><td>Estados vazios padronizados</td></tr>
+          <tr><td class="mono">OfflineBanner</td><td>—</td><td>Faixa de alerta com par próprio (alertSurface/onAlert)</td></tr>
+          <tr><td class="mono">SpherePill</td><td>ink · onInk · yellow</td><td>Pílula do monte do dia; o rótulo é conteúdo da igreja</td></tr>
+          <tr><td class="mono">Dove</td><td>acompanha o tema</td><td>A pomba da marca; preta no claro, branca no escuro</td></tr>
+          <tr><td class="mono">HundredDayRuler · FlyingDove</td><td>—</td><td>Progresso: régua de 100 dias e voo da pomba</td></tr>
+        </table>
+      </div>
+
+      <footer>
+        Gerado a partir do código em 20/09/2026. A fonte da verdade continua sendo
+        <code>mobile/src/ui/theme.ts</code>: se esta página e o código discordarem, o código está certo e esta
+        página está velha.
+      </footer>
+    </div>
+
+    <script type="module">
+      const LIGHT = {
+        background: ['#FFFFFF', 'Início, Jornada e leitor: superfície branca opaca'],
+        surface: ['#FFFFFF', 'Superfície de bloco'],
+        surfaceWarm: ['#F7F5F0', 'Áreas humanas: Juntos, tela do Dia'],
+        surfaceMuted: ['#F1EFE9', 'Círculos de ícone e avatar neutro'],
+        surfaceSunken: ['#EDEBE5', 'Fundo de estado e trilho de progresso'],
+        border: ['#E6E3DC', 'Filete de 1px; decorativo, nunca o único indicador'],
+        borderStrong: ['#D9D6CF', 'Dias futuros, alça de folha'],
+        controlBorder: ['#8A877F', 'Limite de controle não selecionado (desvio medido)'],
+        text: ['#111111', 'Tinta principal'],
+        textSecondary: ['#3F3D38', 'Parágrafos de apoio'],
+        textMuted: ['#5C5A54', 'Legendas e rótulos secundários'],
+        navInactive: ['#55534E', 'Aba inativa'],
+        accent: ['#FFD100', 'Amarelo da marca — preenchimento, nunca texto'],
+        accentSoft: ['#FFF3C4', 'Amarelo rebaixado para faixas largas'],
+        onAccent: ['#111111', 'Sobre amarelo só entra tinta'],
+        nodeDone: ['#3F3D38', 'Ponto de dia concluído na Jornada'],
+        markSurface: ['#111111', 'Marca invertida: fundo'],
+        onMark: ['#FFD100', 'Marca invertida: conteúdo'],
+        alertSurface: ['#111111', 'Faixa de alerta: fundo'],
+        onAlert: ['#FFFFFF', 'Faixa de alerta: conteúdo'],
+        success: ['#2F6B4F', 'Confirmação'],
+        warning: ['#7E601B', 'Atenção'],
+        danger: ['#9E3B33', 'Ação destrutiva'],
+        onDanger: ['#FFFFFF', 'Sobre vermelho'],
+        readerBackground: ['#FFFFFF', 'Fundo do leitor — sempre opaco'],
+      };
+      const DARK = {
+        background: ['#111111', ''], surface: ['#1A1A19', ''], surfaceWarm: ['#1A1917', ''],
+        surfaceMuted: ['#232220', ''], surfaceSunken: ['#0B0B0B', ''], border: ['#2E2C29', ''],
+        borderStrong: ['#3D3A36', ''], controlBorder: ['#8A857C', ''], text: ['#FFFFFF', ''],
+        textSecondary: ['#C7C4BD', ''], textMuted: ['#A6A29A', ''], navInactive: ['#A6A29A', ''],
+        accent: ['#FFD100', ''], accentSoft: ['#3A3100', ''], onAccent: ['#111111', ''],
+        nodeDone: ['#C7C4BD', ''], markSurface: ['#FFD100', 'Invertido: amarelo é o fundo'],
+        onMark: ['#111111', 'Invertido: tinta é o conteúdo'],
+        alertSurface: ['#6B6A63', 'Clareia para continuar sendo faixa sobre página de tinta'],
+        onAlert: ['#FFFFFF', ''], success: ['#6BBF92', ''], warning: ['#D6AC5A', ''],
+        danger: ['#E0817A', ''], onDanger: ['#111111', 'Branco aqui daria 2,77:1'],
+        readerBackground: ['#111111', ''],
+      };
+
+      const lum = (hex) => {
+        const c = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
+        const [r, g, b] = c.map((v) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4));
+        return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+      };
+      const ratio = (a, b) => {
+        const [hi, lo] = [lum(a), lum(b)].sort((x, y) => y - x);
+        return (hi + 0.05) / (lo + 0.05);
+      };
+
+      for (const [id, pal] of [['pal-light', LIGHT], ['pal-dark', DARK]]) {
+        document.getElementById(id).innerHTML = Object.entries(pal)
+          .map(
+            ([name, [hex, role]]) => `
+            <div class="sw">
+              <div class="chip" style="background:${hex}"></div>
+              <div class="meta">
+                <div class="name">${name}</div>
+                <div class="hex">${hex}</div>
+                ${role ? `<div class="role">${role}</div>` : ''}
+              </div>
+            </div>`,
+          )
+          .join('');
+      }
+
+      const PAIRS = [
+        ['Texto principal', 'text', 'background', 4.5],
+        ['Texto de apoio', 'textSecondary', 'background', 4.5],
+        ['Legenda', 'textMuted', 'background', 4.5],
+        ['Texto em área humana', 'text', 'surfaceWarm', 4.5],
+        ['Legenda em área humana', 'textMuted', 'surfaceWarm', 4.5],
+        ['Aba inativa', 'navInactive', 'background', 4.5],
+        ['Conteúdo da marca invertida', 'onMark', 'markSurface', 4.5],
+        ['Conteúdo da faixa de alerta', 'onAlert', 'alertSurface', 4.5],
+        ['Tinta sobre amarelo', 'onAccent', 'accent', 4.5],
+        ['Texto do leitor', 'text', 'readerBackground', 4.5],
+        ['Ação destrutiva', 'danger', 'background', 4.5],
+        ['Sobre vermelho', 'onDanger', 'danger', 4.5],
+        ['Limite de controle', 'controlBorder', 'background', 3],
+        ['Limite de controle em área humana', 'controlBorder', 'surfaceWarm', 3],
+        ['Faixa de alerta contra a página', 'alertSurface', 'background', 3],
+        [
+          'Amarelo contra a página',
+          'accent',
+          'background',
+          null,
+          'Não é reprovação: é a razão da regra. O amarelo sobre branco quase não se distingue, e é por isso que ele nunca é texto nem carrega informação sozinho — ele preenche uma forma cuja borda ou cujo conteúdo faz o contraste.',
+        ],
+      ];
+      const fmt = (n) => n.toFixed(2).replace('.', ',');
+      const cell = (v, min) =>
+        min === null
+          ? `<td class="num">${fmt(v)}:1</td>`
+          : `<td class="num ${v >= min ? 'pass' : 'fail'}">${fmt(v)}:1 ${v >= min ? '✓' : '✕'}</td>`;
+      document.getElementById('contrast').innerHTML =
+        `<tr><th>Par</th><th>Mínimo</th><th>Claro</th><th>Escuro</th></tr>` +
+        PAIRS.map(([label, fg, bg, min, note]) => {
+          const l = ratio(LIGHT[fg][0], LIGHT[bg][0]);
+          const d = ratio(DARK[fg][0], DARK[bg][0]);
+          return `<tr><td>${label}${note ? `<div class="role" style="margin-top:6px">${note}</div>` : ''}</td><td class="num">${
+            min === null ? '—' : `${fmt(min)}:1`
+          }</td>${cell(l, min)}${cell(d, min)}</tr>`;
+        }).join('');
+
+      const A = (w) => `Archivo, sans-serif`;
+      const TYPE = [
+        ['displayXl', 84, 80, -3.8, 900, 'Archivo', 'Dia 100', 'Numeral da Jornada e da chegada'],
+        ['display', 56, 55, -2.3, 900, 'Archivo', '100 dias. Uma igreja.', 'Título de boas-vindas'],
+        ['screenTitle', 34, 35, -1, 800, 'Archivo', 'Sua jornada', 'Título de tela'],
+        ['blockTitleLg', 30, 34, -0.6, 800, 'Archivo', 'O que ficou com você hoje?', 'Título grande de bloco'],
+        ['blockTitle', 26, 30, -0.5, 800, 'Archivo', 'Uma geração de coragem', 'Título de bloco'],
+        ['body', 17, 26, 0, 500, 'Archivo', 'A igreja inteira lê a mesma coisa, no mesmo dia.', 'Parágrafo de interface'],
+        ['action', 17, 20, 0, 700, 'Archivo', 'Concluir leitura', 'Rótulo de ação'],
+        ['item', 15.5, 20, 0, 600, 'Archivo', 'Meu ministério', 'Item de lista'],
+        ['secondary', 15, 22, 0, 500, 'Archivo', 'Um aviso local por dia com quem conduz o altar.', 'Texto secundário'],
+        ['muted', 13, 18, 0, 600, 'Archivo', 'Registro privado. Fica só neste aparelho.', 'Apoio silenciado'],
+        ['caption', 12.5, 16, 0, 600, 'Archivo', '12 capítulos · ~36 min', 'Legenda'],
+        ['tick', 11.5, 15, 0, 600, 'Archivo', '23/09/2026', 'Marcação de trilho'],
+        ['cap', 11, 14, 1.54, 700, 'Archivo', 'Tema de hoje', 'Cap de seção, caixa alta'],
+        ['read', 18, 30.6, 0, 400, 'Literata', 'No princípio criou Deus os céus e a terra.', 'Leitura bíblica'],
+        ['editor', 19, 30.4, 0, 400, 'Literata', 'Escreva à vontade.', 'Campo de reflexão'],
+        ['quote', 16.5, 24, 0, 400, 'Literata', 'O fogo arderá continuamente sobre o altar.', 'Citação'],
+        ['readItalic', 17, 25.5, 0, 400, 'Literata', 'Fala da liderança', 'Itálico de leitura'],
+        ['verse', 11, 16, 0, 600, 'Archivo', '14', 'Numeral de versículo'],
+      ];
+      document.getElementById('type').innerHTML = TYPE.map(
+        ([name, size, lh, ls, weight, family, sample, role]) => `
+        <div class="spec">
+          <div class="sample" style="font-family:${family},serif;font-size:${size}px;line-height:${lh}px;letter-spacing:${ls}px;font-weight:${weight};${
+            name === 'cap' ? 'text-transform:uppercase;' : ''
+          }${family === 'Literata' && name === 'readItalic' ? 'font-style:italic;' : ''}">${sample}</div>
+          <div class="facts">${name} · ${family} ${weight} · ${size}/${lh}${ls ? ` · ${ls}` : ''}<br />${role}</div>
+        </div>`,
+      ).join('');
+
+      document.getElementById('spacing').innerHTML = [4, 8, 12, 16, 24, 32]
+        .map((v) => `<div class="unit"><div class="bar" style="width:${v}px;height:${v}px"></div><div class="lbl">${v}</div></div>`)
+        .join('');
+      document.getElementById('radius').innerHTML = [
+        ['sm', 8], ['button', 14], ['buttonLg', 16], ['block', 20], ['blockLg', 22], ['card', 24], ['sheet', 28], ['pill', 999],
+      ]
+        .map(
+          ([n, v]) =>
+            `<div class="unit"><div class="bar" style="width:64px;height:44px;border-radius:${Math.min(v, 22)}px"></div><div class="lbl">${n} ${v}</div></div>`,
+        )
+        .join('');
+    </script>
+  </body>
+</html>

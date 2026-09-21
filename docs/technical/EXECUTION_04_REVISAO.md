@@ -1,6 +1,6 @@
 # EXECUTION 04 — revisão adversarial e correções
 
-- **Data:** 2026-09-20 · **Estado:** oito frentes corrigidas — as três primeiras em `99eb57b`, os grupos A e H em `f4b60f5`, os grupos C e D em `1fa80e4`; o grupo B está na árvore de trabalho
+- **Data:** 2026-09-20 · **Estado:** oito frentes corrigidas e commitadas — as três primeiras em `99eb57b`, os grupos A e H em `f4b60f5`, os grupos C e D em `1fa80e4`, o grupo B em `ba686a2`
 - **Método:** cinco lentes independentes (design, conteúdo, acessibilidade, correção, completude) produziram
   64 achados; cada achado foi submetido a três refutadores com ângulos distintos (reprodução no código,
   regra escrita que viola, impacto real). Sobrevive o que dois dos três não conseguiram refutar.
@@ -233,16 +233,22 @@ prova de layout é aparelho real com AX5 ligado — que ainda não foi feita.
 
 ## 3. Os achados confirmados que continuam abertos
 
-Os grupos A, H, C, D e B saíram desta tabela: foram corrigidos (seções 1.4 a 1.14). Restam 28.
+Os grupos A, H, C, D e B saíram desta tabela: foram corrigidos (seções 1.4 a 1.14).
+
+**Correção de contagem (2026-09-20).** As contagens anteriores desta seção estavam erradas: os grupos não
+somavam o total declarado. Recontados um a um sobre os dados da revisão: **48 confirmados, 24 corrigidos,
+24 em aberto**. Dois achados foram fechados de passagem pelo grupo B — o `height: 24` inerte do botão
+"Desfazer" e a ênfase do dia truncada a uma linha no bloco de intercessão — e o literal `#FFD100` de
+`juntos.tsx` foi resolvido pelo grupo A, restando nesse achado os outros dois literais.
 
 Agrupados por trabalho, não por arquivo.
 
 | # | Tema | Achados | Severidade | Por que importa |
 |---|---|---|---|---|
-| E | **Leitor de tela** (estado "concluído" não anunciado, rótulos com "~" e "·", cabeçalhos não marcados, anúncio triplicado no modo altar) | 7 | 1 médio | |
-| F | **Cópia e consistência** (altar descrito de três jeitos; "hoje" em dia que não é hoje; "Tema" onde a igreja diz "Ênfase"; enum `pending_authorization` exposto) | 6 | 2 médios | |
-| G | **Jejum** (continua como "propósito" da campanha e ganhou superfície nova, sem a confirmação da igreja) | 2 | 1 médio | Depende de resposta da igreja, não de código |
-| I | **Tokens e higiene** (cores literais fora de `theme.ts`, `gutter.block` sem uso, código sem consumidor, teste tautológico, marco gravado duas vezes) | 14 | baixos | |
+| E | **Leitor de tela** (estado "concluído" não anunciado, rótulos com "~" e "·" lidos como "til" e "ponto", cabeçalho da Jornada não marcado, anúncio triplicado no modo altar, motivo de falha silencioso no iOS) | 7 | 2 médios | |
+| F | **Cópia e consistência** (altar descrito de três jeitos; "hoje" em dia que não é hoje; "Tema" onde a igreja diz "Ênfase"; enum `pending_authorization` exposto; barra de status invisível nas telas de tinta; "Dia 1" antes da campanha começar) | 7 | 1 médio | |
+| G | **Jejum** (continua como "propósito" da campanha e ganhou superfície nova, sem a confirmação da igreja) | 2 | 2 médios | Depende de resposta da igreja, não de código |
+| I | **Tokens e higiene** (cores literais fora de `theme.ts`, `gutter.block` sem uso, código sem consumidor, teste tautológico, marco gravado duas vezes, lembrete com dia num fuso e hora noutro) | 8 | baixos | |
 
 **Recomendação de ordem:** E e F como um passe único de cópia e acessibilidade; G quando a igreja responder;
 I por último. Antes de qualquer um deles, o passe de acessibilidade que a auditoria do grupo B abriu e que
