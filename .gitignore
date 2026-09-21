@@ -27,3 +27,6 @@ content-pipeline/raw/
 
 # Configuração local do preview no navegador (por máquina, não é do produto)
 **/.claude/launch.json
+
+# Saída do scripts/loja/capturas.mjs (capturas da loja, regeneráveis)
+mobile/capturas-loja/

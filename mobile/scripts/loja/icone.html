@@ -1,0 +1,46 @@
+<!doctype html>
+<!--
+  Ícone PROVISÓRIO tipográfico do app "100 dias".
+  PROVISÓRIO (decisão do engenheiro, 2026-09-21: o designer ainda não entregou o ícone e o envio à App Store é na terça;
+  "100" em Schibsted Grotesk 800 sobre o amarelo da marca, sem logo da igreja para não depender da marca).
+  Não abrir à mão: quem usa é scripts/loja/gerar-icone.mjs, que passa o modo no hash:
+    #ios        1024x1024, fundo #FFD100 opaco, "100" grande (o iOS arredonda os cantos sozinho)
+    #android    1024x1024 transparente, "100" dentro da zona segura do ícone adaptativo (66 de 108 dp)
+    #monocromo  igual ao android; o Android 13+ usa só o alfa para o ícone temático
+-->
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<style>
+  @font-face {
+    font-family: 'Schibsted Grotesk';
+    font-weight: 800;
+    src: url('../../node_modules/@expo-google-fonts/schibsted-grotesk/800ExtraBold/SchibstedGrotesk_800ExtraBold.ttf') format('truetype');
+  }
+  html, body { margin: 0; padding: 0; width: 1024px; height: 1024px; overflow: hidden; background: transparent; }
+  .quadro {
+    width: 1024px; height: 1024px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .ios { background: #FFD100; }
+  .numero {
+    font-family: 'Schibsted Grotesk', sans-serif;
+    font-weight: 800;
+    color: #111111;
+    line-height: 1;
+    letter-spacing: -0.04em;
+    font-variant-numeric: lining-nums;
+  }
+  /* Tamanhos medidos pelo gerar-icone.mjs (caixa da tinta impressa no fim). */
+  .ios .numero { font-size: 440px; }
+  .android .numero { font-size: 290px; }
+</style>
+</head>
+<body>
+<div id="q" class="quadro"><span class="numero">100</span></div>
+<script>
+  var modo = (location.hash || '#ios').slice(1);
+  document.getElementById('q').className = 'quadro ' + (modo === 'ios' ? 'ios' : 'android');
+</script>
+</body>
+</html>
