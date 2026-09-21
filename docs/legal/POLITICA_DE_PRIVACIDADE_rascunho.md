@@ -226,7 +226,7 @@ como na Parte 1.
 |---|---|---|
 | **E-mail** | Ao criar conta ou entrar | Enviar o código de acesso de 6 dígitos e identificar sua conta |
 | **Identificador da conta** (um código aleatório) | Ao criar conta | Ligar suas publicações a você |
-| **Nome de exibição** e **foto de perfil** (se você puser) | Ao preparar seu perfil na Comunidade | Mostrar quem publicou |
+| **Nome de exibição** | Ao preparar seu perfil na Comunidade | Mostrar quem publicou |
 | **Faixa de idade** declarada | No cadastro | Liberar a Comunidade só para maiores de 18 |
 | **Código de entrada** da igreja usado | Ao entrar na Comunidade | Garantir que só pessoas da igreja vejam as publicações |
 | **Registro do seu consentimento** (qual texto você aceitou, e quando) | Ao aceitar | Provar que você concordou (LGPD art. 8º) |
@@ -397,7 +397,7 @@ publicidade.** Nada é "compartilhado" no sentido do Google, porque o Supabase e
 | Identificador da conta | Identifiers > User ID | Personal info > User IDs | App functionality; Account management | Obrigatório para ter conta |
 | Faixa de idade | {Other Data} | {Personal info > Other info} | App functionality (controle de idade) | Obrigatório para ter conta |
 | Participação na Comunidade de uma igreja | Sensitive Info (crenças religiosas) | Personal info > Political or religious beliefs | App functionality | Opcional (só quem consente) |
-| Foto publicada e foto de perfil | User Content > Photos or Videos | Photos and videos > Photos | App functionality | Opcional |
+| Foto publicada | User Content > Photos or Videos | Photos and videos > Photos | App functionality | Opcional |
 | Texto publicado e comentários | User Content > Other User Content | App activity > Other user-generated content | App functionality | Opcional |
 | Amém, denúncias, bloqueios | User Content > Other User Content; {Usage Data > Product Interaction} | App activity > App interactions | App functionality; segurança | Opcional |
 | IP e registros de acesso | {Identifiers / Other Data — avaliar} | {Device or other IDs — avaliar} | Segurança; prevenção de fraude | Automático |

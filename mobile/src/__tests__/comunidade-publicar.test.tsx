@@ -199,7 +199,7 @@ beforeEach(() => {
 describe('textos', () => {
   test('a frase de quem vê é a do rascunho §3, com o campo em aberto entre colchetes', () => {
     expect(audienceSentence()).toBe(
-      'Sua publicação aparece, com o seu nome e a sua foto de perfil, para as pessoas que entraram na comunidade da ' +
+      'Sua publicação aparece, com o seu nome, para as pessoas que entraram na comunidade da ' +
         '[NOME DA IGREJA] com um código da igreja — hoje cerca de [N] pessoas maiores de 18 anos. Algumas você não ' +
         'conhece.',
     );

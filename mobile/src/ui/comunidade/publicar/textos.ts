@@ -111,7 +111,7 @@ export function hasOpenFields(text: string): boolean {
  */
 export function audienceSentence(campos: Record<CampoId, string | null> = CAMPOS): string {
   return (
-    `Sua publicação aparece, com o seu nome e a sua foto de perfil, para as pessoas que entraram na comunidade da ` +
+    `Sua publicação aparece, com o seu nome, para as pessoas que entraram na comunidade da ` +
     `${campo('nomeIgreja', campos)} com um código da igreja — hoje cerca de ${campo('pessoasNaComunidade', campos)} ` +
     `pessoas maiores de 18 anos. Algumas você não conhece.`
   );
@@ -149,7 +149,7 @@ export function rulesDocument(campos: Record<CampoId, string | null> = CAMPOS): 
         title: 'Um lugar para a igreja ler junto.',
         paragraphs: [
           'Aqui a gente conta o que Deus falou durante a leitura, ora uns pelos outros e se anima a não desistir. ' +
-            'Tudo o que você escreve aparece com o seu nome e a sua foto de perfil para as pessoas da igreja que ' +
+            'Tudo o que você escreve aparece com o seu nome para as pessoas da igreja que ' +
             'entraram na comunidade com um código. Algumas você não conhece. Escreva como escreveria para um irmão ' +
             'na porta do templo.',
         ],
@@ -279,7 +279,7 @@ export function consentDocument(campos: Record<CampoId, string | null> = CAMPOS)
       {
         title: 'O que você autoriza',
         bullets: [
-          'Mostrar o que você publicar (texto e foto), com o seu nome e a sua foto de perfil, para essas pessoas.',
+          'Mostrar o que você publicar (texto e foto), com o seu nome, para essas pessoas.',
           'Mostrar os seus comentários do mesmo jeito. O seu Amém fica guardado, mas ninguém vê quem deu Amém nem ' +
             'quantos foram.',
           'Uma pessoa da equipe da igreja olhar as suas fotos antes de aparecerem, e um programa conferir seus ' +

@@ -110,7 +110,7 @@ entre as 32. O resumo de cada item está em `01-lojas.md` §3 e §6.
     Isso responde também o que acontece quando alguém sem conta toca Amém, comentar ou "Escrever".
 30. **Uma frase só sobre quem vê**, idêntica em C3, C4 e B4. Hoje C3 diz "toda a igreja" e C4 diz "qualquer pessoa que
     baixar o app". Com textos diferentes, o consentimento pode ser anulado (LGPD art. 9º §1º). Rascunho, ainda sem
-    revisão de advogado: *"Sua publicação aparece, com o seu nome e a sua foto de perfil, para as pessoas que entraram
+    revisão de advogado: *"Sua publicação aparece, com o seu nome, para as pessoas que entraram
     na comunidade da [NOME DA IGREJA] com um código da igreja — hoje cerca de [N] pessoas maiores de 18 anos. Algumas
     você não conhece."* No B4, a segunda frase sobre o que é "só para você" continua (`COMUNIDADE_REGRAS...` §3).
 31. **Caminho completo até publicar:** conta, idade (só maiores de 18), código, regras, consentimento. Hoje o mapa vai

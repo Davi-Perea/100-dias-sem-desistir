@@ -66,7 +66,7 @@ disponíveis a qualquer momento pelo feed (C1) e pela tela de publicar (C3), num
 
 **Um lugar para a igreja ler junto.**
 Aqui a gente conta o que Deus falou durante a leitura, ora uns pelos outros e se anima a não desistir. Tudo o que
-você escreve aparece com o seu nome e a sua foto de perfil para as pessoas da igreja que entraram na comunidade com
+você escreve aparece com o seu nome para as pessoas da igreja que entraram na comunidade com
 um código. Algumas você não conhece. Escreva como escreveria para um irmão na porta do templo.
 
 **O que cabe aqui**
@@ -167,7 +167,7 @@ Link secundário: **Agora não** (volta sem publicar; a pessoa pode guardar a re
 |---|---|---|
 | "Qualquer pessoa que baixar o app vê a sua publicação" | Contradiz C3 ("toda a igreja"); na opção recomendada é falso (sem código não entra) | Frase única de audiência (parte 3) |
 | "Uma vez na vida, e depois nunca mais" | Texto novo exige novo pedido (LGPD art. 8º, §6º) | Com versão; pede de novo se o texto mudar |
-| Não fala de nome e foto de perfil, comentário, Amém | Autorização precisa enumerar finalidades (art. 8º, §4º; art. 11, I) | Lista o que vai junto |
+| Não fala de nome, comentário, Amém | Autorização precisa enumerar finalidades (art. 8º, §4º; art. 11, I) | Lista o que vai junto |
 | Não diz que alguém da igreja olha as fotos | A pessoa precisa saber como funciona | Diz |
 | Não diz o que acontece se desistir | Revogar deve ser fácil e o efeito, claro | Desistir = sai do ar |
 | Não diz até quando fica visível | Faltava | Diz a data (campo) |
@@ -186,12 +186,12 @@ O que você escrever aqui fala da sua fé. A lei brasileira trata isso como dado
 todas as letras, numa tela só para isso.
 
 **Quem vê (frase única, parte 3):**
-> Sua publicação aparece, com o seu nome e a sua foto de perfil, para as pessoas que entraram na comunidade da
+> Sua publicação aparece, com o seu nome, para as pessoas que entraram na comunidade da
 > `[NOME DA IGREJA]` com um código da igreja — hoje cerca de `[N]` pessoas maiores de 18 anos. Algumas você não
 > conhece.
 
 **O que você autoriza** (itens com o marcador amarelo do desenho):
-1. Mostrar o que você publicar (texto e foto), com o seu nome e a sua foto de perfil, para essas pessoas.
+1. Mostrar o que você publicar (texto e foto), com o seu nome, para essas pessoas.
 2. Mostrar os seus comentários do mesmo jeito. O seu Amém fica guardado, mas ninguém vê quem deu Amém nem quantos
    foram.
 3. Uma pessoa da equipe da igreja olhar as suas fotos antes de aparecerem, e um programa conferir seus textos. A equipe
@@ -239,7 +239,7 @@ Estes pontos são condição para o texto acima ser verdade. Se algum não valer
 **Esta frase precisa aparecer idêntica, palavra por palavra, em C3, C4 e B4.** Se uma tela disser uma coisa e outra
 tela disser outra, o consentimento corre o risco de ser nulo (LGPD art. 9º, §1º).
 
-> **Sua publicação aparece, com o seu nome e a sua foto de perfil, para as pessoas que entraram na comunidade da
+> **Sua publicação aparece, com o seu nome, para as pessoas que entraram na comunidade da
 > `[NOME DA IGREJA]` com um código da igreja — hoje cerca de `[N]` pessoas maiores de 18 anos. Algumas você não
 > conhece.**
 
