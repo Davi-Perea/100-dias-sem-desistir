@@ -5,9 +5,13 @@ import { updateSettings, useSettings, type ReadingMode } from '@/settings/settin
 import { Button, ChoiceRow } from '@/ui/components';
 import { OnboardingStep, StepSupport } from '@/ui/OnboardingStep';
 
-/** Rótulos exatos do F2. As descrições de antes saíram com o desenho. */
+/**
+ * Rótulos do F2. As descrições de antes saíram com o desenho. "Ler aqui no app"
+ * virou "Seguir o guia no app" (2026-09-21): sem tradução licenciada (Gate 1) o
+ * app não mostra o texto bíblico, e o rótulo prometia isso.
+ */
 const OPTIONS: { mode: ReadingMode; label: string }[] = [
-  { mode: 'in_app', label: 'Ler aqui no app' },
+  { mode: 'in_app', label: 'Seguir o guia no app' },
   { mode: 'own_bible', label: 'Usar a minha Bíblia' },
   { mode: 'both', label: 'Vou alternar' },
 ];

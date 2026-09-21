@@ -68,6 +68,29 @@ function loadCampaignOnDay(day: number) {
 }
 
 let campaignId = '';
+
+/**
+ * Provedor com texto (licenciado, de teste): liga o modo TEXTO do leitor — o do
+ * "Aa", da folha B3 e do "Prefiro ler na minha Bíblia". Sem ele, o leitor é o
+ * guia (leitor-guia.test.tsx). A frase é escrita para o teste, nunca bíblica.
+ */
+const licensed: BibleTextProvider = {
+  getMetadata: () => ({
+    ...devBibleProvider.getMetadata(),
+    id: 'licenciada-teste',
+    copyrightNotice: 'Atribuição de teste.',
+    attributionRequired: true,
+    isDevPlaceholder: false,
+  }),
+  getPassage: async (reference) => ({
+    reference: `${reference.book} ${reference.chapterStart}`,
+    book: reference.book,
+    bookName: reference.book,
+    chapter: reference.chapterStart,
+    verses: [{ verse: 1, text: 'Frase de teste.' }],
+  }),
+};
+
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const mockRouter = require('expo-router').router as { back: jest.Mock; replace: jest.Mock };
 
@@ -138,7 +161,8 @@ describe('tamanho do texto: 14 a 30, padrão 19, extremos alcançáveis', () => 
 /* ------------------------------------------------------------------------ B1 */
 
 describe('B1 · leitor', () => {
-  test('barra: fechar, título, posição sem símbolo falado, "Aa" e filete', async () => {
+  test('com texto, a barra tem fechar, título, posição sem símbolo falado, "Aa" e filete', async () => {
+    setBibleProvider(licensed);
     await render(<ReaderScreen />);
     const first = chaptersOf(TODAY)[0];
     const total = chaptersOf(TODAY).length;
@@ -158,18 +182,11 @@ describe('B1 · leitor', () => {
     expect(progress.props.accessibilityRole).toBeUndefined();
   });
 
-  test('sem tradução licenciada: cap, numeral e a caixa do TELAS — e nenhum versículo numerado', async () => {
+  test('sem tradução licenciada o leitor é o guia, sem caixa "não liberado" e sem versículo numerado', async () => {
     await render(<ReaderScreen />);
-    const first = chaptersOf(TODAY)[0];
-    await waitFor(() => expect(screen.getByTestId('reader-not-released')).toBeTruthy());
-
-    expect(screen.getByText('Texto ainda não liberado')).toBeTruthy();
-    expect(
-      screen.getByText(
-        `Nenhuma tradução bíblica é exibida enquanto a licença não estiver resolvida. Abra na sua Bíblia em ${first.bookName} ${first.chapter} e volte para marcar.`,
-      ),
-    ).toBeTruthy();
-    expect(screen.getByTestId('reader-chapter-numeral').props.children).toBe(first.chapter);
+    await waitFor(() => expect(screen.getByTestId('reader-guide')).toBeTruthy());
+    expect(screen.queryByTestId('reader-not-released')).toBeNull();
+    expect(screen.queryByText(/não liberado/i)).toBeNull();
     // Estrutura de versículos não existe como dado: nada de numerar (LACUNAS B1).
     expect(screen.queryByLabelText(/^Versículo /)).toBeNull();
     // As frases DEV do provedor de exemplo não aparecem como se fossem leitura.
@@ -213,7 +230,8 @@ describe('B1 · leitor', () => {
     expect(screen.queryByLabelText('Concluir leitura')).toBeNull();
   });
 
-  test('D-1 (P-09): "Prefiro ler na minha Bíblia" grava o modo e volta, sem concluir o dia', async () => {
+  test('D-1 (P-09): com texto, "Prefiro ler na minha Bíblia" grava o modo e volta, sem concluir o dia', async () => {
+    setBibleProvider(licensed);
     await render(<ReaderScreen />);
     await waitFor(() => expect(screen.getByTestId('reader-own-bible')).toBeTruthy());
     await fireEvent.press(screen.getByTestId('reader-own-bible'));
@@ -227,22 +245,6 @@ describe('B1 · leitor', () => {
   });
 
   test('com tradução licenciada, o texto aparece sem teto de escala e com a atribuição', async () => {
-    const licensed: BibleTextProvider = {
-      getMetadata: () => ({
-        ...devBibleProvider.getMetadata(),
-        id: 'licenciada-teste',
-        copyrightNotice: 'Atribuição de teste.',
-        attributionRequired: true,
-        isDevPlaceholder: false,
-      }),
-      getPassage: async (reference) => ({
-        reference: `${reference.book} ${reference.chapterStart}`,
-        book: reference.book,
-        bookName: reference.book,
-        chapter: reference.chapterStart,
-        verses: [{ verse: 1, text: 'Frase de teste.' }],
-      }),
-    };
     setBibleProvider(licensed);
     await render(<ReaderScreen />);
 
@@ -250,7 +252,7 @@ describe('B1 · leitor', () => {
     expect(verse.props.maxFontSizeMultiplier).toBeUndefined();
     expect(StyleSheet.flatten(verse.props.style)).toMatchObject({ fontSize: 19, lineHeight: 32.3 });
     expect(screen.getByTestId('reader-attribution')).toBeTruthy();
-    expect(screen.queryByTestId('reader-not-released')).toBeNull();
+    expect(screen.queryByTestId('reader-guide')).toBeNull();
   });
 });
 
@@ -285,7 +287,9 @@ describe('B2 · rodapé empilha quando o rótulo não cabe em uma linha (medido)
 
 /* ------------------------------------------------------------------------ B3 */
 
-describe('B3 · folha "Tamanho do texto"', () => {
+describe('B3 · folha "Tamanho do texto" (só existe com texto licenciado)', () => {
+  beforeEach(() => setBibleProvider(licensed));
+
   test('amostra sem teto, valor em pt, passos até os extremos', async () => {
     await render(<ReaderScreen />);
     await waitFor(() => expect(screen.getByTestId('reader-text-size')).toBeTruthy());

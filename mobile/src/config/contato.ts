@@ -8,6 +8,9 @@
  *
  * Atenção antes de enviar: a App Store (diretriz 1.5) exige um meio de contato
  * alcançável no app, e as duas lojas pedem a URL da política de privacidade.
+ * A variante production do app.config.ts (assertContactForStore) RECUSA gerar o
+ * build de loja enquanto algum dos dois for null ou a URL não for https.
+ * Sem e-mail, a tela e a linha em Você se chamam "Ajuda" (não "Ajuda e contato").
  */
 
 /** E-mail de suporte (ex.: "contato@igreja.org"). Preenchido pelo fundador antes do envio. */

@@ -12,7 +12,7 @@ import { BUNDLED_CONTENT, loadDataset, resetToBundledContent } from '@/journey/d
 import { calendarDateInCampaignTz } from '@/journey/officialDay';
 import { _resetCompletionsCacheForTests, setDayCompleted } from '@/progress/completionsStore';
 import { devBibleProvider } from '@/reader/devProvider';
-import { setBibleProvider } from '@/reader/provider';
+import { setBibleProvider, type BibleTextProvider } from '@/reader/provider';
 import { _resetReflectionsCacheForTests, saveReflection } from '@/reflections/reflectionsStore';
 import { _resetSettingsCacheForTests, loadSettings, SETTINGS_KEY } from '@/settings/settingsStore';
 
@@ -81,8 +81,16 @@ async function seedSettings(patch: Record<string, unknown> = {}) {
   _resetSettingsCacheForTests();
 }
 
+/** Provedor licenciado de teste: só com ele existe a seção de tamanho do texto. */
+const licensed: BibleTextProvider = {
+  getMetadata: () => ({ ...devBibleProvider.getMetadata(), id: 'licenciada-teste', isDevPlaceholder: false }),
+  getPassage: devBibleProvider.getPassage,
+};
+
 beforeEach(async () => {
   await AsyncStorage.clear();
+  // Gate 1 aberto: o padrão é o provedor sem texto (o leitor é um guia).
+  setBibleProvider(devBibleProvider);
   _resetCompletionsCacheForTests();
   _resetFastingCacheForTests();
   _resetReflectionsCacheForTests();
@@ -149,7 +157,8 @@ describe('D1 · Você', () => {
       await fireEvent.press(screen.getByTestId(id));
       expect(mockRouter.push).toHaveBeenLastCalledWith(route);
     }
-    expect(within(screen.getByTestId('row-help')).getByText('Ajuda e contato')).toBeTruthy();
+    // Sem e-mail de suporte preenchido, a linha não promete contato (1.5).
+    expect(within(screen.getByTestId('row-help')).getByText('Ajuda')).toBeTruthy();
   });
 
   test('o lembrete escolhido aparece em HH:MM', async () => {
@@ -173,7 +182,8 @@ describe('telas que saem de Você', () => {
   test('Ajuda nunca mostra o valor técnico dos direitos', async () => {
     setBibleProvider(devBibleProvider);
     await render(<HelpScreen />);
-    expect(screen.getByText('Ajuda e contato')).toBeTruthy();
+    expect(screen.getByText('Ajuda')).toBeTruthy();
+    expect(screen.queryByText('Ajuda e contato')).toBeNull();
     expect(screen.queryByText(/pending_authorization|dev_fixture|partially_authorized/)).toBeNull();
     expect(screen.getByTestId('help-rights').props.children.join('')).toMatch(
       /Situação dos direitos: aguardando autorização escrita da igreja\./,
@@ -194,6 +204,7 @@ describe('telas que saem de Você', () => {
   });
 
   test('Tamanho da letra segue a escala do leitor (B3) dentro de 14–30 e não tem opção de estatísticas', async () => {
+    setBibleProvider(licensed);
     await seedSettings({ readerFontSize: 29 });
     await render(<AppearanceScreen />);
     await waitFor(() => expect(screen.getByTestId('font-bigger')).toBeTruthy());
@@ -206,6 +217,7 @@ describe('telas que saem de Você', () => {
   });
 
   test('Tamanho da letra: o 18 antigo chega como 19 (mesma escala do leitor)', async () => {
+    setBibleProvider(licensed);
     await seedSettings({ readerFontSize: 18 });
     expect((await loadSettings()).readerFontSize).toBe(19);
     await render(<AppearanceScreen />);

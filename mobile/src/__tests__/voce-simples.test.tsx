@@ -193,7 +193,9 @@ describe('Ajuda e contato', () => {
   test('sem e-mail preenchido, a seção de contato não aparece', async () => {
     setBibleProvider(devBibleProvider);
     await render(<HelpScreen />);
-    expect(screen.getByText('Ajuda e contato')).toBeTruthy();
+    // O título não promete um contato que não existe (1.5).
+    expect(screen.getByText('Ajuda')).toBeTruthy();
+    expect(screen.queryByText('Ajuda e contato')).toBeNull();
     expect(screen.queryByTestId('help-contact')).toBeNull();
     expect(screen.queryByText('Fale com a gente')).toBeNull();
   });
@@ -202,6 +204,7 @@ describe('Ajuda e contato', () => {
     mockContact.email = 'contato@exemplo.org';
     setBibleProvider(devBibleProvider);
     await render(<HelpScreen />);
+    expect(screen.getByText('Ajuda e contato')).toBeTruthy();
     expect(screen.getByText('Fale com a gente')).toBeTruthy();
     await fireEvent.press(screen.getByTestId('help-contact'));
     expect(openURL).toHaveBeenCalledWith('mailto:contato@exemplo.org');

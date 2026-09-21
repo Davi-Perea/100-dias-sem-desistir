@@ -212,7 +212,8 @@ describe('E4 · chegada do Dia 100', () => {
 
   test('botões do desenho, e "Ver minhas reflexões" vai às reflexões', async () => {
     await render(<MilestoneScreen />);
-    await waitFor(() => expect(screen.getByText('Guardar minha jornada')).toBeTruthy());
+    await waitFor(() => expect(screen.getByText('Continuar a jornada')).toBeTruthy());
+    expect(screen.queryByText('Guardar minha jornada')).toBeNull();
     expect(screen.getByTestId('content-banner')).toBeTruthy();
     fireEvent.press(screen.getByTestId('milestone-reflections'));
     expect(mockRouter.replace).toHaveBeenCalledWith('/reflexoes');

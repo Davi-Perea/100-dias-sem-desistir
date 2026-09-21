@@ -18,7 +18,7 @@ import { listMinistries } from '@/journey/ministries';
 import { calendarDateInCampaignTz } from '@/journey/officialDay';
 import { _resetCompletionsCacheForTests, setDayCompleted } from '@/progress/completionsStore';
 import { devBibleProvider } from '@/reader/devProvider';
-import { setBibleProvider } from '@/reader/provider';
+import { setBibleProvider, type BibleTextProvider } from '@/reader/provider';
 import { _resetFastingCacheForTests } from '@/fasting/fastingStore';
 import { _resetReflectionsCacheForTests } from '@/reflections/reflectionsStore';
 import { _resetSettingsCacheForTests, loadSettings, SETTINGS_KEY } from '@/settings/settingsStore';
@@ -122,8 +122,16 @@ async function seedSettings(patch: Record<string, unknown> = {}) {
 
 let announce: jest.SpyInstance;
 
+/** Provedor licenciado de teste: só com ele existe a seção de tamanho do texto. */
+const licensed: BibleTextProvider = {
+  getMetadata: () => ({ ...devBibleProvider.getMetadata(), id: 'licenciada-teste', isDevPlaceholder: false }),
+  getPassage: devBibleProvider.getPassage,
+};
+
 beforeEach(async () => {
   await AsyncStorage.clear();
+  // Gate 1 aberto: o padrão é o provedor sem texto (o leitor é um guia).
+  setBibleProvider(devBibleProvider);
   _resetCompletionsCacheForTests();
   _resetFastingCacheForTests();
   _resetReflectionsCacheForTests();
@@ -190,7 +198,7 @@ describe('D1 · Você', () => {
     await seedSettings();
     await render(<YouScreen />);
     await waitFor(() => expect(screen.getByTestId('row-reading')).toBeTruthy());
-    expect(screen.getByTestId('row-reading').props.accessibilityLabel).toBe('Leitura, Aqui no app');
+    expect(screen.getByTestId('row-reading').props.accessibilityLabel).toBe('Leitura, Guia no app');
     await fireEvent.press(screen.getByTestId('row-reading'));
     expect(mockRouter.push).toHaveBeenLastCalledWith({ pathname: '/aparencia', params: { secao: 'leitura' } });
     expect(screen.queryByText(/dados de uso/)).toBeNull();
@@ -209,13 +217,14 @@ describe('Tamanho da letra / Como eu leio', () => {
     await seedSettings();
     await render(<AppearanceScreen />);
     await waitFor(() => expect(screen.getByTestId('mode-in_app')).toBeTruthy());
-    expect(within(screen.getByTestId('mode-in_app')).getByText('Ler aqui no app')).toBeTruthy();
+    expect(within(screen.getByTestId('mode-in_app')).getByText('Seguir o guia no app')).toBeTruthy();
     expect(within(screen.getByTestId('mode-own_bible')).getByText('Usar a minha Bíblia')).toBeTruthy();
     expect(within(screen.getByTestId('mode-both')).getByText('Vou alternar')).toBeTruthy();
     expect(screen.queryByText(/tela de hoje|marca o dia|Depende do dia/)).toBeNull();
   });
 
   test('R2-3: aberta por "Tamanho da letra", o tamanho vem primeiro', async () => {
+    setBibleProvider(licensed);
     await seedSettings();
     await render(<AppearanceScreen />);
     await waitFor(() => expect(screen.getByTestId('font-sample')).toBeTruthy());
@@ -225,6 +234,7 @@ describe('Tamanho da letra / Como eu leio', () => {
   });
 
   test('R2-3: aberta por "Leitura", o título e a primeira seção são "Como eu leio"', async () => {
+    setBibleProvider(licensed);
     mockParams.current = { secao: 'leitura' };
     await seedSettings();
     await render(<AppearanceScreen />);
@@ -236,6 +246,29 @@ describe('Tamanho da letra / Como eu leio', () => {
     expect(headers[1]).toBe('Tamanho do texto de leitura');
     await fireEvent.press(screen.getByTestId('mode-own_bible'));
     await waitFor(async () => expect((await loadSettings()).readingMode).toBe('own_bible'));
+  });
+
+  test('Gate 1 aberto (guia): sem seção de tamanho, que não teria efeito em tela nenhuma', async () => {
+    mockParams.current = { secao: 'leitura' };
+    await seedSettings();
+    await render(<AppearanceScreen />);
+    await waitFor(() => expect(screen.getByTestId('mode-in_app')).toBeTruthy());
+    const headers = screen.getAllByRole('header').map((node) => node.props.children);
+    expect(headers[0]).toBe('Como eu leio');
+    expect(headers).toContain('Do seu aparelho');
+    expect(headers).not.toContain('Tamanho do texto de leitura');
+    expect(screen.queryByTestId('font-sample')).toBeNull();
+    expect(screen.queryByTestId('font-smaller')).toBeNull();
+    expect(screen.queryByTestId('font-bigger')).toBeNull();
+    expect(screen.queryByText(/também cresce/)).toBeNull();
+  });
+
+  test('Gate 1 aberto: mesmo sem secao o título nunca é "Tamanho da letra"', async () => {
+    await seedSettings();
+    await render(<AppearanceScreen />);
+    await waitFor(() => expect(screen.getByTestId('mode-in_app')).toBeTruthy());
+    expect(screen.queryByText('Tamanho da letra')).toBeNull();
+    expect(screen.getAllByRole('header')[0].props.children).toBe('Como eu leio');
   });
 });
 
@@ -351,5 +384,16 @@ describe('Meu jejum e Ajuda', () => {
     await render(<HelpScreen />);
     expect(screen.queryByText(/insight|grupo/i)).toBeNull();
     expect(screen.getByText(/a reflexão privada nunca vira publicação/)).toBeTruthy();
+  });
+
+  test('Ajuda: o aviso de copyright só aparece com tradução licenciada', async () => {
+    setBibleProvider(devBibleProvider);
+    const first = await render(<HelpScreen />);
+    expect(screen.queryByTestId('help-copyright')).toBeNull();
+    expect(screen.queryByText(/DEV FIXTURE/)).toBeNull();
+    first.unmount();
+    setBibleProvider(licensed);
+    await render(<HelpScreen />);
+    expect(screen.getByTestId('help-copyright')).toBeTruthy();
   });
 });

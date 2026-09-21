@@ -19,6 +19,7 @@ import { LockedDayScreen } from '@/ui/LockSheet';
 import { AppText, Button, Cap, DevContentBanner, Screen, StateView, useFace } from '@/ui/components';
 import { ErrorState } from '@/ui/entrada/States';
 import { ReaderFooter, type ReaderPrimary } from '@/ui/leitor/ReaderFooter';
+import { ReaderGuide } from '@/ui/leitor/ReaderGuide';
 import { ReaderTopBar } from '@/ui/leitor/ReaderTopBar';
 import { TextSizeSheet } from '@/ui/leitor/TextSizeSheet';
 import { MAX_CONTENT_WIDTH, MIN_TOUCH, faces, spacing, useTheme } from '@/ui/theme';
@@ -32,13 +33,17 @@ const READER_GUTTER = 26;
  * O texto fica sempre em superfície OPACA; vidro só na barra de topo, que o
  * texto atravessa ao rolar.
  *
- * Enquanto não houver tradução licenciada (Gate 1), o corpo é: cap do livro,
- * numeral do capítulo e a caixa "TEXTO AINDA NÃO LIBERADO". CORREÇÃO TÉCNICA:
- * a "estrutura de versículos" do desenho (numeral + barra listrada por versículo)
- * NÃO é desenhada — o app não tem a contagem de versículos por capítulo, e
- * numerar versículos de um capítulo real seria inventar estrutura (REGRAS 1.5;
- * LACUNAS B1). Quando um provedor licenciado entrar, o texto dele aparece no
- * mesmo lugar, com os números que ELE fornecer e a atribuição no fim.
+ * Dois modos, escolhidos pelo provedor:
+ * - GUIA (provedor sem texto licenciado — Gate 1 aberto): para cada capítulo, a
+ *   referência grande, "Leia este capítulo na sua Bíblia." e a posição
+ *   ("Capítulo 1 de 12"); o rodapé anda até "Concluir leitura". Nada é pedido
+ *   ao provedor, não há "Aa" (sem texto, o tamanho não muda nada) nem "Prefiro
+ *   ler na minha Bíblia" (o guia JÁ é a leitura na própria Bíblia). Decisão do
+ *   engenheiro, delegada pelo fundador em 2026-09-21: a caixa "Texto ainda não
+ *   liberado" era lida como tela por terminar (Apple 2.1).
+ * - TEXTO (provedor licenciado): cap do livro, numeral do capítulo, o texto com
+ *   os números de versículo que o PROVEDOR fornecer e a atribuição no fim. O app
+ *   nunca inventa estrutura de versículos (REGRAS 1.5; LACUNAS B1).
  */
 export default function ReaderScreen() {
   const { day } = useLocalSearchParams<{ day: string }>();
@@ -78,6 +83,8 @@ export default function ReaderScreen() {
   const unlocked = journey.isDayUnlocked(dayNumber);
   const provider = getBibleProvider();
   const metadata = provider.getMetadata();
+  /** Sem texto licenciado o leitor é o guia (ver o topo). */
+  const hasLicensedText = !metadata.isDevPlaceholder;
 
   const chapters = useMemo(() => {
     if (!dayData) return [];
@@ -98,15 +105,18 @@ export default function ReaderScreen() {
   );
 
   // Dia trancado: nada é pedido ao provedor. Com uma tradução licenciada, isso
-  // seria uma requisição de conteúdo de um dia que ainda não abriu.
+  // seria uma requisição de conteúdo de um dia que ainda não abriu. No guia
+  // também não: o provedor sem licença não tem texto para dar.
   useEffect(() => {
     if (!reference || !unlocked) return;
     let alive = true;
-    provider.getPassage(reference).then(
-      (loaded) => alive && setResult({ key: chapterKey, passage: loaded }),
-      (err: unknown) =>
-        alive && setResult({ key: chapterKey, error: err instanceof Error ? err : new Error(String(err)) }),
-    );
+    if (hasLicensedText) {
+      provider.getPassage(reference).then(
+        (loaded) => alive && setResult({ key: chapterKey, passage: loaded }),
+        (err: unknown) =>
+          alive && setResult({ key: chapterKey, error: err instanceof Error ? err : new Error(String(err)) }),
+      );
+    }
     if (positionReady) {
       // Gravação de conveniência: se o disco falhar, a leitura segue igual.
       saveReaderPosition({ dayNumber, readingIndex: 0, chapterIndex }).catch(() => {});
@@ -115,7 +125,7 @@ export default function ReaderScreen() {
     return () => {
       alive = false;
     };
-  }, [reference, chapterKey, dayNumber, chapterIndex, provider, unlocked, positionReady]);
+  }, [reference, chapterKey, dayNumber, chapterIndex, provider, hasLicensedText, unlocked, positionReady]);
 
   const completionsReady = journey.completions != null;
   const dayDone = isDayCompleted(journey.completions, dayNumber);
@@ -202,7 +212,6 @@ export default function ReaderScreen() {
   const done = dayDone;
   const fontSize = normalizeReaderFontSize(settings?.readerFontSize);
   const isLastChapter = chapterIndex >= chapters.length - 1;
-  const hasLicensedText = !metadata.isDevPlaceholder;
   const chapterLabel = `${current.bookName} ${current.chapter}`;
 
   const completeDay = async () => {
@@ -224,6 +233,7 @@ export default function ReaderScreen() {
   };
 
   // D-1 / invariante P-09: "Prefiro ler na minha Bíblia" NUNCA conclui o dia.
+  // Só existe no modo TEXTO: no guia a leitura já é na Bíblia da pessoa.
   // Grava o modo e volta; a conclusão é sempre o gesto explícito "Concluir
   // leitura" (no último capítulo daqui ou no painel de hoje da Jornada).
   // PROVISÓRIO (pergunta 2 ao designer).
@@ -269,86 +279,91 @@ export default function ReaderScreen() {
             a faixa compacta fica logo abaixo do cabeçalho. */}
         <DevContentBanner state={journey.contentState} compact />
 
-        {/* ------------------------------------------------ cabeça do capítulo */}
-        <View style={{ gap: spacing.xs }}>
-          {/* Só o numeral é cabeçalho: a cap do livro não repete o anúncio (R1-10). */}
-          <Cap accessibilityRole="text">{current.bookName}</Cap>
-          <AppText
-            variant="chapterNumeral"
-            accessibilityRole="header"
-            accessibilityLabel={`Capítulo ${current.chapter}`}
-            testID="reader-chapter-numeral"
-          >
-            {current.chapter}
-          </AppText>
-        </View>
-
         {hasLicensedText ? (
-          error ? (
-            // F5: o molde único de erro (círculo 56 com "!", cópia humana, nenhum
-            // texto técnico). PROVISÓRIO (LACUNAS C45): "nada foi perdido" é a cópia
-            // literal do F5 e ainda não é verificável pelo app.
-            // R1-11: a mensagem padrão fala da "leitura de hoje", e o leitor abre
-            // dias passados; aqui ela vai sem "hoje" (invariante §5.1).
-            // PROVISÓRIO (LACUNAS C31). O link da própria Bíblia NÃO conclui o
-            // dia: grava o modo e volta (D-1; pergunta 2 ao designer).
-            <ErrorState
-              message="Este capítulo não carregou. Sua jornada e as suas reflexões estão salvas — nada foi perdido."
-              onRetry={() => setReloadTick((t) => t + 1)}
-              // O rodapé do leitor já tem o primário ("Próximo capítulo" /
-              // "Concluir leitura"): aqui o "Tentar de novo" vai contornado (R1-12).
-              retryVariant="outline"
-              secondary={
-                done
-                  ? undefined
-                  : { label: 'Ler na minha Bíblia', onPress: readOwnBible, testID: 'reader-error-own-bible' }
-              }
-              testID="reader-error"
-            />
-          ) : !passage ? (
-            <StateView kind="loading" />
-          ) : (
-            <>
-              {passage.verses.map((verse) => (
-                // Sem `maxFontSizeMultiplier`: o texto cresce com a fonte do
-                // sistema sem teto, que é o que a folha B3 promete.
-                <Text
-                  key={verse.verse}
-                  accessibilityLabel={`Versículo ${verse.verse}. ${verse.text}`}
-                  style={{
-                    fontFamily: face(faces.ss400),
-                    fontSize,
-                    lineHeight: readLineHeight(fontSize),
-                    color: colors.text,
-                  }}
-                >
-                  <Text style={{ fontSize: Math.round((12 * fontSize) / 19), color: colors.textMuted }}>
-                    {verse.verse}{' '}
-                  </Text>
-                  {verse.text}
-                </Text>
-              ))}
-              {/* PROVISÓRIO (LACUNAS C29): atribuição exigida pela licença, no
-                  fim do capítulo e acima do rodapé medido. */}
-              <AppText variant="caption" style={{ marginTop: spacing.lg }} testID="reader-attribution">
-                {metadata.copyrightNotice}
+          <>
+            {/* ------------------------------------------------ cabeça do capítulo */}
+            <View style={{ gap: spacing.xs }}>
+              {/* Só o numeral é cabeçalho: a cap do livro não repete o anúncio (R1-10). */}
+              <Cap accessibilityRole="text">{current.bookName}</Cap>
+              <AppText
+                variant="chapterNumeral"
+                accessibilityRole="header"
+                accessibilityLabel={`Capítulo ${current.chapter}`}
+                testID="reader-chapter-numeral"
+              >
+                {current.chapter}
               </AppText>
-            </>
-          )
+            </View>
+
+            {error ? (
+              // F5: o molde único de erro (círculo 56 com "!", cópia humana, nenhum
+              // texto técnico). PROVISÓRIO (LACUNAS C45): "nada foi perdido" é a cópia
+              // literal do F5 e ainda não é verificável pelo app.
+              // R1-11: a mensagem padrão fala da "leitura de hoje", e o leitor abre
+              // dias passados; aqui ela vai sem "hoje" (invariante §5.1).
+              // PROVISÓRIO (LACUNAS C31). O link da própria Bíblia NÃO conclui o
+              // dia: grava o modo e volta (D-1; pergunta 2 ao designer).
+              <ErrorState
+                message="Este capítulo não carregou. Sua jornada e as suas reflexões estão salvas — nada foi perdido."
+                onRetry={() => setReloadTick((t) => t + 1)}
+                // O rodapé do leitor já tem o primário ("Próximo capítulo" /
+                // "Concluir leitura"): aqui o "Tentar de novo" vai contornado (R1-12).
+                retryVariant="outline"
+                secondary={
+                  done
+                    ? undefined
+                    : { label: 'Ler na minha Bíblia', onPress: readOwnBible, testID: 'reader-error-own-bible' }
+                }
+                testID="reader-error"
+              />
+            ) : !passage ? (
+              <StateView kind="loading" />
+            ) : (
+              <>
+                {passage.verses.map((verse) => (
+                  // Sem `maxFontSizeMultiplier`: o texto cresce com a fonte do
+                  // sistema sem teto, que é o que a folha B3 promete.
+                  <Text
+                    key={verse.verse}
+                    accessibilityLabel={`Versículo ${verse.verse}. ${verse.text}`}
+                    style={{
+                      fontFamily: face(faces.ss400),
+                      fontSize,
+                      lineHeight: readLineHeight(fontSize),
+                      color: colors.text,
+                    }}
+                  >
+                    <Text style={{ fontSize: Math.round((12 * fontSize) / 19), color: colors.textMuted }}>
+                      {verse.verse}{' '}
+                    </Text>
+                    {verse.text}
+                  </Text>
+                ))}
+                {/* PROVISÓRIO (LACUNAS C29): atribuição exigida pela licença, no
+                    fim do capítulo e acima do rodapé medido. */}
+                <AppText variant="caption" style={{ marginTop: spacing.lg }} testID="reader-attribution">
+                  {metadata.copyrightNotice}
+                </AppText>
+              </>
+            )}
+          </>
         ) : (
-          <NotReleasedNotice chapterLabel={chapterLabel} />
+          // ------------------------------------------------ guia (sem texto)
+          <ReaderGuide reference={chapterLabel} position={chapterIndex + 1} count={chapters.length} />
         )}
       </ScrollView>
 
       <ReaderTopBar
         topInset={insets.top}
-        title={chapterLabel}
+        // No guia a referência e a posição estão no corpo: a barra diz só o dia.
+        title={hasLicensedText ? chapterLabel : `Dia ${dayNumber}`}
+        showPosition={hasLicensedText}
         dayNumber={dayNumber}
         chapterIndex={chapterIndex}
         chapterCount={chapters.length}
         done={done}
         onClose={goBackOrHome}
-        onTextSize={() => setSizeSheet(true)}
+        onTextSize={hasLicensedText ? () => setSizeSheet(true) : undefined}
         onHeight={setBarHeight}
       />
 
@@ -356,51 +371,21 @@ export default function ReaderScreen() {
         primary={primary}
         isFirstChapter={chapterIndex === 0}
         onPrevious={() => setChapterIndex((i) => Math.max(0, i - 1))}
-        ownBible={done ? undefined : readOwnBible}
+        ownBible={done || !hasLicensedText ? undefined : readOwnBible}
         bottomPadding={Math.max(40, insets.bottom)}
         onHeight={setFooterHeight}
         saveFailed={saveFailed}
       />
 
-      <TextSizeSheet
-        visible={sizeSheet}
-        onClose={() => setSizeSheet(false)}
-        size={fontSize}
-        onStep={stepFont}
-      />
+      {hasLicensedText ? (
+        <TextSizeSheet
+          visible={sizeSheet}
+          onClose={() => setSizeSheet(false)}
+          size={fontSize}
+          onStep={stepFont}
+        />
+      ) : null}
     </Screen>
   );
 }
 
-/**
- * Caixa "TEXTO AINDA NÃO LIBERADO" (B1): borda 1,5px `border`, raio 16, fundo
- * `surfaceWarm`; rótulo Schibsted 700 11/14 em `warning` (5,4:1 sobre o quente).
- */
-function NotReleasedNotice({ chapterLabel }: { chapterLabel: string }) {
-  const { colors } = useTheme();
-  return (
-    <View
-      testID="reader-not-released"
-      style={{
-        borderWidth: 1.5,
-        borderColor: colors.border,
-        borderRadius: 16,
-        backgroundColor: colors.surfaceWarm,
-        padding: spacing.lg,
-        gap: spacing.xs,
-        minHeight: MIN_TOUCH,
-      }}
-    >
-      <AppText variant="cap" accessibilityRole="header" style={{ fontFamily: faces.sg700, color: colors.warning }}>
-        Texto ainda não liberado
-      </AppText>
-      {/* PROVISÓRIO (pergunta 2 ao designer): "volte para marcar" ainda não diz
-          onde. Pela D-1 o dia se marca em "Concluir leitura", no último capítulo
-          daqui ou no painel de hoje da Jornada — nunca em "Prefiro ler na minha
-          Bíblia". */}
-      <AppText variant="bodySm">
-        {`Nenhuma tradução bíblica é exibida enquanto a licença não estiver resolvida. Abra na sua Bíblia em ${chapterLabel} e volte para marcar.`}
-      </AppText>
-    </View>
-  );
-}

@@ -171,7 +171,7 @@ export function TodayPanel({
         <>
           <Button title="Concluir leitura" onPress={onComplete} loading={busy} testID="complete-day" />
           <Button
-            title="Ler aqui no app"
+            title="Seguir o guia no app"
             variant="underline"
             onPress={onRead}
             disabled={busy}

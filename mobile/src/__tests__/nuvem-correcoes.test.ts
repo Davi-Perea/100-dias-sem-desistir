@@ -17,7 +17,7 @@ import aesjs from 'aes-js';
 import { render, screen, waitFor } from '@testing-library/react-native';
 import { createElement } from 'react';
 
-import appConfig, { assertRightsForStore } from '../../app.config';
+import appConfig, { assertContactForStore, assertRightsForStore } from '../../app.config';
 import { _setSupabaseClientForTests } from '@/cloud/client';
 import { _setCloudConfigForTests, cloudAllowedInThisBuild, getCloudConfig, isCloudConfigured } from '@/cloud/config';
 import { classifyError } from '@/cloud/errors';
@@ -440,6 +440,27 @@ describe('DIR-04/05/06: o README diz a verdade', () => {
       JSON.stringify({ provenance: { rights_status: 'authorized', rights_reference: 'autorizacao-2026-09-25' } }),
     );
     expect(() => assertRightsForStore(root)).not.toThrow();
+  });
+
+  test('1.5 / 5.1.1(i): a variante production recusa gerar config sem e-mail de suporte e URL https da política', () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'contato-'));
+    fs.mkdirSync(path.join(root, 'src', 'config'), { recursive: true });
+    const file = path.join(root, 'src', 'config', 'contato.ts');
+    const write = (email: string, url: string) =>
+      fs.writeFileSync(
+        file,
+        `export const SUPPORT_EMAIL: string | null = ${email};\nexport const PRIVACY_URL: string | null = ${url};\n`,
+      );
+    write('null', 'null');
+    expect(() => assertContactForStore(root)).toThrow(/SUPPORT_EMAIL .* e PRIVACY_URL/);
+    write("'contato@exemplo.org'", 'null');
+    expect(() => assertContactForStore(root)).toThrow(/PRIVACY_URL \(https\)/);
+    write("'contato@exemplo.org'", "'http://exemplo.org/privacidade'");
+    expect(() => assertContactForStore(root)).toThrow(/PRIVACY_URL/);
+    write('null', "'https://exemplo.org/privacidade'");
+    expect(() => assertContactForStore(root)).toThrow(/SUPPORT_EMAIL/);
+    write("'contato@exemplo.org'", "'https://exemplo.org/privacidade'");
+    expect(() => assertContactForStore(root)).not.toThrow();
   });
 });
 

@@ -347,18 +347,19 @@ export default function MilestoneScreen() {
         </View>
 
         <View style={{ gap: spacing.sm, marginTop: spacing.lg }}>
-          {/* PROVISÓRIO (LACUNAS P17): o que "Guardar minha jornada" guarda não foi
-              definido. Mantido o de hoje: registra (analytics desligado por
+          {/* CORREÇÃO (2.1/2.3): "Guardar minha jornada" prometia guardar algo e só
+              voltava para a Jornada; sem nuvem não há onde guardar. Mesmo rótulo e
+              mesma ação do outro ramo do marco. Registra (analytics desligado por
               padrão) e fecha. O marco já foi gravado como visto ao abrir. */}
           <Button
-            title="Guardar minha jornada"
+            title="Continuar a jornada"
             variant="yellow"
             tone="ink"
             onPress={() => {
               track({ name: 'milestone_reached', dayNumber: day });
               goHome();
             }}
-            testID="milestone-keep"
+            testID="milestone-continue"
           />
           <Button
             title="Ver minhas reflexões"

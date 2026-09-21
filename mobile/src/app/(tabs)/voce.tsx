@@ -1,5 +1,6 @@
 import { router } from 'expo-router';
 
+import { SUPPORT_EMAIL } from '@/config/contato';
 import { fastingKeptCount, useFasting } from '@/fasting/fastingStore';
 import { useJourney } from '@/journey/useJourney';
 import { completedDayNumbers } from '@/progress/completionsStore';
@@ -11,7 +12,7 @@ import { ProgressBlock } from '@/ui/voce/ProgressBlock';
 import { RowGroup } from '@/ui/voce/SubScreen';
 
 const READING_MODE_LABEL: Record<string, string> = {
-  in_app: 'Aqui no app',
+  in_app: 'Guia no app',
   own_bible: 'Minha Bíblia',
   both: 'Vou alternar',
 };
@@ -121,7 +122,7 @@ export default function YouScreen() {
             testID="row-proposito"
           />
           <SettingRow label="Privacidade" onPress={() => router.push('/privacidade')} testID="row-privacy" />
-          <SettingRow label="Ajuda e contato" onPress={() => router.push('/ajuda')} testID="row-help" />
+          <SettingRow label={SUPPORT_EMAIL ? 'Ajuda e contato' : 'Ajuda'} onPress={() => router.push('/ajuda')} testID="row-help" />
         </RowGroup>
 
         {__DEV__ ? (

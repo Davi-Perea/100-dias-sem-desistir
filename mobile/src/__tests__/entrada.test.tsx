@@ -177,7 +177,7 @@ describe('F2 · passo 1, como você vai ler', () => {
     expect(title.props.children).toBe('Como você pretende ler na maioria dos dias?');
     expect(title.props.accessibilityRole).toBe('header');
     expect(flat(title)).toMatchObject({ fontFamily: faces.sg800, fontSize: 34, lineHeight: 38 });
-    for (const label of ['Ler aqui no app', 'Usar a minha Bíblia', 'Vou alternar']) {
+    for (const label of ['Seguir o guia no app', 'Usar a minha Bíblia', 'Vou alternar']) {
       expect(screen.getByRole('radio', { name: label })).toBeTruthy();
     }
     expect(screen.getByText('Ler na Bíblia impressa não é pior. Dá para mudar depois quando quiser.')).toBeTruthy();

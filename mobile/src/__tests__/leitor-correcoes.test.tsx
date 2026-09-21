@@ -85,6 +85,18 @@ const failing: BibleTextProvider = {
   },
 };
 
+/** Provedor com texto de teste (nunca bíblico): liga o modo TEXTO do leitor. */
+const licensed: BibleTextProvider = {
+  getMetadata: () => ({ ...devBibleProvider.getMetadata(), id: 'licenciada-teste', isDevPlaceholder: false }),
+  getPassage: async (reference) => ({
+    reference: `${reference.book} ${reference.chapterStart}`,
+    book: reference.book,
+    bookName: reference.book,
+    chapter: reference.chapterStart,
+    verses: [{ verse: 1, text: 'Frase de teste.' }],
+  }),
+};
+
 let campaignId = '';
 
 beforeEach(async () => {
@@ -150,7 +162,8 @@ describe('B1 · barra de topo', () => {
     expect(fill()).toBe('100%');
   });
 
-  test('R1-14: "Aa" cresce com a fonte do sistema, com teto que cabe na caixa de 48', async () => {
+  test('R1-14: "Aa" (modo texto) cresce com a fonte do sistema, com teto que cabe na caixa de 48', async () => {
+    setBibleProvider(licensed);
     await render(<ReaderScreen />);
     const aa = await screen.findByText('Aa', { includeHiddenElements: true });
     expect(aa.props.allowFontScaling).not.toBe(false);
@@ -159,9 +172,10 @@ describe('B1 · barra de topo', () => {
     expect(20 * aa.props.maxFontSizeMultiplier).toBeLessThanOrEqual(48);
   });
 
-  test('R1-10: a cap do livro não é cabeçalho, e a troca de capítulo é anunciada', async () => {
+  test('R1-10: no modo texto a cap do livro não é cabeçalho, e a troca de capítulo é anunciada', async () => {
     const day = dayWithChapters(2);
     mockDay = String(day);
+    setBibleProvider(licensed);
     const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility').mockImplementation(() => {});
     await render(<ReaderScreen />);
     await waitFor(() => expect(screen.getByTestId('reader-next')).toBeTruthy());
@@ -188,8 +202,9 @@ describe('PER-04 · posição de leitura', () => {
     await AsyncStorage.setItem(POSITION_KEY, JSON.stringify({ dayNumber: day, readingIndex: 0, chapterIndex: 2 }));
     await render(<ReaderScreen />);
     const total = chaptersOf(day).length;
-    await waitFor(() => expect(screen.getByText(`Dia ${day} · capítulo 3 de ${total}`)).toBeTruthy());
-    expect(screen.getByTestId('reader-chapter-numeral').props.children).toBe(chaptersOf(day)[2].chapter);
+    await waitFor(() => expect(screen.getByText(`Capítulo 3 de ${total}`)).toBeTruthy());
+    const third = chaptersOf(day)[2];
+    expect(screen.getByTestId('reader-guide-reference').props.children).toBe(`${third.bookName} ${third.chapter}`);
   });
 
   test('a posição de outro dia é ignorada, e a do dia aberto é gravada ao andar', async () => {
@@ -198,7 +213,7 @@ describe('PER-04 · posição de leitura', () => {
     await AsyncStorage.setItem(POSITION_KEY, JSON.stringify({ dayNumber: day - 1, readingIndex: 0, chapterIndex: 1 }));
     await render(<ReaderScreen />);
     const total = chaptersOf(day).length;
-    await waitFor(() => expect(screen.getByText(`Dia ${day} · capítulo 1 de ${total}`)).toBeTruthy());
+    await waitFor(() => expect(screen.getByText(`Capítulo 1 de ${total}`)).toBeTruthy());
     await fireEvent.press(screen.getByTestId('reader-next'));
     await waitFor(async () =>
       expect(JSON.parse((await AsyncStorage.getItem(POSITION_KEY)) ?? '{}')).toMatchObject({
@@ -215,13 +230,15 @@ describe('PER-04 · posição de leitura', () => {
     await AsyncStorage.setItem(POSITION_KEY, JSON.stringify({ dayNumber: day, readingIndex: 0, chapterIndex: 2 }));
     await render(<ReaderScreen />);
     const total = chaptersOf(day).length;
-    await waitFor(() => expect(screen.getByText(`Dia ${day} · capítulo 1 de ${total}`)).toBeTruthy());
+    await waitFor(() => expect(screen.getByText(`Capítulo 1 de ${total}`)).toBeTruthy());
   });
 });
 
 /* ------------------------------------------------------------ B3 */
 
-describe('B3 · folha de tamanho do texto', () => {
+describe('B3 · folha de tamanho do texto (modo texto)', () => {
+  beforeEach(() => setBibleProvider(licensed));
+
   test('R1-3: "Pronto" fecha a folha', async () => {
     await render(<ReaderScreen />);
     await waitFor(() => expect(screen.getByTestId('reader-text-size')).toBeTruthy());

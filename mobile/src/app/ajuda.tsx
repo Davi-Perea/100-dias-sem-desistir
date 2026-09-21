@@ -29,11 +29,15 @@ const RIGHTS_LABEL: Record<RightsStatus, string> = {
 export default function HelpScreen() {
   const dataset = useDataset();
   const metadata = getBibleProvider().getMetadata();
+  // Mesma regra do leitor: sem tradução licenciada não há aviso de copyright a
+  // mostrar. O do provedor de desenvolvimento é texto de placeholder (2.1).
+  const hasLicensedText = !metadata.isDevPlaceholder;
   const rights = RIGHTS_LABEL[dataset.provenance.rights_status] ?? 'situação não informada';
 
   return (
     <SubScreen
-      title="Ajuda e contato"
+      // Sem contato preenchido o título não promete um (1.5).
+      title={SUPPORT_EMAIL ? 'Ajuda e contato' : 'Ajuda'}
       // PROVISÓRIO (pergunta 5 ao designer): aviso de conteúdo compacto, abaixo do cabeçalho.
       banner={<DevContentBanner state={contentState()} compact />}
     >
@@ -91,7 +95,11 @@ export default function HelpScreen() {
         <AppText variant="bodySm" testID="help-rights">
           Fonte editorial: {dataset.provenance.source_name}. Situação dos direitos: {rights}.
         </AppText>
-        <AppText variant="caption">{metadata.copyrightNotice}</AppText>
+        {hasLicensedText ? (
+          <AppText variant="caption" testID="help-copyright">
+            {metadata.copyrightNotice}
+          </AppText>
+        ) : null}
       </View>
     </SubScreen>
   );

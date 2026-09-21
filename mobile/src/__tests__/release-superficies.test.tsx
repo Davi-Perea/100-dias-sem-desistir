@@ -8,6 +8,7 @@ import HelpScreen from '@/app/ajuda';
 import WelcomeScreen from '@/app/onboarding/index';
 import { _setCloudConfigForTests, cloudAllowedInThisBuild, isCloudConfigured } from '@/cloud/config';
 import { COMMUNITY_ENABLED } from '@/config/features';
+import { isDevBuild } from '@/journey/devBuild';
 import { loadDataset } from '@/journey/datasetSource';
 import { devDataset } from '@/journey/fixtures/devCampaign';
 import { calendarDateInCampaignTz } from '@/journey/officialDay';
@@ -159,5 +160,23 @@ describe('nenhuma tela alcançável em release diz "indisponível"', () => {
   test('Ajuda: sem recado de indisponível', async () => {
     await render(<HelpScreen />);
     expect(allText()).not.toMatch(UNAVAILABLE);
+  });
+
+  test('Ajuda em release (isDevBuild = false): sem o aviso DEV FIXTURE do provedor sem texto (2.1)', async () => {
+    const g = globalThis as unknown as { __DEV__: boolean };
+    const previous = g.__DEV__;
+    g.__DEV__ = false;
+    try {
+      expect(isDevBuild()).toBe(false);
+      await render(<HelpScreen />);
+      // O aviso do provedor sem texto ('DEV FIXTURE — texto de exemplo…') não aparece.
+      // (A fonte editorial aqui vem do dataset fictício do teste; em release o
+      // carregador só aceita o dataset real, então ela não entra nesta conferência.)
+      expect(allText()).not.toContain(devBibleProvider.getMetadata().copyrightNotice);
+      expect(allText()).not.toMatch(/Launch Gate|texto de exemplo|Nenhuma tradução bíblica/i);
+      expect(screen.queryByTestId('help-copyright')).toBeNull();
+    } finally {
+      g.__DEV__ = previous;
+    }
   });
 });

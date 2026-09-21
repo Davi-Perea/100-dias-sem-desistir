@@ -184,7 +184,7 @@ describe('A1 · a casa abre no dia da igreja', () => {
 
     // PROVISÓRIO (pergunta 2): "Concluir leitura" vira a ação principal e o
     // sublinhado devolve o leitor do app.
-    await waitFor(() => expect(screen.getByText('Ler aqui no app')).toBeTruthy());
+    await waitFor(() => expect(screen.getByText('Seguir o guia no app')).toBeTruthy());
     expect(screen.queryByTestId('read-now')).toBeNull();
     expect(screen.getByText('Concluir leitura')).toBeTruthy();
     expect(screen.queryByTestId('day-completed')).toBeNull();

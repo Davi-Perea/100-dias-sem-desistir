@@ -2,6 +2,7 @@ import { useLocalSearchParams } from 'expo-router';
 import { View } from 'react-native';
 
 import { track } from '@/analytics/analytics';
+import { getBibleProvider } from '@/reader/provider';
 import {
   READER_FONT_MAX,
   READER_FONT_MIN,
@@ -18,9 +19,10 @@ import { SubScreen } from '@/ui/voce/SubScreen';
  * Os três rótulos exatos do F2 (onboarding/leitura.tsx), sem descrição: a antiga
  * prometia texto na "tela de hoje" (que não existe e, com o Gate 1 aberto, não
  * mostra texto) e uma marcação cujo lugar ainda é a pergunta 2 ao designer.
+ * "Seguir o guia no app" pelo mesmo motivo (2026-09-21): o leitor é um guia.
  */
 const MODES: { mode: ReadingMode; label: string }[] = [
-  { mode: 'in_app', label: 'Ler aqui no app' },
+  { mode: 'in_app', label: 'Seguir o guia no app' },
   { mode: 'own_bible', label: 'Usar a minha Bíblia' },
   { mode: 'both', label: 'Vou alternar' },
 ];
@@ -37,6 +39,12 @@ const MODES: { mode: ReadingMode; label: string }[] = [
  * nada (decisão D-4, 2026-09-21). A preferência antiga do settings só alimenta
  * o buffer em memória do painel DEV; nada sai do aparelho.
  *
+ * Gate 1 aberto (2026-09-21): sem tradução licenciada o leitor é um guia e
+ * nenhuma tela usa o tamanho do texto de leitura. A seção de tamanho só
+ * aparece com texto licenciado (mesma regra hasLicensedText do leitor, que
+ * pelo mesmo motivo esconde o "Aa"): um controle sem efeito é 2.1/2.3. Com o
+ * guia, a tela é "Como eu leio" (modos + "Do seu aparelho").
+ *
  * O tamanho segue a MESMA escala do B3 (padrão 19; 14 · 15 · 17 … 29 · 30;
  * entrelinha 1,7×), de `@/reader/readerFontSize`: uma tela não pode mostrar
  * um valor que a outra não alcança (LACUNAS C47).
@@ -46,7 +54,9 @@ export default function AppearanceScreen() {
   const settings = useSettings();
   const reducedMotion = useReducedMotion();
   const { secao } = useLocalSearchParams<{ secao?: string }>();
-  const readingFirst = secao === 'leitura';
+  const hasLicensedText = !getBibleProvider().getMetadata().isDevPlaceholder;
+  // Sem texto licenciado não há seção de tamanho: a tela é só "Como eu leio".
+  const readingFirst = secao === 'leitura' || !hasLicensedText;
 
   if (!settings) {
     return (
@@ -120,9 +130,12 @@ export default function AppearanceScreen() {
     <SubScreen title={readingFirst ? 'Como eu leio' : 'Tamanho da letra'}>
       {readingFirst ? modeSection : fontSection}
 
-      <Rule />
-
-      {readingFirst ? fontSection : modeSection}
+      {hasLicensedText ? (
+        <>
+          <Rule />
+          {readingFirst ? fontSection : modeSection}
+        </>
+      ) : null}
 
       <Rule />
 

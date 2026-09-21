@@ -11,7 +11,7 @@ import type { JourneyDataset } from '@/journey/types';
 import { _resetCompletionsCacheForTests } from '@/progress/completionsStore';
 import { _resetReflectionsCacheForTests } from '@/reflections/reflectionsStore';
 import { devBibleProvider } from '@/reader/devProvider';
-import { setBibleProvider } from '@/reader/provider';
+import { setBibleProvider, type BibleTextProvider } from '@/reader/provider';
 import { _resetSettingsCacheForTests, SETTINGS_KEY } from '@/settings/settingsStore';
 
 /** Parâmetro de rota do caso corrente; lido tarde, na chamada do hook. */
@@ -56,13 +56,15 @@ jest.mock('@/reader/provider', () => {
   let wrapper: unknown = null;
   return {
     ...actual,
+    // O provedor real é resolvido a cada chamada: o teste troca entre o de
+    // exemplo (guia) e um com texto (licenciado de teste).
     getBibleProvider: () => {
-      const real = actual.getBibleProvider();
+      actual.getBibleProvider();
       wrapper ??= {
-        getMetadata: () => real.getMetadata(),
+        getMetadata: () => actual.getBibleProvider().getMetadata(),
         getPassage: (reference: unknown) => {
           mockGetPassage(reference);
-          return real.getPassage(reference);
+          return actual.getBibleProvider().getPassage(reference);
         },
       };
       return wrapper;
@@ -90,6 +92,18 @@ function labelOf(day: number): RegExp {
   if (!summary) throw new Error(`fixture do dia ${day} sem leitura`);
   return new RegExp(escape(summary.label));
 }
+
+/** Provedor com texto de teste (nunca bíblico): o leitor pede passagens a ele. */
+const licensed: BibleTextProvider = {
+  getMetadata: () => ({ ...devBibleProvider.getMetadata(), id: 'licenciada-teste', isDevPlaceholder: false }),
+  getPassage: async (reference) => ({
+    reference: `${reference.book} ${reference.chapterStart}`,
+    book: reference.book,
+    bookName: reference.book,
+    chapter: reference.chapterStart,
+    verses: [{ verse: 1, text: 'Frase de teste.' }],
+  }),
+};
 
 const TODAY = 17;
 const FUTURE = 40;
@@ -127,6 +141,7 @@ describe('leitor de um dia que ainda não abriu', () => {
   });
 
   test('não pede a passagem ao provedor de texto bíblico', async () => {
+    setBibleProvider(licensed);
     mockDay = String(FUTURE);
     await render(<ReaderScreen />);
     await waitFor(() => expect(screen.getByTestId('locked-day-screen')).toBeTruthy());
@@ -136,11 +151,27 @@ describe('leitor de um dia que ainda não abriu', () => {
     expect(mockGetPassage).not.toHaveBeenCalled();
   });
 
-  test('o dia de hoje continua abrindo e pedindo a passagem', async () => {
+  test('com texto licenciado, o dia de hoje continua abrindo e pedindo a passagem', async () => {
+    setBibleProvider(licensed);
     await render(<ReaderScreen />);
     await waitFor(() => expect(mockGetPassage).toHaveBeenCalled());
     expect(screen.queryByTestId('locked-day-screen')).toBeNull();
     expect(screen.getByTestId('reader-footer')).toBeTruthy();
+  });
+
+  test('sem texto licenciado, o dia de hoje abre o guia e não pede nada ao provedor', async () => {
+    await render(<ReaderScreen />);
+    await waitFor(() => expect(screen.getByTestId('reader-guide')).toBeTruthy());
+    expect(screen.queryByTestId('locked-day-screen')).toBeNull();
+    expect(mockGetPassage).not.toHaveBeenCalled();
+  });
+
+  test('sem texto licenciado, o dia futuro continua trancado e não mostra o guia', async () => {
+    mockDay = String(FUTURE);
+    await render(<ReaderScreen />);
+    await waitFor(() => expect(screen.getByTestId('locked-day-screen')).toBeTruthy());
+    expect(screen.queryByTestId('reader-guide')).toBeNull();
+    expect(screen.queryByTestId('reader-guide-reference')).toBeNull();
   });
 });
 
