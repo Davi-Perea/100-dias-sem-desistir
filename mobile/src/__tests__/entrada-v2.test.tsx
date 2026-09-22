@@ -2,9 +2,11 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
-import { AccessibilityInfo, StyleSheet } from 'react-native';
+import type { ReactNode } from 'react';
+import { AccessibilityInfo, Pressable, StyleSheet } from 'react-native';
 
 import { clearRecordedEvents, recordedEvents, setAnalyticsEnabled } from '@/analytics/analytics';
+import OnboardingLayout from '@/app/onboarding/_layout';
 import WelcomeScreen from '@/app/onboarding/index';
 import LeituraStep from '@/app/onboarding/leitura';
 import LembreteStep from '@/app/onboarding/lembrete';
@@ -20,19 +22,69 @@ import {
   PROFILE_NAME_MAX,
   SETTINGS_KEY,
 } from '@/settings/settingsStore';
-import { DOVE_FLIGHT_MS, DOVE_SWAP_AT, DoveTransitionProvider } from '@/ui/motion/DoveTransition';
+import { useDoveTransition } from '@/ui/entrada/doveContext';
+import {
+  contentOpacityAt,
+  DIRECTION_CYCLE,
+  DOVE_ASPECT,
+  DOVE_DRIFT,
+  DOVE_EASE,
+  DOVE_FLIGHT_MS,
+  DOVE_HEADING,
+  DOVE_REDUCED_IN_MS,
+  DOVE_REDUCED_OUT_MS,
+  DOVE_SWAP_AT,
+  DOVE_SWAP_DIP,
+  DOVE_SWELL,
+  DOVE_TILT,
+  doveGeometry,
+  dovePose,
+  DoveTransitionProvider,
+} from '@/ui/motion/DoveTransition';
 import { ONBOARDING_STEP, ONBOARDING_STEPS } from '@/ui/OnboardingStep';
 import { MIN_TOUCH, palettes } from '@/ui/theme';
 
 /**
  * Entrada v2 (feedback do Davi, 2026-09-22, itens E1–E5): texto novo da F1, sem
  * a nota da leitura, sem o passo do jejum, passos de nome e metas, e a pomba
- * atravessando a tela em duas transições, nunca com "Reduzir movimento".
+ * gigante do designer atravessando a tela em cada "seguir" da entrada, nunca com
+ * "Reduzir movimento" e nunca na saída para a Jornada.
  */
 
-// Reanimated/worklets: mock global em jest.setup.js.
+/**
+ * Reanimated no Jest (sobre o mock global de jest.setup.js), fazendo o papel da
+ * thread de UI: as animações NÃO terminam sozinhas (o teste chama o fim), a
+ * reação que vê a pomba cruzar o meio fica guardada para o teste disparar, e os
+ * valores compartilhados sobrevivem entre renderizações, como no aparelho.
+ */
+type MockTiming = { to: unknown; duration?: number; done?: (finished?: boolean) => void; taken?: boolean };
+const mockMotion: {
+  timings: MockTiming[];
+  reaction: { react: (crossed: boolean, previous: boolean | null) => void } | null;
+  engineReduced: boolean;
+} = { timings: [], reaction: null, engineReduced: false };
+jest.mock('react-native-reanimated', () => {
+  const actual = jest.requireActual('react-native-reanimated/mock');
+  const { useState } = jest.requireActual('react');
+  return {
+    ...actual,
+    useReducedMotion: () => mockMotion.engineReduced,
+    useSharedValue: (init: unknown) => useState(() => actual.useSharedValue(init))[0],
+    withTiming: (to: unknown, config?: { duration?: number }, done?: (finished?: boolean) => void) => {
+      mockMotion.timings.push({ to, duration: config?.duration, done });
+      return to;
+    },
+    useAnimatedReaction: (_prepare: unknown, react: (crossed: boolean, previous: boolean | null) => void) => {
+      mockMotion.reaction = { react };
+    },
+  };
+});
 
 const mockRouter = { push: jest.fn(), replace: jest.fn(), back: jest.fn(), canGoBack: jest.fn(() => true) };
+const mockStack: { options: Record<string, unknown> | null; render: (() => ReactNode) | null } = {
+  options: null,
+  render: null,
+};
 jest.mock('expo-router', () => ({
   get router() {
     return mockRouter;
@@ -41,7 +93,13 @@ jest.mock('expo-router', () => ({
   useLocalSearchParams: () => ({}),
   useSegments: () => [],
   useFocusEffect: () => {},
-  Stack: Object.assign(() => null, { Screen: () => null }),
+  Stack: Object.assign(
+    ({ screenOptions }: { screenOptions: Record<string, unknown> }) => {
+      mockStack.options = screenOptions;
+      return mockStack.render ? mockStack.render() : null;
+    },
+    { Screen: () => null },
+  ),
 }));
 
 jest.mock('expo-status-bar', () => ({ StatusBar: () => null }));
@@ -87,6 +145,11 @@ function mockReducedMotion(value: boolean) {
 beforeEach(async () => {
   jest.clearAllMocks();
   jest.restoreAllMocks();
+  mockMotion.timings = [];
+  mockMotion.reaction = null;
+  mockMotion.engineReduced = false;
+  mockStack.options = null;
+  mockStack.render = null;
   mockScheme.value = 'light';
   mockRouter.canGoBack.mockReturnValue(true);
   mockReminders.scheduleDailyReminder.mockResolvedValue({ ok: true });
@@ -320,122 +383,393 @@ describe('settings.profile: formato compartilhado e normalização', () => {
 
 /* --------------------------------------------------------- E5 · pomba */
 
-describe('E5 · a pomba atravessa a tela e troca o passo quando passa', () => {
-  test('"Começar": a pomba voa, a tela troca no meio do voo e a camada some no fim', async () => {
+/** A próxima animação ainda não terminada com esta duração (o teste é a thread de UI). */
+function takeTiming(duration: number): MockTiming {
+  const timing = mockMotion.timings.find((t) => t.duration === duration && !t.taken);
+  if (!timing) throw new Error(`nenhuma animação pendente de ${duration} ms`);
+  timing.taken = true;
+  return timing;
+}
+const pendingTimings = (duration: number) => mockMotion.timings.filter((t) => t.duration === duration && !t.taken);
+
+/** A pomba cruza o meio da tela (0,5 do caminho): a thread de UI pede a troca. */
+async function passMiddle() {
+  await act(async () => {
+    mockMotion.reaction?.react(true, false);
+  });
+}
+
+/** Uma animação chega ao fim. */
+async function finish(duration: number) {
+  const timing = takeTiming(duration);
+  await act(async () => {
+    timing.done?.(true);
+  });
+}
+
+async function flushReducedMotion() {
+  await waitFor(() => expect(AccessibilityInfo.isReduceMotionEnabled).toHaveBeenCalled());
+  await act(async () => {
+    await Promise.resolve();
+  });
+}
+
+/** Botão de teste que pede um voo e anota se o toque foi aceito. */
+function FlyButton({ onResult }: { onResult: (accepted: boolean) => void }) {
+  const flyDove = useDoveTransition();
+  return <Pressable testID="fly" onPress={() => onResult(flyDove(() => mockRouter.push('/destino')))} />;
+}
+
+const bird = () => screen.getByTestId('dove-transition-bird', { includeHiddenElements: true });
+
+describe('E5 · a pomba do designer atravessa a tela e troca o passo quando passa pelo meio', () => {
+  test('os números do handoff (TransitionBird)', () => {
+    expect(DOVE_FLIGHT_MS).toBe(720);
+    expect(DOVE_EASE).toEqual([0.7, 0, 0.2, 1]);
+    expect(DOVE_SWAP_AT).toBe(0.5);
+    expect(DOVE_SWAP_DIP).toBe(0.1);
+    expect(DOVE_TILT).toBe(2);
+    expect(DOVE_DRIFT).toBe(0.02);
+    expect(DOVE_SWELL).toBe(0.035);
+    expect(DOVE_ASPECT).toBe(1.3733);
+    expect(DOVE_REDUCED_OUT_MS).toBe(90);
+    expect(DIRECTION_CYCLE).toEqual(['bottom-to-top', 'left-to-right', 'top-to-bottom', 'right-to-left']);
+    expect(DIRECTION_CYCLE.map((d) => DOVE_HEADING[d])).toEqual([0, 90, 180, -90]);
+  });
+
+  test('pomba maior que a tela: entra e sai inteira por fora e passa pelo centro na troca', () => {
+    const [w, h] = [390, 844];
+    for (const direction of DIRECTION_CYCLE) {
+      const g = doveGeometry(direction, w, h);
+      const vertical = direction === 'bottom-to-top' || direction === 'top-to-bottom';
+      const along = vertical ? h : w;
+      const cross = vertical ? w : h;
+      expect(g.length).toBeGreaterThanOrEqual(1.15 * along - 1e-9);
+      expect(g.span).toBeGreaterThanOrEqual(1.2 * cross - 1e-9);
+      expect(g.span / g.length).toBeCloseTo(DOVE_ASPECT, 6);
+      // Nas pontas do caminho o centro da pomba está a meia viagem + meio corpo:
+      // ela está inteira fora da tela.
+      for (const p of [0, 1]) {
+        const pose = dovePose(p, g);
+        expect(Math.abs(vertical ? pose.y : pose.x)).toBeCloseTo(along / 2 + g.length / 2, 6);
+        expect(pose.scale).toBeCloseTo(1, 6);
+      }
+      // No meio: centralizada no eixo da viagem, só a curva lateral de 2%.
+      const mid = dovePose(DOVE_SWAP_AT, g);
+      expect(vertical ? mid.y : mid.x).toBeCloseTo(0, 6);
+      expect(Math.abs(vertical ? mid.x : mid.y)).toBeCloseTo(DOVE_DRIFT * cross, 6);
+      expect(mid.scale).toBeCloseTo(1 + DOVE_SWELL, 6);
+      expect(mid.rotate).toBeCloseTo(DOVE_HEADING[direction], 6);
+    }
+    // De baixo para cima: começa embaixo, termina em cima.
+    const up = doveGeometry('bottom-to-top', w, h);
+    expect(dovePose(0, up).y).toBeGreaterThan(0);
+    expect(dovePose(1, up).y).toBeLessThan(0);
+  });
+
+  test('o conteúdo esmaece em volta da troca (0,1 do caminho de cada lado)', () => {
+    expect(contentOpacityAt(0, false, 0)).toBe(1);
+    expect(contentOpacityAt(0.4, false, 0)).toBeCloseTo(1, 6);
+    expect(contentOpacityAt(0.45, false, 0)).toBeCloseTo(0.5, 6);
+    expect(contentOpacityAt(0.52, false, 0)).toBe(0);
+    expect(contentOpacityAt(0.52, true, 0.52)).toBe(0);
+    expect(contentOpacityAt(0.57, true, 0.52)).toBeCloseTo(0.5, 6);
+    expect(contentOpacityAt(1, true, 0.52)).toBe(1);
+  });
+
+  test('"Começar": a troca acontece UMA vez, no meio do voo; a camada não pega toque nem leitor de tela', async () => {
     mockReducedMotion(false);
-    jest.useFakeTimers();
     await render(
       <DoveTransitionProvider>
         <WelcomeScreen />
       </DoveTransitionProvider>,
     );
-    await act(async () => {
-      await Promise.resolve();
-    });
-    await fireEvent.press(screen.getByTestId('onboarding-start'));
+    await flushReducedMotion();
     const layer = screen.getByTestId('dove-transition', { includeHiddenElements: true });
-    // Decorativa: fora do leitor de tela, e segura os toques durante o voo.
+    expect(layer.props.pointerEvents).toBe('none');
     expect(layer.props.importantForAccessibility).toBe('no-hide-descendants');
-    expect(layer.props.pointerEvents).toBe('auto');
+    expect(layer.props.accessibilityElementsHidden).toBe(true);
+    // Em repouso a pomba está montada (imagem já carregada), mas invisível.
+    expect(flat(bird()).opacity).toBe(0);
+
+    await fireEvent.press(screen.getByTestId('onboarding-start'));
+    expect(pendingTimings(DOVE_FLIGHT_MS)).toHaveLength(1);
     expect(mockRouter.push).not.toHaveBeenCalled();
 
-    // Segundo toque durante o voo não empilha outra tela.
+    // Segundo toque durante o voo: ignorado, nenhum voo novo.
     await fireEvent.press(screen.getByTestId('onboarding-start'));
+    expect(pendingTimings(DOVE_FLIGHT_MS)).toHaveLength(1);
 
-    await act(async () => {
-      jest.advanceTimersByTime(DOVE_FLIGHT_MS * DOVE_SWAP_AT);
-    });
+    await passMiddle();
     expect(mockRouter.push).toHaveBeenCalledTimes(1);
     expect(mockRouter.push).toHaveBeenCalledWith('/onboarding/nome');
-    expect(screen.getByTestId('dove-transition', { includeHiddenElements: true })).toBeTruthy();
+    // Em voo a pomba aparece (o mock só recalcula o estilo quando renderiza: aqui, na troca).
+    expect(flat(bird()).opacity).toBe(1);
+    // O quadro seguinte ainda está depois do meio: não troca de novo.
+    await passMiddle();
+    expect(mockRouter.push).toHaveBeenCalledTimes(1);
 
-    await act(async () => {
-      jest.advanceTimersByTime(DOVE_FLIGHT_MS);
-    });
-    expect(screen.queryByTestId('dove-transition', { includeHiddenElements: true })).toBeNull();
+    await finish(DOVE_FLIGHT_MS);
+    expect(mockRouter.push).toHaveBeenCalledTimes(1);
+    expect(flat(bird()).opacity).toBe(0);
+    expect(flat(screen.getByTestId('dove-content')).opacity).toBe(1);
+  });
+
+  test('toque durante o voo é ignorado: flyDove devolve false até a pomba sair da tela', async () => {
+    mockReducedMotion(false);
+    const results: boolean[] = [];
+    await render(
+      <DoveTransitionProvider>
+        <FlyButton onResult={(accepted) => results.push(accepted)} />
+      </DoveTransitionProvider>,
+    );
+    await flushReducedMotion();
+    await fireEvent.press(screen.getByTestId('fly'));
+    await fireEvent.press(screen.getByTestId('fly'));
+    expect(results).toEqual([true, false]);
+    await passMiddle();
+    await fireEvent.press(screen.getByTestId('fly'));
+    expect(results).toEqual([true, false, false]);
+    expect(mockRouter.push).toHaveBeenCalledTimes(1);
+
+    await finish(DOVE_FLIGHT_MS);
+    await fireEvent.press(screen.getByTestId('fly'));
+    expect(results).toEqual([true, false, false, true]);
+  });
+
+  test('se o quadro do meio não chegar, a troca acontece no fim do voo, uma vez', async () => {
+    mockReducedMotion(false);
+    const results: boolean[] = [];
+    await render(
+      <DoveTransitionProvider>
+        <FlyButton onResult={(accepted) => results.push(accepted)} />
+      </DoveTransitionProvider>,
+    );
+    await flushReducedMotion();
+    await fireEvent.press(screen.getByTestId('fly'));
+    await finish(DOVE_FLIGHT_MS);
     expect(mockRouter.push).toHaveBeenCalledTimes(1);
   });
 
-  test('a pomba sai preta sobre o amarelo fixo, mesmo no tema escuro', async () => {
+  test('a direção gira a cada voo: baixo→cima, esquerda→direita, cima→baixo, direita→esquerda', async () => {
+    mockReducedMotion(false);
+    await render(
+      <DoveTransitionProvider>
+        <FlyButton onResult={() => undefined} />
+      </DoveTransitionProvider>,
+    );
+    await flushReducedMotion();
+    const rotations: string[] = [];
+    for (let i = 0; i < 5; i++) {
+      await fireEvent.press(screen.getByTestId('fly'));
+      await passMiddle();
+      // O mock deixa a animação no ponto final (p = 1): rumo menos a inclinação.
+      const transform = flat(bird()).transform as Record<string, unknown>[];
+      rotations.push(transform[2].rotate as string);
+      await finish(DOVE_FLIGHT_MS);
+    }
+    const expected = [0, 90, 180, -90, 0].map((heading) => `${heading - DOVE_TILT}deg`);
+    expect(rotations).toEqual(expected);
+  });
+
+  test('a pomba branca é tingida: tinta sobre o amarelo da F1, branca depois no tema escuro', async () => {
     mockScheme.value = 'dark';
     mockReducedMotion(false);
-    jest.useFakeTimers();
     await render(
       <DoveTransitionProvider>
         <WelcomeScreen />
       </DoveTransitionProvider>,
     );
-    await act(async () => {
-      await Promise.resolve();
-    });
+    await flushReducedMotion();
+    expect(bird().props.source).toBe(require('../../assets/pomba/dove-up.png'));
     await fireEvent.press(screen.getByTestId('onboarding-start'));
-    const sources: unknown[] = [];
-    const walk = (node: unknown) => {
-      if (!node || typeof node !== 'object') return;
-      if (Array.isArray(node)) return node.forEach(walk);
-      const n = node as { props?: { testID?: string; source?: unknown }; children?: unknown };
-      if (n.props?.source !== undefined) sources.push(n.props.source);
-      walk(n.children);
-    };
-    const findLayer = (node: unknown): unknown => {
-      if (!node || typeof node !== 'object') return null;
-      if (Array.isArray(node)) return node.map(findLayer).find(Boolean) ?? null;
-      const n = node as { props?: { testID?: string }; children?: unknown };
-      return n.props?.testID === 'dove-transition' ? n : findLayer(n.children);
-    };
-    walk(findLayer(screen.toJSON()));
-    expect(sources).toEqual([
-      require('../../assets/brand/dove-black.png'),
-      require('../../assets/brand/dove-white.png'),
-    ]);
-    await act(async () => {
-      jest.advanceTimersByTime(DOVE_FLIGHT_MS);
-    });
+    expect(flat(bird()).tintColor).toBe('#111111');
+    await passMiddle();
+    expect(flat(bird()).tintColor).toBe(palettes.dark.text);
+    await finish(DOVE_FLIGHT_MS);
   });
 
-  test('metas → leitura também voa', async () => {
+  test('nas telas claras a pomba tem a cor do texto do tema', async () => {
     mockReducedMotion(false);
     await seedSettings();
-    jest.useFakeTimers();
     await render(
       <DoveTransitionProvider>
         <GoalsStep />
       </DoveTransitionProvider>,
     );
-    await act(async () => {
-      await Promise.resolve();
-    });
+    await flushReducedMotion();
     await fireEvent.press(screen.getByTestId('goals-skip'));
-    expect(screen.getByTestId('dove-transition', { includeHiddenElements: true })).toBeTruthy();
-    expect(mockRouter.push).not.toHaveBeenCalled();
-    await act(async () => {
-      jest.advanceTimersByTime(DOVE_FLIGHT_MS);
-    });
-    expect(mockRouter.push).toHaveBeenCalledWith('/onboarding/leitura');
+    expect(flat(bird()).tintColor).toBe(palettes.light.text);
+    await passMiddle();
+    expect(flat(bird()).tintColor).toBe(palettes.light.text);
+    await finish(DOVE_FLIGHT_MS);
   });
 
-  test('com "Reduzir movimento": nenhuma pomba, a troca é imediata', async () => {
+  test.each([
+    {
+      name: 'nome → metas ("Pular")',
+      seed: {},
+      Step: NameStep,
+      press: 'name-skip',
+      to: '/onboarding/metas',
+    },
+    {
+      name: 'metas → leitura',
+      seed: {},
+      Step: GoalsStep,
+      press: 'goals-skip',
+      to: '/onboarding/leitura',
+    },
+    {
+      name: 'leitura → lembrete',
+      seed: { readingMode: 'in_app' },
+      Step: LeituraStep,
+      press: 'reading-continue',
+      to: '/onboarding/lembrete',
+    },
+  ])('$name também voa, e troca no meio', async ({ seed, Step, press, to }) => {
+    mockReducedMotion(false);
+    await seedSettings(seed);
+    await render(
+      <DoveTransitionProvider>
+        <Step />
+      </DoveTransitionProvider>,
+    );
+    await flushReducedMotion();
+    await fireEvent.press(screen.getByTestId(press));
+    expect(pendingTimings(DOVE_FLIGHT_MS)).toHaveLength(1);
+    expect(mockRouter.push).not.toHaveBeenCalled();
+    await passMiddle();
+    expect(mockRouter.push).toHaveBeenCalledTimes(1);
+    expect(mockRouter.push).toHaveBeenCalledWith(to);
+    await finish(DOVE_FLIGHT_MS);
+  });
+
+  test('nome: "Continuar" grava e então voa para as metas', async () => {
+    mockReducedMotion(false);
+    await seedSettings();
+    await render(
+      <DoveTransitionProvider>
+        <NameStep />
+      </DoveTransitionProvider>,
+    );
+    await flushReducedMotion();
+    await fireEvent.changeText(screen.getByTestId('name-input'), 'Davi');
+    await fireEvent.press(screen.getByTestId('name-continue'));
+    await waitFor(() => expect(pendingTimings(DOVE_FLIGHT_MS)).toHaveLength(1));
+    expect(getCachedSettings()?.profile.name).toBe('Davi');
+    expect(mockRouter.push).not.toHaveBeenCalled();
+    await passMiddle();
+    expect(mockRouter.push).toHaveBeenCalledWith('/onboarding/metas');
+    await finish(DOVE_FLIGHT_MS);
+  });
+
+  test('leitura: toque repetido durante o voo não repete o evento', async () => {
+    mockReducedMotion(false);
+    await seedSettings({ readingMode: 'own_bible' });
+    setAnalyticsEnabled(true);
+    clearRecordedEvents();
+    try {
+      await render(
+        <DoveTransitionProvider>
+          <LeituraStep />
+        </DoveTransitionProvider>,
+      );
+      await flushReducedMotion();
+      await fireEvent.press(screen.getByTestId('reading-continue'));
+      await fireEvent.press(screen.getByTestId('reading-continue'));
+      const selected = recordedEvents().filter((e) => e.event.name === 'reading_mode_selected');
+      expect(selected).toHaveLength(1);
+      await passMiddle();
+      await finish(DOVE_FLIGHT_MS);
+    } finally {
+      setAnalyticsEnabled(false);
+    }
+  });
+
+  test('o último passo NÃO voa: lembrete → Jornada é troca normal', async () => {
+    mockReducedMotion(false);
+    await seedSettings({ readingMode: 'in_app' });
+    await render(
+      <DoveTransitionProvider>
+        <LembreteStep />
+      </DoveTransitionProvider>,
+    );
+    await flushReducedMotion();
+    await fireEvent.press(screen.getByTestId('reminder-continue'));
+    await waitFor(() => expect(mockRouter.replace).toHaveBeenCalledWith('/'));
+    expect(pendingTimings(DOVE_FLIGHT_MS)).toHaveLength(0);
+    expect(flat(bird()).opacity).toBe(0);
+  });
+
+  test('todo "seguir" da entrada voa, menos o último', () => {
+    const dir = join(__dirname, '..', 'app', 'onboarding');
+    const flying = ['index.tsx', 'nome.tsx', 'metas.tsx', 'leitura.tsx', 'lembrete.tsx'].filter((file) =>
+      /flyDove\(/.test(readFileSync(join(dir, file), 'utf8')),
+    );
+    expect(flying).toEqual(['index.tsx', 'nome.tsx', 'metas.tsx', 'leitura.tsx']);
+  });
+
+  test('com "Reduzir movimento": nenhum voo; o conteúdo esmaece em 90 ms, troca e volta', async () => {
     mockReducedMotion(true);
     await render(
       <DoveTransitionProvider>
         <WelcomeScreen />
       </DoveTransitionProvider>,
     );
-    await waitFor(() => expect(AccessibilityInfo.isReduceMotionEnabled).toHaveBeenCalled());
-    await act(async () => {
-      await Promise.resolve();
-    });
-    await fireEvent.press(screen.getByTestId('onboarding-start'));
+    await flushReducedMotion();
+    // A pomba nem é montada.
     expect(screen.queryByTestId('dove-transition', { includeHiddenElements: true })).toBeNull();
+
+    await fireEvent.press(screen.getByTestId('onboarding-start'));
+    expect(pendingTimings(DOVE_FLIGHT_MS)).toHaveLength(0);
+    expect(pendingTimings(DOVE_REDUCED_OUT_MS)).toHaveLength(1);
+    expect(mockRouter.push).not.toHaveBeenCalled();
+    // Toque durante o esmaecimento também é ignorado.
+    await fireEvent.press(screen.getByTestId('onboarding-start'));
+    expect(pendingTimings(DOVE_REDUCED_OUT_MS)).toHaveLength(1);
+
+    await finish(DOVE_REDUCED_OUT_MS);
+    expect(mockRouter.push).toHaveBeenCalledTimes(1);
     expect(mockRouter.push).toHaveBeenCalledWith('/onboarding/nome');
+    await finish(DOVE_REDUCED_IN_MS);
+    expect(flat(screen.getByTestId('dove-content')).opacity).toBe(1);
+    expect(screen.queryByTestId('dove-transition', { includeHiddenElements: true })).toBeNull();
+    expect(mockRouter.push).toHaveBeenCalledTimes(1);
   });
 
-  test('só duas transições voam (começar → nome, metas → leitura), não todas', () => {
-    const dir = join(__dirname, '..', 'app', 'onboarding');
-    const flying = ['index.tsx', 'nome.tsx', 'metas.tsx', 'leitura.tsx', 'lembrete.tsx'].filter((file) =>
-      /flyDove\(/.test(readFileSync(join(dir, file), 'utf8')),
+  test('"Reduzir movimento" lido pelo Reanimated também desliga o voo', async () => {
+    mockReducedMotion(false);
+    mockMotion.engineReduced = true;
+    await render(
+      <DoveTransitionProvider>
+        <WelcomeScreen />
+      </DoveTransitionProvider>,
     );
-    expect(flying).toEqual(['index.tsx', 'metas.tsx']);
+    await flushReducedMotion();
+    expect(screen.queryByTestId('dove-transition', { includeHiddenElements: true })).toBeNull();
+    await fireEvent.press(screen.getByTestId('onboarding-start'));
+    expect(pendingTimings(DOVE_FLIGHT_MS)).toHaveLength(0);
+    await finish(DOVE_REDUCED_OUT_MS);
+    expect(mockRouter.push).toHaveBeenCalledWith('/onboarding/nome');
+    await finish(DOVE_REDUCED_IN_MS);
+  });
+
+  test('durante o voo a pilha entra sem deslize; depois, o voltar volta a deslizar', async () => {
+    mockReducedMotion(false);
+    mockStack.render = () => <FlyButton onResult={() => undefined} />;
+    await render(<OnboardingLayout />);
+    await flushReducedMotion();
+    expect(mockStack.options).toMatchObject({ animation: 'slide_from_right' });
+
+    await fireEvent.press(screen.getByTestId('fly'));
+    expect(mockStack.options).toMatchObject({ animation: 'none' });
+    await passMiddle();
+    expect(mockRouter.push).toHaveBeenCalledWith('/destino');
+    expect(mockStack.options).toMatchObject({ animation: 'none' });
+
+    await finish(DOVE_FLIGHT_MS);
+    expect(mockStack.options).toMatchObject({ animation: 'slide_from_right' });
   });
 
   test('nenhum arquivo da entrada declara fontWeight', () => {

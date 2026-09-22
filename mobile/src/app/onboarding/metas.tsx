@@ -16,7 +16,7 @@ import { ONBOARDING_STEP, OnboardingStep, StepSupport } from '@/ui/OnboardingSte
  * mesmas marcas. Metas ficam SÓ neste aparelho: "jejuar" e "orar todo dia" são
  * prática religiosa, dado sensível (LGPD art. 5º, II). Nunca em analytics.
  *
- * Daqui para a leitura a troca é com a pomba (E5).
+ * Daqui para a leitura a troca é com a pomba (E5), como em todo passo da entrada.
  */
 export default function GoalsStep() {
   const settings = useSettings();
