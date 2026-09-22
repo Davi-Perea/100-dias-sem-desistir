@@ -32,20 +32,22 @@ type FnDef = { name: string; header: string; body: string };
 const functions: FnDef[] = [...sql.matchAll(/create or replace function ([\w.]+)\(([\s\S]*?)\$\$([\s\S]*?)\$\$;/g)].map(
   (m) => ({ name: m[1], header: m[2], body: m[3] }),
 );
+/** A definição que vale: a ÚLTIMA (migrations posteriores fazem `create or replace`). */
 function fn(name: string): FnDef {
-  const found = functions.find((f) => f.name === name);
+  const found = [...functions].reverse().find((f) => f.name === name);
   if (!found) throw new Error(`função ${name} não encontrada`);
   return found;
 }
 const policies = [...sql.matchAll(/create policy[\s\S]*?;/g)].map((m) => m[0]);
 
 describe('arquivos', () => {
-  test('quatro migrations novas, depois da fundação, e quatro pgTAP novos', () => {
+  test('migrations da comunidade depois da fundação (a 5ª é o perfil v2 de 2026-09-22) e os pgTAP', () => {
     expect(communityFiles).toEqual([
       '20260921130000_comunidade_tabelas.sql',
       '20260921130100_comunidade_funcoes.sql',
       '20260921130200_comunidade_storage.sql',
       '20260921140000_comunidade_edge_functions.sql',
+      '20260922120000_comunidade_perfil_v2.sql',
     ]);
     const foundation = allFiles.filter((f) => !f.includes('comunidade'));
     expect(foundation.every((f) => f < communityFiles[0])).toBe(true);
@@ -192,16 +194,50 @@ describe('regras de conteúdo', () => {
     expect(body).toMatch(/v_author = v_uid/);
   });
 
-  test('marcar Amém exige consentimento vigente no servidor; desmarcar continua livre', () => {
+  test('marcar Amém exige consentimento vigente no servidor (não o perfil); desmarcar continua livre', () => {
     const body = fn('private.set_amen').body;
     const [unmark, mark] = body.split(/return false;\s*end if;/);
     expect(unmark).toMatch(/private\.assert_member\(\)/);
-    expect(unmark).not.toMatch(/perform private\.assert_can_publish/);
-    expect(mark).toMatch(/perform private\.assert_can_publish\(\);/);
-    expect(mark.indexOf('perform private.assert_can_publish')).toBeLessThan(
-      mark.indexOf('insert into public.community_amens'),
+    expect(unmark).not.toMatch(/perform private\.assert_(can_publish|consents)/);
+    expect(mark).toMatch(/perform private\.assert_consents\(\);/);
+    expect(mark.indexOf('perform private.assert_consents')).toBeLessThan(mark.indexOf('insert into public.community_amens'));
+    expect(fn('private.assert_consents').body).toMatch(/private\.has_current_consents\(v_uid\)/);
+    // Publicar = consentimentos + perfil completo (C4).
+    expect(fn('private.assert_can_publish').body).toMatch(/private\.assert_consents\(\)/);
+    expect(fn('private.assert_can_publish').body).toMatch(/private\.community_profile_complete\(v_uid\)/);
+  });
+
+  test('C2: a comunidade não barra mais a conta ligada ao aparelho (sessão anônima)', () => {
+    for (const name of [
+      'private.assert_member',
+      'private.assert_consents',
+      'private.assert_can_publish',
+      'private.can_publish',
+      'private.accept_community_terms',
+      'private.join_community',
+    ]) {
+      expect(fn(name).body).not.toMatch(/is_anonymous_session/);
+    }
+  });
+
+  test('C3: entrar não pede código; redeem_invite_code sai e CM001 não fala em código', () => {
+    expect(fn('private.join_community').body).not.toMatch(/invite_code/);
+    expect(fn('private.join_community').body).toMatch(/errcode = 'CM004'/);
+    expect(sql).toContain('drop function public.redeem_invite_code(text, text, boolean);');
+    expect(sql).toContain('grant execute on function public.join_community(text) to authenticated;');
+    expect(sql).toContain('revoke all on function public.join_community(text) from public, anon;');
+    expect(fn('private.assert_member').body).toMatch(/'crie seu perfil para entrar na comunidade' using errcode = 'CM001'/);
+    expect(fn('private.assert_member').body).not.toMatch(/código/);
+  });
+
+  test('C4: foto de perfil só aparece para os outros aprovada; a moderação decide pelo ticket, sem user_id', () => {
+    expect(fn('private.community_feed').body).toMatch(
+      /case when a\.avatar_status = 'approved' or p\.author_id = \(select auth\.uid\(\)\) then a\.avatar_path end/,
     );
-    expect(fn('private.assert_can_publish').body).toMatch(/private\.has_current_consents\(v_uid\)/);
+    expect(fn('private.can_view_community_photo').body).toMatch(/cp\.avatar_status = 'approved'/);
+    expect(fn('public.community_avatar_queue').header).not.toMatch(/user_id/);
+    expect(fn('private.moderate_community_avatar').body).toMatch(/ninguém modera a própria foto/);
+    expect(fn('private.service_enqueue_orphan_photos').body).toMatch(/cp\.avatar_path = o\.name/);
   });
 
   test('prazo da denúncia comum é 24 h (Apple 1.2) e o urgente, 4 h', () => {

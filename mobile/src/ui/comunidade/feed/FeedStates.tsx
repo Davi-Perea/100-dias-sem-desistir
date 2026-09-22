@@ -1,7 +1,6 @@
 import { router } from 'expo-router';
 import { View } from 'react-native';
 
-import { isCommunityDemo } from '@/community/demoApi';
 import { Dove } from '@/ui/brand';
 import {
   AppText,
@@ -102,7 +101,7 @@ export function FeedEnd() {
 }
 
 /**
- * Tudo o que vem antes do feed: sem servidor, sem conta, sem código, suspensa
+ * Tudo o que vem antes do feed: sem servidor, sem conta, sem perfil, suspensa
  * ou erro ao perguntar o estado. Cada um diz o que é e dá uma saída; nenhum
  * mostra feed falso nem código técnico.
  */
@@ -126,17 +125,13 @@ export function GateView({ gate, onRetry }: { gate: Exclude<CommunityGate, { kin
         <Block tone="warm" testID="gate-signed-out">
           <View style={{ gap: spacing.md }}>
             <AppText variant="blockTitle" accessibilityRole="header">
-              A comunidade é para quem tem 18 anos ou mais
+              Leia junto com a igreja
             </AppText>
             <AppText variant="bodySm">
-              Para ler e escrever aqui, entre com o seu e-mail e depois use o código que a sua igreja passou. Sua
-              leitura, seu progresso e as suas reflexões continuam funcionando sem conta.
+              Para entrar, basta criar o seu perfil. Não precisa de e-mail nem de senha. Sua leitura, seu progresso e
+              as suas reflexões continuam funcionando sem isso.
             </AppText>
-            <Button
-              title="Entrar com meu e-mail"
-              onPress={() => router.push(isCommunityDemo() ? COMMUNITY_ROUTES.entrar : COMMUNITY_ROUTES.conta)}
-              testID="gate-sign-in"
-            />
+            <Button title="Entrar na comunidade" onPress={() => router.push(COMMUNITY_ROUTES.entrar)} testID="gate-sign-in" />
           </View>
         </Block>
       );
@@ -145,13 +140,12 @@ export function GateView({ gate, onRetry }: { gate: Exclude<CommunityGate, { kin
         <Block tone="warm" testID="gate-not-member">
           <View style={{ gap: spacing.md }}>
             <AppText variant="blockTitle" accessibilityRole="header">
-              Entre com o código da sua igreja
+              Crie o seu perfil para entrar
             </AppText>
             <AppText variant="bodySm">
-              A comunidade é só para quem recebeu um código de um líder ou de um ministério. Sem código, a sua jornada
-              continua igual.
+              Quem cria o perfil entra na comunidade e vê as publicações. Sem ele, a sua jornada continua igual.
             </AppText>
-            <Button title="Tenho um código" onPress={() => router.push(COMMUNITY_ROUTES.entrar)} testID="gate-enter-code" />
+            <Button title="Criar meu perfil" onPress={() => router.push(COMMUNITY_ROUTES.entrar)} testID="gate-create-profile" />
           </View>
         </Block>
       );

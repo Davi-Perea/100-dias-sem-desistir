@@ -12,7 +12,7 @@ import { Icon } from '@/ui/icons';
 import { TextField } from '@/ui/TextField';
 import { radius, spacing, useGutter, useTheme } from '@/ui/theme';
 
-import type { HistoryEntry, ModerationApi, OpenReport, QueueItem, SuspendTarget } from './moderacaoApi';
+import type { AvatarItem, HistoryEntry, ModerationApi, OpenReport, QueueItem, SuspendTarget } from './moderacaoApi';
 import { NOTE_MAX } from './moderacaoApi';
 import { canModerate } from './acesso';
 import { HOLD_LABEL, KIND_LABEL, REASON_GUIDANCE, REASON_LABEL, dueLabel, timeAgo } from './rotulos';
@@ -85,6 +85,7 @@ export function ModerationQueueScreen({ community, moderation, onNotModerator, n
   const [loadError, setLoadError] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>('analise');
   const [queue, setQueue] = useState<QueueItem[]>([]);
+  const [avatars, setAvatars] = useState<AvatarItem[]>([]);
   const [reports, setReports] = useState<OpenReport[]>([]);
   const [photoUrls, setPhotoUrls] = useState<Map<string, string>>(new Map());
   const [history, setHistory] = useState<HistoryEntry[] | null | undefined>(undefined);
@@ -99,13 +100,20 @@ export function ModerationQueueScreen({ community, moderation, onNotModerator, n
   }, [onNotModerator]);
 
   const loadQueue = useCallback(async () => {
-    const [items, open] = await Promise.all([moderation.queue(), moderation.openReports()]);
+    const [items, open, faces] = await Promise.all([
+      moderation.queue(),
+      moderation.openReports(),
+      moderation.avatarQueue(),
+    ]);
     setQueue(items);
     setReports(open);
+    setAvatars(faces);
     // URL assinada de 1 h, em lote. Se falhar, a foto não abre e "Aprovar" fica
     // indisponível: ninguém aprova uma foto que não viu.
     try {
-      setPhotoUrls(await community.signPhotoUrls(items.map((i) => i.photoPath)));
+      setPhotoUrls(
+        await community.signPhotoUrls([...items.map((i) => i.photoPath), ...faces.map((f) => f.avatarPath)]),
+      );
     } catch {
       setPhotoUrls(new Map());
     }
@@ -309,7 +317,14 @@ export function ModerationQueueScreen({ community, moderation, onNotModerator, n
     );
   }
 
-  const photoCount = inReview.photos.length + inReview.texts.length;
+  const photoCount = inReview.photos.length + inReview.texts.length + avatars.length;
+
+  const decideAvatar = (item: AvatarItem, approveIt: boolean) =>
+    refreshAfter(
+      `${approveIt ? 'approve' : 'reject'}:${item.ticket}`,
+      () => moderation.decideAvatar(item.ticket, approveIt),
+      approveIt ? 'Foto de perfil aprovada.' : 'Foto de perfil recusada. A pessoa vai escolher outra.',
+    );
 
   return (
     <Screen>
@@ -352,6 +367,31 @@ export function ModerationQueueScreen({ community, moderation, onNotModerator, n
             />
           ) : (
             <>
+              {avatars.length > 0 ? (
+                <AppText variant="cap" accessibilityRole="header">
+                  Fotos de perfil aguardando aprovação
+                </AppText>
+              ) : null}
+              {avatars.map((item) => (
+                <AvatarCard
+                  key={item.ticket}
+                  item={item}
+                  photoUrl={photoUrls.get(item.avatarPath)}
+                  now={now()}
+                  busy={busy}
+                  actions={[
+                    {
+                      key: 'approve',
+                      title: 'Aprovar',
+                      variant: 'outline',
+                      // Ninguém aprova uma foto que não abriu na tela.
+                      disabled: !photoUrls.get(item.avatarPath),
+                      onPress: () => decideAvatar(item, true),
+                    },
+                    { key: 'reject', title: 'Recusar', variant: 'underline', onPress: () => decideAvatar(item, false) },
+                  ]}
+                />
+              ))}
               {inReview.photos.length > 0 ? (
                 <AppText variant="cap" accessibilityRole="header">
                   Fotos aguardando aprovação
@@ -682,6 +722,51 @@ function ItemCard({
         ) : null}
 
         <Actions id={item.itemId} actions={actions} busy={busy} />
+      </View>
+    </Block>
+  );
+}
+
+/** Foto de perfil em análise: só a foto e o nome; a regra é a mesma de toda foto. */
+function AvatarCard({
+  item,
+  photoUrl,
+  now,
+  busy,
+  actions,
+}: {
+  item: AvatarItem;
+  photoUrl?: string;
+  now: number;
+  busy: string | null;
+  actions: CardAction[];
+}) {
+  const { colors } = useTheme();
+  const who = item.displayName || 'participante';
+  return (
+    <Block testID={`avatar-${item.ticket}`}>
+      <View style={{ gap: spacing.md }}>
+        <View style={{ gap: 2 }}>
+          <AppText variant="rowLabel">{`Foto de perfil de ${who}`}</AppText>
+          <Meta parts={[timeAgo(item.submittedAt, now), 'só a pessoa vê até a aprovação']} />
+        </View>
+        {photoUrl ? (
+          <Image
+            source={{ uri: photoUrl }}
+            accessibilityLabel={`Foto de perfil enviada por ${who}`}
+            resizeMode="contain"
+            style={{ width: '100%', aspectRatio: 1, borderRadius: radius.button, backgroundColor: colors.surfaceMuted }}
+            testID={`avatar-photo-${item.ticket}`}
+          />
+        ) : (
+          <AppText variant="bodySm" style={{ color: colors.danger }}>
+            A foto não abriu. Não dá para aprovar sem ver; tente de novo mais tarde.
+          </AppText>
+        )}
+        <AppText variant="bodySm">
+          Aprove só se for uma foto da própria pessoa, sem criança e sem outras pessoas.
+        </AppText>
+        <Actions id={item.ticket} actions={actions} busy={busy} />
       </View>
     </Block>
   );

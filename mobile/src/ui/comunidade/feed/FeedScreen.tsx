@@ -32,7 +32,7 @@ const COLUMN = { flex: 1, width: '100%', maxWidth: MAX_CONTENT_WIDTH + FEED_GUTT
  *
  * Cabeçalho ("Comunidade" + pílula "Escrever"), a linha do dia que a igreja
  * está lendo (o feed nunca esquece de onde veio), os cartões e o fim explícito.
- * Estados: sem servidor, sem conta, sem código, suspensa, carregando (esqueleto
+ * Estados: sem servidor, sem conta, sem perfil, suspensa, carregando (esqueleto
  * na forma do post), erro (F5), vazio (C2) e sem internet (o feed fica
  * indisponível, a jornada não).
  */
@@ -210,7 +210,7 @@ function ReadyFeed({
   day: number;
 }) {
   const journey = useJourney();
-  const feed = useFeed(api, status.displayName ?? 'Você');
+  const feed = useFeed(api, status.displayName ?? 'Você', status.profile.ministry, status.profile.avatarPath);
   const [sheet, setSheet] = useState<SheetTarget | null>(null);
 
   // Carrega ao aparecer e se atualiza ao voltar de Publicar, dos comentários ou do consentimento.
@@ -258,6 +258,7 @@ function ReadyFeed({
             card={card}
             gutter={FEED_GUTTER}
             photoUrl={card.photoPath ? feed.photos.get(card.photoPath) : undefined}
+            avatarUrl={card.avatarPath ? feed.photos.get(card.avatarPath) : undefined}
             onAmen={(next) => {
               if (gated) {
                 openConsent();

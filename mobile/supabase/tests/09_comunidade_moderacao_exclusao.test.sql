@@ -27,6 +27,8 @@ insert into public.community_profiles (user_id, display_name, adult_attested_at)
   ('00000000-0000-4000-8000-0000000009a1', 'Ana',   now()),
   ('00000000-0000-4000-8000-0000000009b1', 'Bruno', now()),
   ('00000000-0000-4000-8000-0000000009e1', 'Mara',  now());
+-- Perfil completo para publicar (C4, 2026-09-22): foto enviada, ministério respondido, 16+ declarado.
+update public.community_profiles set ministry_answered = true, avatar_status = 'in_review', avatar_path = user_id::text || '.jpg';
 insert into public.community_moderators (user_id) values ('00000000-0000-4000-8000-0000000009e1');
 
 insert into public.consent_records (user_id, purpose, text_version, text_sha256)

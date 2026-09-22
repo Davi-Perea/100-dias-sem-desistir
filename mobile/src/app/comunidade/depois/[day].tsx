@@ -23,8 +23,9 @@ import { spacing, useTheme } from '@/ui/theme';
  * só para mim" (B5, reflexão privada). A reflexão NUNCA pré-preenche publicação:
  * nenhuma das portas leva texto adiante, só o número do dia.
  *
- * A frase de quem vê é `audienceSentence()`, a mesma de C3 e C4 (rascunho §3),
- * nunca uma cópia.
+ * A frase de quem vê é `audienceSentence()`, a mesma de publicar e do
+ * consentimento, sozinha (feedback de 2026-09-22, C5: saiu a frase do "guardar
+ * só para você"), nunca uma cópia.
  */
 export default function AfterReadingScreen() {
   const params = useLocalSearchParams<{ day?: string }>();
@@ -93,7 +94,7 @@ export default function AfterReadingScreen() {
           </View>
           <Rule />
           <AppText variant="caption" style={onBlueSoft} testID="after-audience">
-            {`O que você escreve para a igreja: ${audienceSentence()} O que você guarda só para você fica neste aparelho e nunca vira publicação.`}
+            {audienceSentence()}
           </AppText>
         </Block>
 

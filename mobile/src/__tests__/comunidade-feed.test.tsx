@@ -1,7 +1,7 @@
 /**
  * Feed (C1, C2) e comentários (C6) com o cliente da Comunidade SIMULADO (mesmo
  * molde de comunidade-cliente.test.ts). Prova o comportamento das TELAS: os
- * portões honestos (sem servidor, sem conta, sem código, suspensa), o Amém sem
+ * portões honestos (sem servidor, sem conta, sem perfil, suspensa), o Amém sem
  * contador, o feed com fim (sem rolagem infinita), o "Em análise" só para o
  * autor, as regras e o consentimento antes do primeiro Amém ou comentário, e
  * que o campo de comentário nunca vem pré-preenchido. Não prova o servidor.
@@ -230,22 +230,24 @@ describe('C1: portões honestos antes do feed', () => {
     expect(screen.queryByTestId(/^post-/)).toBeNull();
   });
 
-  test('sem conta: convida a entrar com e-mail (18+) e nada vai para o servidor', async () => {
+  test('sem conta: convida a entrar SEM e-mail e sem aviso de 18+ (C1, C2); nada vai para o servidor', async () => {
     const { rpc } = setup();
     mockSignedIn = false;
     await render(<FeedScreen />);
     expect(screen.getByTestId('gate-signed-out')).toBeTruthy();
-    expect(screen.getByText('A comunidade é para quem tem 18 anos ou mais')).toBeTruthy();
+    expect(screen.queryByText(/18 anos/)).toBeNull();
+    expect(screen.queryByText(/e-mail/)).not.toBeNull(); // "Não precisa de e-mail nem de senha."
     await fireEvent.press(screen.getByTestId('gate-sign-in'));
-    expect(mockRouter.push).toHaveBeenCalledWith('/conta?reason=comunidade');
+    expect(mockRouter.push).toHaveBeenCalledWith('/comunidade/entrar');
     expect(rpc).not.toHaveBeenCalled();
   });
 
-  test('com conta e sem código: pede o código da igreja e não pede o feed', async () => {
+  test('com conta e sem perfil: leva a criar o perfil (sem código, C3) e não pede o feed', async () => {
     const { rpc } = setup({ my_community_status: { data: [{ ...READY_STATUS, is_member: false, member_status: null }] } });
     await render(<FeedScreen />);
     await waitFor(() => expect(screen.getByTestId('gate-not-member')).toBeTruthy());
-    await fireEvent.press(screen.getByTestId('gate-enter-code'));
+    expect(screen.queryByText(/código/)).toBeNull();
+    await fireEvent.press(screen.getByTestId('gate-create-profile'));
     expect(mockRouter.push).toHaveBeenCalledWith('/comunidade/entrar');
     expect(calls(rpc, 'community_feed')).toHaveLength(0);
   });
@@ -293,6 +295,20 @@ describe('C1: feed', () => {
     // Nada de "3 améns", "Ver 4 comentários" ou contagem ao lado dos ícones.
     expect(allText()).not.toMatch(/\d+\s*(améns?|amém|comentários?|reações?)/i);
     expect(screen.queryByText(/^\d+$/)).toBeNull();
+  });
+
+  test('C4: "Nome · Ministério X" no cartão (só o nome com "Nenhum") e a foto de perfil assinada', async () => {
+    const avatar = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee.jpg';
+    const { createSignedUrls } = setup({
+      community_feed: {
+        data: [feedRow(0, { author_ministry: 'Comunicação', author_avatar_path: avatar }), feedRow(1)],
+      },
+    });
+    await render(<FeedScreen />);
+    await waitFor(() => expect(screen.getByTestId(`post-${POST(0)}`)).toBeTruthy());
+    expect(screen.getByTestId(`post-author-${POST(0)}`).props.children).toBe('Ana · Ministério Comunicação');
+    expect(screen.getByTestId(`post-author-${POST(1)}`).props.children).toBe('Bruno');
+    await waitFor(() => expect(createSignedUrls).toHaveBeenCalledWith([avatar], expect.any(Number)));
   });
 
   test('Amém marca e desmarca, só o MEU estado, e manda o id do post e nada mais', async () => {

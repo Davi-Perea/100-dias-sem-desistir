@@ -57,6 +57,8 @@ insert into public.community_profiles (user_id, display_name, adult_attested_at)
   ('00000000-0000-4000-8000-0000000011c3', 'Carla', now()),
   ('00000000-0000-4000-8000-0000000011c5', 'Edu',   now()),   -- membro SEM consentimento
   ('00000000-0000-4000-8000-0000000011c9', 'Mara',  now());
+-- Perfil completo para publicar (C4, 2026-09-22): foto enviada, ministério respondido, 16+ declarado.
+update public.community_profiles set ministry_answered = true, avatar_status = 'in_review', avatar_path = user_id::text || '.jpg';
 insert into public.community_moderators (user_id) values ('00000000-0000-4000-8000-0000000011c9');
 
 insert into public.consent_records (user_id, purpose, text_version, text_sha256)
@@ -133,8 +135,8 @@ select set_config('request.jwt.claims', '{"role":"anon"}', true);
 set local role anon;
 select throws_ok($$ select * from public.community_feed() $$, '42501', null, 'C: anon não lê o feed');
 select throws_ok($$ select * from public.my_profile() $$, '42501', null, 'C: anon não chama my_profile');
-select throws_ok($$ select public.redeem_invite_code('ABCDE-23456', 'X', true) $$, '42501', null,
-  'C: anon não tenta código de entrada');
+select throws_ok($$ select public.join_community('X') $$, '42501', null,
+  'C: anon não entra na comunidade');
 select throws_ok($$ select user_id from public.profiles $$, '42501', null, 'C: anon não lê profiles');
 select throws_ok($$ select private.is_app_admin() $$, '42501', null, 'C: anon não alcança o schema private');
 select throws_ok($$ select * from public.claim_storage_deletions(10) $$, '42501', null,
@@ -237,10 +239,10 @@ select set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-8000-0000000
 set local role authenticated;
 select throws_ok($$ select * from public.create_community_comment('20000000-0000-4000-8000-0000000011f1', 'Amém!') $$,
   'CM002', null, 'G: sem consentimento não comenta');
-select throws_ok(
+select lives_ok(
   $$ insert into storage.objects (bucket_id, name, owner_id)
      values ('community-photos', 'e5e50000-0000-4000-8000-000000000001.jpg', '00000000-0000-4000-8000-0000000011c5') $$,
-  '42501', null, 'G: sem consentimento não sobe foto (policy do Storage)');
+  'G: membro sem consentimento sobe foto de PERFIL (só vira foto de post com consentimento e perfil completo)');
 select lives_ok($$ select public.block_community_author(target_post => '20000000-0000-4000-8000-0000000011f3') $$,
   'G: bloquear não exige consentimento (Edu bloqueia Bruno)');
 reset role;
@@ -253,16 +255,17 @@ select lives_ok(
   'G: com consentimento sobe a foto (upload solto, ainda sem post)');
 reset role;
 
--- A mesma conta com claim de sessão anônima (JWT is_anonymous) não publica nem sobe foto.
+-- C2 (2026-09-22): a mesma conta com claim de sessão anônima (conta ligada ao aparelho)
+-- publica e sobe foto como qualquer conta; o que vale é ser membro, consentir e ter o perfil.
 select set_config('request.jwt.claims',
   '{"sub":"00000000-0000-4000-8000-0000000011c2","role":"authenticated","is_anonymous":true}', true);
 set local role authenticated;
-select throws_ok($$ select * from public.create_community_post(post_body => 'Oi') $$, 'CM006', null,
-  'G: sessão anônima não publica, mesmo com consentimento gravado');
-select throws_ok(
+select is((select status from public.create_community_post(post_body => 'Oi da conta do aparelho')), 'published',
+  'G: sessão anônima publica com consentimento e perfil completo');
+select lives_ok(
   $$ insert into storage.objects (bucket_id, name, owner_id)
      values ('community-photos', 'b2c20000-0000-4000-8000-000000000002.jpg', '00000000-0000-4000-8000-0000000011c2') $$,
-  '42501', null, 'G: sessão anônima não sobe foto (can_publish na policy do Storage)');
+  'G: sessão anônima sobe foto');
 reset role;
 
 -- Texto novo aprovado: o consentimento antigo deixa de valer.
@@ -301,8 +304,8 @@ insert into public.community_moderators (user_id) values ('00000000-0000-4000-80
 set local role service_role;
 select results_eq(
   $$ select object_name from public.service_prepare_account_deletion('00000000-0000-4000-8000-0000000011c2') $$,
-  $$ values ('b2c20000-0000-4000-8000-000000000001.jpg'::text) $$,
-  'I: a preparação devolve também o upload solto (que não virou post)');
+  $$ values ('b2c20000-0000-4000-8000-000000000001.jpg'::text), ('b2c20000-0000-4000-8000-000000000002.jpg'::text) $$,
+  'I: a preparação devolve também os uploads soltos (que não viraram post)');
 reset role;
 select lives_ok($$ delete from auth.users where id = '00000000-0000-4000-8000-0000000011c2' $$,
   'I: auth.admin.deleteUser (delete em auth.users) não é bloqueado');

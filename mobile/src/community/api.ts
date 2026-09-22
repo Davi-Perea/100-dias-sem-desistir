@@ -7,7 +7,9 @@ import { COMMUNITY_ENABLED } from '@/config/features';
 import { getDemoCommunityApi } from './demoApi';
 import { communityError, toCommunityError } from './errors';
 import { assertPhotoSafeToUpload, isPhotoPath, newPhotoPath, PHOTO_BUCKET, SIGNED_URL_TTL_SECONDS } from './photos';
+import { isValidContactEmail, profileArgs, type ProfileUpdate } from './profile';
 import type {
+  AvatarStatus,
   CommunityStatus,
   ContentStatus,
   FeedCursor,
@@ -31,7 +33,6 @@ import {
   isValidDisplayName,
   isValidPostBody,
   LIMITS,
-  normalizeInviteCode,
   charLength,
 } from './validation';
 
@@ -69,6 +70,7 @@ type Row = Record<string, unknown>;
 const CONTENT_STATUSES: readonly ContentStatus[] = ['in_review', 'published', 'not_published', 'removed'];
 const HOLD_REASONS: readonly HoldReason[] = ['foto', 'termo', 'link', 'contato', 'denuncia'];
 const MEMBER_STATUSES: readonly MemberStatus[] = ['active', 'suspended', 'removed'];
+const AVATAR_STATUSES: readonly AvatarStatus[] = ['none', 'in_review', 'approved', 'rejected'];
 
 function str(value: unknown): string | null {
   return typeof value === 'string' ? value : null;
@@ -98,6 +100,8 @@ export function toFeedPost(row: Row): FeedPost {
     dayNumber: num(row.day_number),
     publishedAt: str(row.published_at) ?? '',
     authorName: str(row.author_name) ?? '',
+    authorMinistry: str(row.author_ministry),
+    authorAvatarPath: str(row.author_avatar_path),
     isMine: bool(row.is_mine),
     iSaidAmen: bool(row.i_said_amen),
   };
@@ -145,10 +149,25 @@ export function toMyPost(row: Row): MyPost {
 
 export function toStatus(data: unknown): CommunityStatus {
   const row = rows(data)[0] ?? {};
+  const avatarPath = str(row.avatar_path);
+  const profile = {
+    displayName: str(row.display_name),
+    ministry: str(row.ministry),
+    ministryAnswered: bool(row.ministry_answered),
+    bio: str(row.bio),
+    avatarPath,
+    // Estado desconhecido com foto vira "em análise" (nunca "aprovada").
+    avatarStatus: oneOf(row.avatar_status, AVATAR_STATUSES) ?? (avatarPath ? 'in_review' : 'none'),
+    ageConfirmed: bool(row.age_confirmed),
+    contactEmail: str(row.contact_email),
+    newsOptIn: bool(row.news_opt_in),
+  };
   return {
     isMember: bool(row.is_member),
     memberStatus: oneOf(row.member_status, MEMBER_STATUSES),
-    displayName: str(row.display_name),
+    displayName: profile.displayName,
+    profile,
+    profileComplete: bool(row.profile_complete),
     canPublish: bool(row.can_publish),
     needsPublishConsent: row.needs_publish_consent !== false,
     needsRules: row.needs_rules !== false,
@@ -171,6 +190,8 @@ function requireUuid(value: string | undefined): string {
 }
 
 export type CommunityApi = ReturnType<typeof createCommunityApi>;
+export type { ProfileUpdate } from './profile';
+
 
 export function createCommunityApi(client: CommunityClient, deps: { randomUUID: () => string }) {
   async function call(fn: string, args?: Record<string, unknown>): Promise<unknown> {
@@ -207,22 +228,64 @@ export function createCommunityApi(client: CommunityClient, deps: { randomUUID: 
       });
     },
 
-    /** 'joined' ou 'invalid_code' (inválido, vencido, revogado e esgotado dão a mesma resposta). */
-    async redeemInviteCode(input: {
-      code: string;
-      displayName: string;
-      confirmsAdult: boolean;
-    }): Promise<'joined' | 'invalid_code'> {
-      const code = normalizeInviteCode(input.code);
-      if (!code) return 'invalid_code'; // não gasta tentativa com o que nem tem forma de código
-      if (!isValidDisplayName(input.displayName)) throw communityError('invalid_input');
-      if (!input.confirmsAdult) throw communityError('needs_adult_account');
-      const joined = await call('redeem_invite_code', {
-        invite_code: code,
-        chosen_name: input.displayName.trim(),
-        confirms_adult: true,
-      });
-      return joined === true ? 'joined' : 'invalid_code';
+    /**
+     * Entra na comunidade SEM código (C3, decisão do fundador de 2026-09-22):
+     * quem cria o perfil no app entra. Nome e o resto do perfil vêm depois, cada
+     * passo pode ser pulado (C4). Sem declaração de idade na entrada (C1).
+     * Quem está suspenso ou removido recebe 'blocked_from_community'.
+     */
+    async joinCommunity(input: { displayName?: string | null } = {}): Promise<void> {
+      const name = cleanText(input.displayName);
+      if (name && !isValidDisplayName(name)) throw communityError('invalid_input');
+      await call('join_community', { chosen_name: name });
+    },
+
+    /**
+     * Um ou mais passos do perfil. Campo ausente = não mexe. O nome não volta a
+     * ficar vazio depois de escolhido; o ministério "Nenhum" é `noMinistry`.
+     */
+    async updateProfile(input: ProfileUpdate): Promise<void> {
+      await call('set_community_profile', profileArgs(input));
+    },
+
+    /**
+     * Foto de perfil JÁ PREPARADA (mesma regra da foto de post: reencodada, sem
+     * EXIF/XMP/IPTC). Sobe, vira a foto de perfil e volta 'in_review': só depois
+     * da moderação ela aparece para os outros.
+     */
+    async setAvatar(photo: { bytes: Uint8Array; uri: string }): Promise<AvatarStatus> {
+      assertPhotoSafeToUpload(photo.bytes);
+      const path = newPhotoPath(deps.randomUUID);
+      let uploaded: Result<unknown>;
+      try {
+        uploaded = await client.storage.from(PHOTO_BUCKET).upload(path, photo.bytes, {
+          contentType: 'image/jpeg',
+          upsert: false,
+        });
+      } catch (error) {
+        throw toCommunityError(error);
+      }
+      if (uploaded.error) throw toCommunityError(uploaded.error);
+      try {
+        const status = await call('set_community_avatar', { new_path: path });
+        return oneOf(status, AVATAR_STATUSES) ?? 'in_review';
+      } catch (error) {
+        // Não deixa arquivo solto quando o perfil não aceitou a foto.
+        client.storage.from(PHOTO_BUCKET).remove([path]).then(() => {}, () => {});
+        throw error;
+      }
+    },
+
+    async removeAvatar(): Promise<void> {
+      await call('remove_community_avatar');
+    },
+
+    /** E-mail opcional e o aceite SEPARADO de novidades (N3). Sem e-mail, sem novidades. */
+    async setContact(input: { email: string | null; wantsNews: boolean }): Promise<void> {
+      const email = cleanText(input.email);
+      if (email && !isValidContactEmail(email)) throw communityError('invalid_input');
+      if (!email && input.wantsNews) throw communityError('invalid_input');
+      await call('set_community_contact', { new_email: email ? email.toLowerCase() : null, wants_news: input.wantsNews });
     },
 
     async setDisplayName(name: string): Promise<void> {

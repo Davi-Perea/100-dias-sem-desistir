@@ -1,15 +1,16 @@
-import { router, Stack } from 'expo-router';
+import { Stack } from 'expo-router';
 import { useEffect, useState, type PropsWithChildren, type ReactNode } from 'react';
 import { ScrollView, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { DEMO_BADGE, demoSignIn, isCommunityDemo } from '@/community/demoApi';
+import { DEMO_BADGE, isCommunityDemo } from '@/community/demoApi';
+import { startDeviceSession } from '@/community/deviceSession';
+import { toCommunityError } from '@/community/errors';
 import { BackBar } from '@/ui/BackBar';
 import { AppText, Button, Screen, Sheet, StateView, useFace } from '@/ui/components';
 import { faces, MAX_CONTENT_WIDTH, radius, spacing, useGutter, useTheme } from '@/ui/theme';
 import { announceNotice } from '@/ui/voce/announce';
 
-import { SIGN_IN_ROUTE } from './routes';
 import type { CommunityAccount } from './useCommunityAccount';
 
 /**
@@ -72,39 +73,7 @@ export function AccountStateView({ account }: { account: Exclude<CommunityAccoun
       </ProfileScreen>
     );
   }
-  if (account.kind === 'signed_out' && isCommunityDemo()) {
-    // Demonstração: o passo do e-mail é simulado. Nenhum e-mail sai, nenhum código é pedido.
-    return (
-      <ProfileScreen testID="community-account-demo-sign-in">
-        <StateView
-          kind="empty"
-          icon="person"
-          title="Entrar com o seu e-mail"
-          message={`${DEMO_BADGE}. No app de verdade, aqui você digita o e-mail e recebe um código. Na demonstração, este passo é simulado.`}
-          action={<Button title="Continuar na demonstração" onPress={demoSignIn} testID="community-demo-sign-in" />}
-        />
-      </ProfileScreen>
-    );
-  }
-  if (account.kind === 'signed_out') {
-    return (
-      <ProfileScreen testID="community-account-signed-out">
-        <StateView
-          kind="empty"
-          icon="person"
-          title="Entre com o seu e-mail"
-          message="Esta parte da comunidade usa a sua conta de e-mail. Sem senha: enviamos um código."
-          action={
-            <Button
-              title="Entrar com meu e-mail"
-              onPress={() => router.push(SIGN_IN_ROUTE)}
-              testID="community-sign-in"
-            />
-          }
-        />
-      </ProfileScreen>
-    );
-  }
+  if (account.kind === 'signed_out') return <SignedOutIntro />;
   return (
     <ProfileScreen testID="community-account-error">
       <StateView
@@ -113,6 +82,48 @@ export function AccountStateView({ account }: { account: Exclude<CommunityAccoun
         title="Não deu para carregar"
         message={`${account.message} Sua jornada e as suas reflexões estão salvas neste aparelho.`}
         action={<Button title="Tentar de novo" onPress={account.retry} testID="community-retry" />}
+      />
+    </ProfileScreen>
+  );
+}
+
+/**
+ * Entrada SEM e-mail (C2, feedback de 2026-09-22): um toque cria a conta ligada
+ * a este aparelho (sessão anônima do Supabase; na demonstração, direto). Depois
+ * vêm os passos do perfil, que podem ser pulados. Sem código (C3, decisão do
+ * fundador de 2026-09-22): quem cria o perfil entra.
+ */
+export const DEVICE_ACCOUNT_COPY =
+  'Não precisa de e-mail nem de senha: a sua conta fica ligada a este celular. Depois você monta o seu perfil.';
+
+function SignedOutIntro() {
+  const demo = isCommunityDemo();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const enter = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await startDeviceSession();
+    } catch (failure) {
+      setError(toCommunityError(failure).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <ProfileScreen testID="community-account-signed-out">
+      <StateView
+        kind="empty"
+        icon="community"
+        title="Entrar na comunidade"
+        message={demo ? `${DEVICE_ACCOUNT_COPY} ${DEMO_BADGE}.` : DEVICE_ACCOUNT_COPY}
+        action={
+          <View style={{ gap: spacing.md, alignSelf: 'stretch' }}>
+            <ActionError message={error} testID="community-sign-in-error" />
+            <Button title="Entrar na comunidade" onPress={enter} loading={busy} testID="community-sign-in" />
+          </View>
+        }
       />
     </ProfileScreen>
   );
@@ -192,7 +203,7 @@ export function ConfirmSheet({
 }
 
 /**
- * Campo de uma linha (código, nome, palavra de confirmação). Borda de 1,5px em
+ * Campo de uma linha (nome, e-mail, palavra de confirmação). Borda de 1,5px em
  * `controlBorder` (3,59:1) e, com foco, 2,5px em tinta: o foco muda de espessura
  * e de tom. `minHeight` + `paddingVertical`, nunca `height`, e sem teto de fonte.
  */
@@ -204,8 +215,9 @@ export function LineField({
   placeholder,
   autoCapitalize = 'none',
   maxLength,
-  mono = false,
   onSubmitEditing,
+  keyboardType,
+  autoComplete,
 }: {
   value: string;
   onChangeText: (value: string) => void;
@@ -214,9 +226,9 @@ export function LineField({
   placeholder?: string;
   autoCapitalize?: 'none' | 'characters' | 'words' | 'sentences';
   maxLength?: number;
-  /** Letras espaçadas, para o código de entrada. */
-  mono?: boolean;
   onSubmitEditing?: () => void;
+  keyboardType?: 'default' | 'email-address';
+  autoComplete?: 'email' | 'name' | 'off';
 }) {
   const { colors } = useTheme();
   const face = useFace();
@@ -235,6 +247,8 @@ export function LineField({
       spellCheck={false}
       maxLength={maxLength}
       onSubmitEditing={onSubmitEditing}
+      keyboardType={keyboardType}
+      autoComplete={autoComplete}
       returnKeyType="done"
       onFocus={() => setFocused(true)}
       onBlur={() => setFocused(false)}
@@ -246,9 +260,8 @@ export function LineField({
         borderColor: focused ? colors.text : colors.controlBorder,
         backgroundColor: colors.surface,
         borderRadius: radius.button,
-        fontFamily: face(mono ? faces.sg700 : faces.sg500),
-        fontSize: mono ? 20 : 17,
-        letterSpacing: mono ? 2 : 0,
+        fontFamily: face(faces.sg500),
+        fontSize: 17,
         color: colors.text,
       }}
     />

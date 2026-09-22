@@ -39,10 +39,36 @@ export const REPORT_REASONS: readonly ReportReason[] = [
 
 export type TermsPurpose = 'community_publish' | 'community_rules';
 
+/** Foto de perfil: none = sem foto · in_review = só o dono vê · approved = todos veem · rejected = recusada (escolher outra). */
+export type AvatarStatus = 'none' | 'in_review' | 'approved' | 'rejected';
+
+/**
+ * Perfil na comunidade (C4, 2026-09-22). Tudo opcional para ENTRAR; para
+ * PUBLICAR o servidor exige nome, foto, ministério respondido e 16+ (CM007).
+ */
+export type CommunityProfile = {
+  displayName: string | null;
+  /** null com ministryAnswered = "Nenhum". */
+  ministry: string | null;
+  ministryAnswered: boolean;
+  bio: string | null;
+  avatarPath: string | null;
+  avatarStatus: AvatarStatus;
+  /** "Tenho 16 anos ou mais" (C1). */
+  ageConfirmed: boolean;
+  /** E-mail opcional (N3). Ninguém na comunidade vê. */
+  contactEmail: string | null;
+  /** Aceite separado de novidades, desmarcado por padrão. */
+  newsOptIn: boolean;
+};
+
 export type CommunityStatus = {
   isMember: boolean;
   memberStatus: MemberStatus | null;
   displayName: string | null;
+  profile: CommunityProfile;
+  /** Nome, foto, ministério e 16+: o que publicar exige. */
+  profileComplete: boolean;
   canPublish: boolean;
   needsPublishConsent: boolean;
   needsRules: boolean;
@@ -59,6 +85,10 @@ export type FeedPost = {
   dayNumber: number | null;
   publishedAt: string;
   authorName: string;
+  /** Ministério do autor (null = "Nenhum" ou não respondeu): aparece "Nome · Ministério X". */
+  authorMinistry: string | null;
+  /** Foto de perfil aprovada (a própria aparece sempre). */
+  authorAvatarPath: string | null;
   isMine: boolean;
   iSaidAmen: boolean;
 };

@@ -33,3 +33,10 @@ import_map = "./functions/drain-storage-deletions/deno.json"
 [functions.moderate-text]
 verify_jwt = false
 import_map = "./functions/moderate-text/deno.json"
+
+# Comunidade sem e-mail (feedback do fundador de 2026-09-22, C2): a conta fica
+# ligada ao aparelho (supabase.auth.signInAnonymously, src/community/deviceSession.ts).
+# Vale só para o ambiente LOCAL; no projeto hospedado é Authentication → Sign In /
+# Providers → "Allow anonymous sign-ins", junto com CAPTCHA ou limite de taxa.
+[auth]
+enable_anonymous_sign_ins = true

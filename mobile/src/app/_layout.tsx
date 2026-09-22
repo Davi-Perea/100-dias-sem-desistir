@@ -202,6 +202,7 @@ function AppRoot() {
         <Stack.Screen name="comunidade/entrar/index" options={{ headerShown: false }} />
         <Stack.Screen name="comunidade/minhas-publicacoes" options={{ headerShown: false }} />
         <Stack.Screen name="comunidade/conta-e-privacidade" options={{ headerShown: false }} />
+        <Stack.Screen name="comunidade/perfil" options={{ headerShown: false }} />
         <Stack.Screen name="moderacao/index" options={{ headerShown: false }} />
         <Stack.Screen name="admin" options={{ title: 'Administração' }} />
         <Stack.Screen name="dev" options={{ title: 'Painel de desenvolvimento', presentation: 'modal' }} />

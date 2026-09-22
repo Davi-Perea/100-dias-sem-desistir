@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { Image, Pressable, Text, View } from 'react-native';
 
-import { AppText, Avatar, Rule, useFace } from '@/ui/components';
+import { authorLine } from '@/community/profile';
+import { AppText, Rule, useFace } from '@/ui/components';
+import { ProfileAvatar } from '@/ui/comunidade/perfil/ProfileAvatar';
 import { Icon } from '@/ui/icons';
 import { MIN_TOUCH, faces, spacing, useTheme } from '@/ui/theme';
 
@@ -24,6 +26,7 @@ import type { CardModel } from './useFeed';
 export function PostCard({
   card,
   photoUrl,
+  avatarUrl,
   gutter,
   onAmen,
   onComments,
@@ -32,6 +35,8 @@ export function PostCard({
 }: {
   card: CardModel;
   photoUrl: string | undefined;
+  /** Foto de perfil assinada (só aprovada, ou a própria). Sem ela, as iniciais. */
+  avatarUrl?: string;
   gutter: number;
   onAmen: (next: boolean) => void;
   onComments: () => void;
@@ -43,17 +48,19 @@ export function PostCard({
   const meta = postMeta(card.dayNumber, card.at, now);
   const hasPhoto = Boolean(card.photoPath);
   const who = card.isMine ? 'sua publicação' : `publicação de ${card.authorName}`;
+  // C4: "Davi · Ministério Comunicação" (ou só o nome, com "Nenhum").
+  const author = authorLine(card.authorName, card.authorMinistry);
 
   const header = (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingLeft: gutter, paddingRight: gutter - 12 }}>
-      <Avatar name={card.authorName} size={42} />
+      <ProfileAvatar name={card.authorName} uri={avatarUrl} size={42} testID={`post-avatar-${card.postId}`} />
       <View
         style={{ flex: 1, gap: 2, paddingVertical: spacing.xs }}
         accessible
-        accessibilityLabel={meta.spoken ? `${card.authorName}, ${meta.spoken}` : card.authorName}
+        accessibilityLabel={meta.spoken ? `${author.replace(' · ', ', ')}, ${meta.spoken}` : author.replace(' · ', ', ')}
       >
-        <AppText variant="rowLabel" style={{ lineHeight: 19 }}>
-          {card.authorName}
+        <AppText variant="rowLabel" style={{ lineHeight: 19 }} testID={`post-author-${card.postId}`}>
+          {author}
         </AppText>
         {meta.short ? (
           <AppText variant="caption" style={{ fontSize: 12, lineHeight: 16 }}>

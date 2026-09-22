@@ -10,14 +10,14 @@ import { StyleSheet } from 'react-native';
 import AccountScreen from '@/app/conta';
 import CommunityAccountScreen from '@/app/comunidade/conta-e-privacidade';
 import EntrarScreen from '@/app/comunidade/entrar';
+import CommunityProfileScreen from '@/app/comunidade/perfil';
 import MyPostsScreen from '@/app/comunidade/minhas-publicacoes';
 import { createCommunityApi, type CommunityClient } from '@/community/api';
-import {
-  CODE_FORMAT_COPY,
-  INVALID_CODE_COPY,
-  NAME_TOO_LONG_COPY,
-  UNDER_18_COPY,
-} from '@/ui/comunidade/perfil/EntradaFlow';
+import { authorLine } from '@/community/profile';
+import { listMinistries } from '@/journey/ministries';
+import { NAME_TOO_LONG_COPY } from '@/ui/comunidade/perfil/EntradaFlow';
+import { AVATAR_NOTE, NEWS_LABEL } from '@/ui/comunidade/perfil/PerfilCampos';
+import { DEVICE_ACCOUNT_COPY } from '@/ui/comunidade/perfil/parts';
 import { AX5, resetViewport, setViewport } from './support/viewport';
 
 jest.mock('expo-crypto', () => ({
@@ -45,6 +45,31 @@ jest.mock('react-native-safe-area-context', () => {
 });
 
 jest.mock('@expo/vector-icons', () => ({ Ionicons: () => null }));
+
+// Entrar sem e-mail (C2): a sessão do aparelho é do Supabase Auth, fora deste teste.
+jest.mock('@/community/deviceSession', () => ({ startDeviceSession: jest.fn(async () => {}) }));
+
+// Foto de perfil: galeria e reencode simulados (JPEG mínimo, sem metadados).
+const mockLaunch = jest.fn(async () => ({
+  canceled: false,
+  assets: [{ uri: 'file:///galeria/eu.jpg', width: 800, height: 800 }],
+}));
+jest.mock('expo-image-picker', () => ({ launchImageLibraryAsync: () => mockLaunch() }));
+jest.mock('expo-image-manipulator', () => {
+  const clean = Buffer.from([0xff, 0xd8, 0xff, 0xdb, 0x00, 0x04, 0x00, 0x00, 0xff, 0xda, 0x00, 0x02]).toString('base64');
+  const ref = {
+    width: 800,
+    height: 800,
+    release: () => {},
+    saveAsync: async () => ({ uri: 'file:///cache/eu.jpg', width: 800, height: 800, base64: clean }),
+  };
+  return {
+    SaveFormat: { JPEG: 'jpeg' },
+    ImageManipulator: {
+      manipulate: () => ({ renderAsync: async () => ref, resize: () => ({ renderAsync: async () => ref }), release: () => {} }),
+    },
+  };
+});
 
 // Interruptores e nuvem controlados pelo teste.
 const mockEnv = {
@@ -142,6 +167,7 @@ function mockApiFactory() {
 
 const router = jest.requireMock('expo-router').router as { push: jest.Mock; replace: jest.Mock; back: jest.Mock };
 const auth = jest.requireMock('@/cloud/auth') as { signOut: jest.Mock; requestAccountDeletion: jest.Mock };
+const deviceSession = jest.requireMock('@/community/deviceSession') as { startDeviceSession: jest.Mock };
 
 function statusRow(patch: Record<string, unknown> = {}) {
   return {
@@ -203,6 +229,8 @@ beforeEach(() => {
   router.push.mockClear();
   router.replace.mockClear();
   auth.signOut.mockClear();
+  deviceSession.startDeviceSession.mockClear();
+  mockLaunch.mockClear();
   auth.requestAccountDeletion.mockClear();
   resetViewport();
 });
@@ -226,19 +254,24 @@ describe('estados honestos', () => {
     expect(rpc).not.toHaveBeenCalled();
   });
 
-  test('sem conta: pede o e-mail e leva ao /conta com o motivo da comunidade', async () => {
+  test('sem conta: entra SEM e-mail, com um toque (C2); nada vai para o servidor da comunidade antes', async () => {
     mockEnv.email = null;
     await render(<EntrarScreen />);
-    expect(screen.getByText('Entre com o seu e-mail')).toBeTruthy();
+    expect(screen.getAllByText('Entrar na comunidade').length).toBeGreaterThan(0);
+    expect(screen.getByText(DEVICE_ACCOUNT_COPY)).toBeTruthy();
+    expect(screen.queryByText(/18 anos/)).toBeNull();
     await fireEvent.press(screen.getByTestId('community-sign-in'));
-    expect(router.push).toHaveBeenCalledWith('/conta?reason=comunidade');
+    expect(deviceSession.startDeviceSession).toHaveBeenCalledTimes(1);
+    expect(router.push).not.toHaveBeenCalledWith('/conta?reason=comunidade');
     expect(rpc).not.toHaveBeenCalled();
   });
 
-  test('sessão anônima não conta como conta de e-mail', async () => {
+  test('conta ligada ao aparelho (sessão anônima) vale: entra sem código e segue para a foto (C3)', async () => {
+    mockEnv.email = 'anon';
     mockEnv.anonymous = true;
     await render(<EntrarScreen />);
-    expect(screen.getByText('Entre com o seu e-mail')).toBeTruthy();
+    await waitFor(() => expect(screen.getByTestId('entrar-foto')).toBeTruthy());
+    expect(calls('join_community')).toEqual([['join_community', { chosen_name: null }]]);
   });
 
   test('servidor fora do ar: erro humano com "Tentar de novo", sem texto cru', async () => {
@@ -248,145 +281,232 @@ describe('estados honestos', () => {
     expect(screen.queryByText(/TypeError/)).toBeNull();
     mockRpc.results.my_community_status = statusRow();
     await fireEvent.press(screen.getByTestId('community-retry'));
-    await waitFor(() => expect(screen.getByTestId('entrar-idade')).toBeTruthy());
+    await waitFor(() => expect(screen.getByTestId('entrar-foto')).toBeTruthy());
   });
 });
 
-describe('entrada: 18+ → código → perfil', () => {
-  async function toCodeStep() {
+describe('entrada sem código: foto → nome e 16+ → ministério → bio (C1, C3, C4)', () => {
+  async function join() {
+    mockRpc.results.join_community = { data: true };
     await render(<EntrarScreen />);
-    await waitFor(() => expect(screen.getByTestId('entrar-idade')).toBeTruthy());
-    expect(screen.getByText('Passo 1 de 3')).toBeTruthy();
-    await fireEvent.press(screen.getByTestId('entrar-adulto'));
-    expect(screen.getByTestId('entrar-codigo')).toBeTruthy();
+    await waitFor(() => expect(screen.getByTestId('entrar-foto')).toBeTruthy());
   }
 
-  test('caminho feliz: uma só chamada, com o código normalizado, o nome e a declaração de 18+', async () => {
-    mockRpc.results.redeem_invite_code = { data: true };
-    await toCodeStep();
-    await fireEvent.changeText(screen.getByTestId('entrar-codigo-input'), 'abcde 23456');
-    expect(screen.getByTestId('entrar-codigo-formatado').props.children).toEqual(['Código: ', 'ABCDE-23456']);
-    await fireEvent.press(screen.getByTestId('entrar-codigo-continuar'));
-    expect(screen.getByTestId('entrar-perfil')).toBeTruthy();
-    // O código ainda não foi gasto: o servidor só é chamado com o nome.
-    expect(calls('redeem_invite_code')).toHaveLength(0);
+  test('sem código e sem aviso de 18+: abre direto no passo 1 de 4, a foto (C1, C3)', async () => {
+    await join();
+    expect(screen.getByText('Passo 1 de 4')).toBeTruthy();
+    expect(screen.queryByText(/18 anos|maiores de 18/)).toBeNull();
+    expect(screen.queryByText(/código/i)).toBeNull();
+    expect(calls('join_community')).toEqual([['join_community', { chosen_name: null }]]);
+  });
 
-    // Nenhum nome vem pré-preenchido (nunca derivado do e-mail).
-    expect(screen.getByTestId('entrar-nome-input').props.value).toBe('');
-    expect(screen.getByTestId('entrar-confirmar').props.accessibilityState.disabled).toBe(true);
-    await fireEvent.changeText(screen.getByTestId('entrar-nome-input'), '  Ana Souza ');
-    expect(screen.getByTestId('entrar-previa').props.accessibilityLabel).toBe('É assim que você aparece: Ana Souza');
-    await fireEvent.press(screen.getByTestId('entrar-confirmar'));
+  test('caminho completo: entra na hora; cada passo salva o que a pessoa escolheu', async () => {
+    mockRpc.results.set_community_avatar = { data: 'in_review' };
+    await join();
+    expect(screen.getByText('Passo 1 de 4')).toBeTruthy();
 
-    await waitFor(() => expect(screen.getByTestId('entrar-pronto')).toBeTruthy());
-    expect(calls('redeem_invite_code')).toEqual([
-      ['redeem_invite_code', { invite_code: 'ABCDE23456', chosen_name: 'Ana Souza', confirms_adult: true }],
+    // Foto: as regras aparecem ANTES da galeria; volta "em análise".
+    expect(screen.getByTestId('entrar-foto-continuar').props.accessibilityState.disabled).toBe(true);
+    await fireEvent.press(screen.getByTestId('perfil-foto-abrir'));
+    expect(screen.getByTestId('perfil-foto-regras')).toBeTruthy();
+    expect(mockLaunch).not.toHaveBeenCalled();
+    await fireEvent.press(screen.getByTestId('perfil-foto-escolher'));
+    await waitFor(() => expect(screen.getByTestId('perfil-foto-estado').props.children).toBe(AVATAR_NOTE.in_review));
+    expect(calls('set_community_avatar')).toEqual([
+      ['set_community_avatar', { new_path: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee.jpg' }],
     ]);
-    // A tela seguinte não promete publicar sem regras e consentimento.
+    await fireEvent.press(screen.getByTestId('entrar-foto-continuar'));
+
+    // Nome + 16+ (nada marcado de antemão, nome nunca derivado do e-mail).
+    expect(screen.getByTestId('perfil-nome').props.value).toBe('');
+    expect(screen.getByTestId('perfil-idade').props.accessibilityState.checked).toBe(false);
+    await fireEvent.changeText(screen.getByTestId('perfil-nome'), '  Davi ');
+    await fireEvent.press(screen.getByTestId('perfil-idade'));
+    await fireEvent.press(screen.getByTestId('entrar-confirmar'));
+    await waitFor(() => expect(screen.getByTestId('entrar-ministerio')).toBeTruthy());
+    expect(calls('set_community_profile').at(-1)?.[1]).toMatchObject({ new_name: 'Davi', confirms_16: true });
+
+    // Ministério da lista do app, com "Nenhum" no topo.
+    expect(screen.getByTestId('perfil-ministerio-nenhum')).toBeTruthy();
+    await fireEvent.press(screen.getByTestId('perfil-ministerio-nenhum'));
+    await fireEvent.press(screen.getByTestId('entrar-ministerio-continuar'));
+    await waitFor(() => expect(screen.getByTestId('entrar-bio')).toBeTruthy());
+    expect(calls('set_community_profile').at(-1)?.[1]).toMatchObject({ no_ministry: true, new_ministry: null });
+
+    // Bio: opcional.
+    await fireEvent.press(screen.getByTestId('entrar-pular-bio'));
+    await waitFor(() => expect(screen.getByTestId('entrar-pronto')).toBeTruthy());
+    expect(screen.getByTestId('entrar-previa').props.accessibilityLabel).toBe('É assim que você aparece: Davi');
+    expect(screen.queryByTestId('entrar-falta')).toBeNull();
     expect(screen.getByText(/mostra as regras da comunidade e pede o seu consentimento/)).toBeTruthy();
   });
 
+  test('tudo pode ser pulado; o fim diz o que falta para publicar, sem bloquear quem só quer ler', async () => {
+    await join();
+    await fireEvent.press(screen.getByTestId('entrar-pular-foto'));
+    await fireEvent.press(screen.getByTestId('entrar-pular-nome'));
+    await fireEvent.press(screen.getByTestId('entrar-pular-ministerio'));
+    await fireEvent.press(screen.getByTestId('entrar-pular-bio'));
+    expect(screen.getByTestId('entrar-pronto')).toBeTruthy();
+    expect(calls('set_community_profile')).toHaveLength(0);
+    expect(screen.getByText(/Para publicar, falta: foto de perfil, nome, a confirmação de 16 anos ou mais e ministério/)).toBeTruthy();
+    await fireEvent.press(screen.getByTestId('entrar-completar'));
+    expect(router.replace).toHaveBeenCalledWith('/comunidade/perfil');
+  });
+
+  test('ministério aparece como "Nome · Ministério X"', async () => {
+    await join();
+    await fireEvent.press(screen.getByTestId('entrar-pular-foto'));
+    await fireEvent.changeText(screen.getByTestId('perfil-nome'), 'Davi');
+    await fireEvent.press(screen.getByTestId('entrar-confirmar'));
+    await waitFor(() => expect(screen.getByTestId('entrar-ministerio')).toBeTruthy());
+    const first = listMinistries()[0].name;
+    await fireEvent.press(screen.getByTestId(`perfil-ministerio-${first}`));
+    await fireEvent.press(screen.getByTestId('entrar-ministerio-continuar'));
+    await waitFor(() => expect(screen.getByTestId('entrar-bio')).toBeTruthy());
+    expect(calls('set_community_profile').at(-1)?.[1]).toMatchObject({ new_ministry: first, no_ministry: false });
+    await fireEvent.press(screen.getByTestId('entrar-pular-bio'));
+    expect(screen.getByTestId('entrar-previa').props.accessibilityLabel).toBe(
+      `É assim que você aparece: ${authorLine('Davi', first)}`,
+    );
+  });
+
   test('nome longo demais: a tela diz por que o botão não funciona', async () => {
-    await toCodeStep();
-    await fireEvent.changeText(screen.getByTestId('entrar-codigo-input'), 'ABCDE-23456');
-    await fireEvent.press(screen.getByTestId('entrar-codigo-continuar'));
-    expect(screen.queryByTestId('entrar-nome-longo')).toBeNull();
-    await fireEvent.changeText(screen.getByTestId('entrar-nome-input'), 'M'.repeat(41));
-    expect(screen.getByTestId('entrar-nome-longo').props.children).toBe(NAME_TOO_LONG_COPY);
-    expect(screen.getByTestId('entrar-nome-longo').props.accessibilityLiveRegion).toBe('polite');
+    await join();
+    await fireEvent.press(screen.getByTestId('entrar-pular-foto'));
+    expect(screen.queryByTestId('perfil-nome-longo')).toBeNull();
+    await fireEvent.changeText(screen.getByTestId('perfil-nome'), 'M'.repeat(41));
+    expect(screen.getByTestId('perfil-nome-longo').props.children).toBe(NAME_TOO_LONG_COPY);
+    expect(screen.getByTestId('perfil-nome-longo').props.accessibilityLiveRegion).toBe('polite');
     expect(screen.getByTestId('entrar-confirmar').props.accessibilityState.disabled).toBe(true);
-    await fireEvent.changeText(screen.getByTestId('entrar-nome-input'), 'Maria');
-    expect(screen.queryByTestId('entrar-nome-longo')).toBeNull();
+    await fireEvent.changeText(screen.getByTestId('perfil-nome'), 'Maria');
+    expect(screen.queryByTestId('perfil-nome-longo')).toBeNull();
   });
 
-  test('código sem forma de código: avisa no aparelho e não gasta tentativa', async () => {
-    await toCodeStep();
-    await fireEvent.changeText(screen.getByTestId('entrar-codigo-input'), 'OI123');
-    await fireEvent.press(screen.getByTestId('entrar-codigo-continuar'));
-    expect(screen.getByTestId('entrar-codigo-erro').props.children).toBe(CODE_FORMAT_COPY);
-    expect(screen.getByTestId('entrar-codigo')).toBeTruthy();
-    expect(calls('redeem_invite_code')).toHaveLength(0);
-  });
-
-  test('código errado, vencido ou cancelado: volta ao passo do código com a mesma frase', async () => {
-    mockRpc.results.redeem_invite_code = { data: false };
-    await toCodeStep();
-    await fireEvent.changeText(screen.getByTestId('entrar-codigo-input'), 'ABCDE-23456');
-    await fireEvent.press(screen.getByTestId('entrar-codigo-continuar'));
-    await fireEvent.changeText(screen.getByTestId('entrar-nome-input'), 'Ana');
-    await fireEvent.press(screen.getByTestId('entrar-confirmar'));
-    await waitFor(() => expect(screen.getByTestId('entrar-codigo')).toBeTruthy());
-    expect(screen.getByTestId('entrar-codigo-erro').props.children).toBe(INVALID_CODE_COPY);
-    expect(INVALID_CODE_COPY).toMatch(/errado, vencido ou cancelado/);
-    // O que a pessoa digitou continua lá para corrigir.
-    expect(screen.getByTestId('entrar-codigo-input').props.value).toBe('ABCDE-23456');
-  });
-
-  test('limite de tentativas: frase própria, sem texto do servidor', async () => {
-    mockRpc.results.redeem_invite_code = { error: { code: 'CM003', message: 'limite de tentativas' } };
-    await toCodeStep();
-    await fireEvent.changeText(screen.getByTestId('entrar-codigo-input'), 'ABCDE-23456');
-    await fireEvent.press(screen.getByTestId('entrar-codigo-continuar'));
-    await fireEvent.changeText(screen.getByTestId('entrar-nome-input'), 'Ana');
-    await fireEvent.press(screen.getByTestId('entrar-confirmar'));
-    await waitFor(() => expect(screen.getByTestId('entrar-codigo-erro')).toBeTruthy());
-    expect(screen.getByTestId('entrar-codigo-erro').props.children).toMatch(/Muitas tentativas/);
-    expect(screen.queryByText(/limite de tentativas/)).toBeNull();
-  });
-
-  test('quem tem menos de 18 não segue, e nada é enviado', async () => {
+  test('falha ao entrar: erro humano com "Tentar de novo", sem texto do servidor', async () => {
+    mockRpc.results.join_community = { error: { message: 'TypeError: Network request failed' } };
     await render(<EntrarScreen />);
-    await waitFor(() => expect(screen.getByTestId('entrar-idade')).toBeTruthy());
-    await fireEvent.press(screen.getByTestId('entrar-menor-de-18'));
-    expect(screen.getByText(UNDER_18_COPY)).toBeTruthy();
-    await fireEvent.press(screen.getByTestId('entrar-menor-voltar'));
-    expect(router.replace).toHaveBeenCalledWith('/');
-    expect(calls('redeem_invite_code')).toHaveLength(0);
+    await waitFor(() => expect(screen.getByText('Não foi possível entrar agora')).toBeTruthy());
+    expect(screen.queryByText(/TypeError/)).toBeNull();
+    mockRpc.results.join_community = { data: true };
+    await fireEvent.press(screen.getByTestId('entrar-tentar-de-novo'));
+    await waitFor(() => expect(screen.getByTestId('entrar-foto')).toBeTruthy());
   });
 
-  test('a declaração de idade é um toque explícito; não há campo de nascimento, CPF ou telefone', async () => {
+  test('bloqueio vindo do servidor na entrada (CM004): tela de suspensão', async () => {
+    mockRpc.results.join_community = { error: { code: 'CM004', message: 'entrada na comunidade bloqueada' } };
     await render(<EntrarScreen />);
-    await waitFor(() => expect(screen.getByTestId('entrar-idade')).toBeTruthy());
-    expect(screen.queryByRole('checkbox')).toBeNull();
-    expect(textInputs()).toHaveLength(0);
-    await fireEvent.press(screen.getByTestId('entrar-adulto'));
-    await fireEvent.changeText(screen.getByTestId('entrar-codigo-input'), 'ABCDE-23456');
-    await fireEvent.press(screen.getByTestId('entrar-codigo-continuar'));
+    await waitFor(() => expect(screen.getByText('Participação suspensa')).toBeTruthy());
+    expect(screen.queryByText(/bloqueada/)).toBeNull();
+  });
+
+  test('a idade é uma caixa desmarcada; não há campo de nascimento, CPF ou telefone', async () => {
+    await join();
+    await fireEvent.press(screen.getByTestId('entrar-pular-foto'));
     expect(textInputs().map((node) => node.props.accessibilityLabel)).toEqual(['Seu nome na comunidade']);
-    expect(screen.queryByText(/CPF|telefone/i)).toBeNull();
+    expect(screen.getAllByRole('checkbox')).toHaveLength(1);
+    expect(screen.queryByText(/CPF|telefone|nascimento:/i)).toBeNull();
   });
 
-  test('suspenso ou removido: não entra com outro código', async () => {
+  test('suspenso ou removido: não entra de novo (nem tenta)', async () => {
     mockRpc.results.my_community_status = statusRow({ member_status: 'suspended' });
     await render(<EntrarScreen />);
     await waitFor(() => expect(screen.getByText('Participação suspensa')).toBeTruthy());
-    expect(screen.queryByTestId('entrar-codigo-input')).toBeNull();
+    expect(calls('join_community')).toHaveLength(0);
+    expect(screen.queryByTestId('entrar-foto')).toBeNull();
   });
 
-  test('quem já é membro não refaz a entrada', async () => {
+  test('quem já é membro não refaz a entrada e pode editar o perfil', async () => {
     mockRpc.results.my_community_status = MEMBER;
     await render(<EntrarScreen />);
     await waitFor(() => expect(screen.getByText('Você já está na comunidade')).toBeTruthy());
     expect(screen.getByText('Você aparece como Ana.')).toBeTruthy();
+    await fireEvent.press(screen.getByTestId('entrar-editar-perfil'));
+    expect(router.push).toHaveBeenCalledWith('/comunidade/perfil');
   });
 
-  test('"Voltar" no meio volta um passo, não sai da entrada', async () => {
-    await toCodeStep();
+  test('"Voltar" no meio do perfil volta um passo, não sai da entrada', async () => {
+    await join();
+    await fireEvent.press(screen.getByTestId('entrar-pular-foto'));
+    expect(screen.getByTestId('entrar-perfil')).toBeTruthy();
     await fireEvent.press(screen.getByTestId('back-button'));
-    expect(screen.getByTestId('entrar-idade')).toBeTruthy();
+    expect(screen.getByTestId('entrar-foto')).toBeTruthy();
     expect(router.back).not.toHaveBeenCalled();
   });
 
   test('fonte a 3,571×: os campos crescem (minHeight, nunca height) e a barra empilha', async () => {
     setViewport(AX5);
-    await render(<EntrarScreen />);
-    await waitFor(() => expect(screen.getByTestId('entrar-idade')).toBeTruthy());
+    await join();
     expect(screen.getByTestId('back-bar-second-row')).toBeTruthy();
-    await fireEvent.press(screen.getByTestId('entrar-adulto'));
-    const style = StyleSheet.flatten(screen.getByTestId('entrar-codigo-input').props.style);
+    await fireEvent.press(screen.getByTestId('entrar-pular-foto'));
+    const style = StyleSheet.flatten(screen.getByTestId('perfil-nome').props.style);
     expect(style.height).toBeUndefined();
     expect(style.minHeight).toBeGreaterThanOrEqual(48);
     expect(style.fontWeight).toBeUndefined();
+  });
+});
+
+describe('perfil da comunidade (C1, C4, N3)', () => {
+  const COMPLETE = statusRow({
+    is_member: true,
+    member_status: 'active',
+    display_name: 'Davi',
+    ministry: null,
+    ministry_answered: true,
+    avatar_path: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee.jpg',
+    avatar_status: 'approved',
+    age_confirmed: true,
+    profile_complete: true,
+  });
+
+  test('mostra "é assim que você aparece" e a foto assinada; e-mail vazio e novidades DESMARCADAS', async () => {
+    mockRpc.results.my_community_status = COMPLETE;
+    await render(<CommunityProfileScreen />);
+    await waitFor(() => expect(screen.getByTestId('perfil')).toBeTruthy());
+    expect(screen.getByTestId('perfil-previa').props.accessibilityLabel).toBe('É assim que você aparece: Davi');
+    expect(screen.queryByTestId('perfil-falta')).toBeNull();
+    expect(screen.getByTestId('perfil-email').props.value).toBe('');
+    expect(screen.getByTestId('perfil-novidades').props.accessibilityState.checked).toBe(false);
+    expect(screen.getByLabelText(NEWS_LABEL)).toBeTruthy();
+    await waitFor(() =>
+      expect(createSignedUrls).toHaveBeenCalledWith(['aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee.jpg'], expect.any(Number)),
+    );
+  });
+
+  test('N3: novidades sem e-mail não salva; com e-mail, vai junto com o aceite separado', async () => {
+    mockRpc.results.my_community_status = COMPLETE;
+    await render(<CommunityProfileScreen />);
+    await waitFor(() => expect(screen.getByTestId('perfil')).toBeTruthy());
+    await fireEvent.press(screen.getByTestId('perfil-novidades'));
+    expect(screen.getByTestId('perfil-novidades-sem-email')).toBeTruthy();
+    expect(screen.getByTestId('perfil-salvar').props.accessibilityState.disabled).toBe(true);
+    await fireEvent.changeText(screen.getByTestId('perfil-email'), 'Davi@Exemplo.com');
+    await fireEvent.press(screen.getByTestId('perfil-salvar'));
+    await waitFor(() => expect(screen.getByTestId('perfil-salvo')).toBeTruthy());
+    expect(calls('set_community_contact')).toEqual([
+      ['set_community_contact', { new_email: 'davi@exemplo.com', wants_news: true }],
+    ]);
+  });
+
+  test('vindo de Publicar com o perfil incompleto: diz o que falta; completo, segue para Publicar', async () => {
+    mockParams.current = { next: '/comunidade/publicar', day: '9' };
+    mockRpc.results.my_community_status = statusRow({ is_member: true, member_status: 'active', display_name: 'Davi' });
+    await render(<CommunityProfileScreen />);
+    await waitFor(() => expect(screen.getByTestId('perfil-falta')).toBeTruthy());
+    await fireEvent.press(screen.getByTestId('perfil-salvar'));
+    await waitFor(() => expect(screen.getByTestId('perfil-salvo')).toBeTruthy());
+    expect(router.replace).not.toHaveBeenCalled();
+  });
+
+  test('perfil completo vindo de Publicar: salvar leva de volta a Publicar com o dia', async () => {
+    mockParams.current = { next: '/comunidade/publicar', day: '9' };
+    mockRpc.results.my_community_status = COMPLETE;
+    await render(<CommunityProfileScreen />);
+    await waitFor(() => expect(screen.getByTestId('perfil')).toBeTruthy());
+    await fireEvent.press(screen.getByTestId('perfil-salvar'));
+    await waitFor(() =>
+      expect(router.replace).toHaveBeenCalledWith({ pathname: '/comunidade/publicar', params: { day: '9' } }),
+    );
   });
 });
 

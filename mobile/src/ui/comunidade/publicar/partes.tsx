@@ -5,7 +5,7 @@ import { Keyboard, Platform, Text, View } from 'react-native';
 import { AppText, Block, Button, StateView, useFace } from '@/ui/components';
 import { Icon } from '@/ui/icons';
 import { goBackOrHome } from '@/ui/BackBar';
-import { COMMUNITY_ENTRY_ROUTE, SIGN_IN_ROUTE } from '@/ui/comunidade/perfil/routes';
+import { COMMUNITY_ENTRY_ROUTE } from '@/ui/comunidade/perfil/routes';
 import { MIN_TOUCH, type Palette, faces, spacing, useTheme } from '@/ui/theme';
 
 import { audienceSentence, type TermsDocument } from './textos';
@@ -143,14 +143,14 @@ export function useKeyboardVisible(): boolean {
 
 /**
  * Tudo o que não é o formulário: carregando, Comunidade desligada, sem conta,
- * erro do servidor, sem código, suspenso. Sempre com uma saída.
+ * erro do servidor, sem perfil, suspenso. Sempre com uma saída.
  */
 export function CommunityGateView({
   state,
   step,
 }: {
   state: CommunityStatusState & { reload: () => void };
-  step?: 'needs_invite' | 'blocked' | 'cannot_publish';
+  step?: 'needs_join' | 'blocked' | 'profile' | 'cannot_publish';
 }) {
   const back = <Button title="Voltar" variant="outline" onPress={goBackOrHome} testID="gate-back" />;
   if (state.kind === 'loading') return <StateView kind="loading" />;
@@ -162,11 +162,11 @@ export function CommunityGateView({
       <StateView
         kind="empty"
         icon="community"
-        title="Entre com o seu e-mail"
-        message="A comunidade é para quem tem 18 anos ou mais e uma conta com e-mail."
+        title="Entre na comunidade"
+        message="Para escrever para a igreja, entre na comunidade. Basta criar o seu perfil; não precisa de e-mail."
         action={
           <View style={{ gap: spacing.sm, alignSelf: 'stretch' }}>
-            <Button title="Entrar com meu e-mail" onPress={() => router.push(SIGN_IN_ROUTE)} testID="gate-sign-in" />
+            <Button title="Entrar na comunidade" onPress={() => router.push(COMMUNITY_ENTRY_ROUTE)} testID="gate-sign-in" />
             <Button title="Agora não" variant="underline" onPress={goBackOrHome} />
           </View>
         }
@@ -189,16 +189,16 @@ export function CommunityGateView({
       />
     );
   }
-  if (step === 'needs_invite') {
+  if (step === 'needs_join') {
     return (
       <StateView
         kind="empty"
         icon="community"
         title="Entre na comunidade"
-        message="Para participar, entre com o código da sua igreja."
+        message="Para participar, crie o seu perfil. Quem cria o perfil entra na comunidade."
         action={
           <View style={{ gap: spacing.sm, alignSelf: 'stretch' }}>
-            <Button title="Entrar com o código" onPress={() => router.push(COMMUNITY_ENTRY_ROUTE)} testID="gate-invite" />
+            <Button title="Criar meu perfil" onPress={() => router.push(COMMUNITY_ENTRY_ROUTE)} testID="gate-join" />
             <Button title="Agora não" variant="underline" onPress={goBackOrHome} testID="gate-back" />
           </View>
         }

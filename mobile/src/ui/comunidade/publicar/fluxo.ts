@@ -1,15 +1,19 @@
 import type { CommunityStatus, ContentStatus } from '@/community/types';
 
 /**
- * Ordem das telas antes da primeira publicação, comentário ou Amém
- * (rascunho legal §1 e §2): regras (rolar até o fim + "Li e aceito") → consentimento
- * destacado (C4) → a ação. Puro, para testar sem tela.
+ * Ordem das telas antes da primeira publicação ou comentário: perfil completo
+ * (foto, nome, ministério e 16+, feedback de 2026-09-22 C1/C4) → regras (rolar
+ * até o fim + "Li e aceito", rascunho legal §1) → consentimento destacado (§2)
+ * → a ação. O Amém não passa pelo perfil (ninguém vê quem deu Amém). Puro, para
+ * testar sem tela.
  */
 export type PublishStep =
-  /** Não entrou na comunidade com o código da igreja. */
-  | 'needs_invite'
+  /** Ainda não entrou na comunidade (não criou o perfil; sem código desde o C3). */
+  | 'needs_join'
   /** Participação suspensa ou removida. */
   | 'blocked'
+  /** Falta foto, nome, ministério ou a confirmação de 16+ (o servidor recusa com CM007). */
+  | 'profile'
   | 'rules'
   | 'consent'
   | 'form'
@@ -17,8 +21,9 @@ export type PublishStep =
   | 'cannot_publish';
 
 export function publishStep(status: CommunityStatus): PublishStep {
-  if (!status.isMember) return 'needs_invite';
+  if (!status.isMember) return 'needs_join';
   if (status.memberStatus !== 'active') return 'blocked';
+  if (!status.profileComplete) return 'profile';
   if (status.needsRules) return 'rules';
   if (status.needsPublishConsent) return 'consent';
   if (!status.canPublish) return 'cannot_publish';
@@ -29,6 +34,8 @@ export const ROUTES = {
   publicar: '/comunidade/publicar',
   consentimento: '/comunidade/consentimento',
   regras: '/comunidade/regras',
+  /** Perfil da comunidade (foto, nome, ministério, bio, 16+ e e-mail opcional). */
+  perfil: '/comunidade/perfil',
 } as const;
 
 /**

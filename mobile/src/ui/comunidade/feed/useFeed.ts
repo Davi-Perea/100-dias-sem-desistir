@@ -17,6 +17,10 @@ import { humanError } from './useCommunity';
 export type CardModel = {
   postId: string;
   authorName: string;
+  /** "Nome · Ministério X" (C4); null = "Nenhum" ou não respondeu: só o nome. */
+  authorMinistry: string | null;
+  /** Foto de perfil (aprovada; a própria sempre). null = iniciais. */
+  avatarPath: string | null;
   body: string | null;
   photoPath: string | null;
   dayNumber: number | null;
@@ -32,6 +36,8 @@ export function fromFeed(post: FeedPost): CardModel {
   return {
     postId: post.postId,
     authorName: post.authorName,
+    authorMinistry: post.authorMinistry,
+    avatarPath: post.authorAvatarPath,
     body: post.body,
     photoPath: post.photoPath,
     dayNumber: post.dayNumber,
@@ -42,10 +48,12 @@ export function fromFeed(post: FeedPost): CardModel {
   };
 }
 
-export function fromMine(post: MyPost, myName: string): CardModel {
+export function fromMine(post: MyPost, myName: string, myMinistry: string | null = null, myAvatar: string | null = null): CardModel {
   return {
     postId: post.postId,
     authorName: myName,
+    authorMinistry: myMinistry,
+    avatarPath: myAvatar,
     body: post.body,
     photoPath: post.photoPath,
     dayNumber: post.dayNumber,
@@ -67,7 +75,12 @@ type FeedState =
       ended: boolean;
     };
 
-export function useFeed(api: CommunityApi | null, myName: string) {
+export function useFeed(
+  api: CommunityApi | null,
+  myName: string,
+  myMinistry: string | null = null,
+  myAvatar: string | null = null,
+) {
   const [state, setState] = useState<FeedState>({ phase: 'loading' });
   const [photos, setPhotos] = useState<Map<string, string>>(new Map());
   const [loadingMore, setLoadingMore] = useState(false);
@@ -82,7 +95,8 @@ export function useFeed(api: CommunityApi | null, myName: string) {
     async (cards: CardModel[]) => {
       if (!api) return;
       try {
-        const urls = await api.signPhotoUrls(cards.map((c) => c.photoPath));
+        // Fotos dos posts e as fotos de perfil, numa chamada só.
+        const urls = await api.signPhotoUrls(cards.flatMap((c) => [c.photoPath, c.avatarPath]));
         if (urls.size === 0) return;
         setPhotos((prev) => new Map([...prev, ...urls]));
       } catch {
@@ -106,7 +120,9 @@ export function useFeed(api: CommunityApi | null, myName: string) {
           api.myPosts().catch(() => [] as MyPost[]),
         ]);
         if (generation.current !== id) return;
-        const inReview = mine.filter((p) => p.status === 'in_review').map((p) => fromMine(p, myName));
+        const inReview = mine
+          .filter((p) => p.status === 'in_review')
+          .map((p) => fromMine(p, myName, myMinistry, myAvatar));
         const posts = page.posts.map(fromFeed);
         setState({ phase: 'ready', inReview, posts, cursor: page.nextCursor, ended: page.ended });
         sign([...inReview, ...posts]);
@@ -117,7 +133,7 @@ export function useFeed(api: CommunityApi | null, myName: string) {
         if (generation.current === id) setRefreshing(false);
       }
     },
-    [api, myName, sign],
+    [api, myName, myMinistry, myAvatar, sign],
   );
 
   const refresh = useCallback(() => load('refresh'), [load]);

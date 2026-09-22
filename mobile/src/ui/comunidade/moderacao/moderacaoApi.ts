@@ -89,6 +89,18 @@ export type HistoryEntry = {
 
 export type ContentDecision = 'approve' | 'reject' | 'remove';
 
+/** Foto de perfil em análise (C4, 2026-09-22). Só o ticket: nunca o user_id. */
+export type AvatarItem = { ticket: string; avatarPath: string; displayName: string; submittedAt: string };
+
+export function toAvatarItem(row: Row): AvatarItem {
+  return {
+    ticket: typeof row.ticket === 'string' ? row.ticket : '',
+    avatarPath: typeof row.avatar_path === 'string' ? row.avatar_path : '',
+    displayName: typeof row.display_name === 'string' ? row.display_name : '',
+    submittedAt: typeof row.submitted_at === 'string' ? row.submitted_at : '',
+  };
+}
+
 /** De onde o servidor tira quem suspender: o conteúdo ou a denúncia, nunca um user_id. */
 export type SuspendTarget = { kind: 'post' | 'comment' | 'report'; id: string };
 
@@ -258,6 +270,24 @@ export function createModerationApi(client: Pick<CommunityClient, 'rpc'>) {
           note_for_author: input.decision === 'approve' ? null : note,
         });
       }
+    },
+
+    /**
+     * Fotos de perfil em análise. Servidor sem a RPC ainda (migration
+     * 20260922120000 não aplicada) = lista vazia, sem quebrar a fila.
+     */
+    async avatarQueue(): Promise<AvatarItem[]> {
+      const result = await raw('community_avatar_queue');
+      if (result.error) {
+        if (isMissingFunction(result.error)) return [];
+        throw toCommunityError(result.error);
+      }
+      return rows(result.data).map(toAvatarItem).filter((item) => isUuid(item.ticket) && item.avatarPath !== '');
+    },
+
+    /** Aprovar mostra a foto para a comunidade; recusar apaga o arquivo e a pessoa escolhe outra. */
+    async decideAvatar(ticket: string, approve: boolean): Promise<void> {
+      await call('moderate_community_avatar', { target_ticket: requireUuid(ticket), approve });
     },
 
     /** Fecha a denúncia sem mexer no conteúdo: 'dismissed' (manter) ou 'actioned'. */

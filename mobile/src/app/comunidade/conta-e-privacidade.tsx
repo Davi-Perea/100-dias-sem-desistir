@@ -9,7 +9,7 @@ import type { CommunityApi } from '@/community/api';
 import type { CommunityStatus, MyBlock } from '@/community/types';
 import { AppText, Button, Cap, Rule, SettingRow } from '@/ui/components';
 import { AccountDeletionSection } from '@/ui/comunidade/perfil/AccountDeletionSection';
-import { COMMUNITY_ENTRY_ROUTE, MY_POSTS_ROUTE } from '@/ui/comunidade/perfil/routes';
+import { COMMUNITY_ENTRY_ROUTE, COMMUNITY_PROFILE_ROUTE, MY_POSTS_ROUTE } from '@/ui/comunidade/perfil/routes';
 import {
   AccountStateView,
   ActionError,
@@ -34,10 +34,12 @@ import { announceNotice } from '@/ui/voce/announce';
  *   depende da Comunidade (explica o que some, confirmação forte e o caminho
  *   pela web; sem a exclusão pronta, diz a verdade sem botão morto).
  *
- * Nenhum dado além do e-mail e do nome escolhido: sem CPF, telefone ou data de nascimento.
+ * Desde 2026-09-22 (C2) a conta pode ser só a do aparelho, sem e-mail. O perfil
+ * (foto, nome, ministério, bio, 16+ e o e-mail opcional com novidades) tem tela
+ * própria. Sem CPF, telefone ou data de nascimento.
  */
 
-type Sheet = 'purge' | 'leave' | { unblock: MyBlock } | null;
+type Sheet = 'purge' | 'leave' | 'signout' | { unblock: MyBlock } | null;
 
 export default function CommunityAccountScreen() {
   const account = useCommunityAccount();
@@ -54,7 +56,7 @@ function AccountAndPrivacy({
 }: {
   api: CommunityApi;
   status: CommunityStatus;
-  email: string;
+  email: string | null;
 }) {
   const [sheet, setSheet] = useState<Sheet>(null);
   const [busy, setBusy] = useState(false);
@@ -139,9 +141,19 @@ function AccountAndPrivacy({
 
       <View style={{ gap: spacing.xs }}>
         <Cap>Sua conta</Cap>
-        <SettingRow first label="E-mail" value={email} testID="account-email" />
-        {member && status.displayName ? (
-          <SettingRow label="Nome na comunidade" value={status.displayName} testID="account-display-name" />
+        <SettingRow
+          first
+          label={email ? 'E-mail da conta' : 'Conta'}
+          value={email ?? 'ligada a este celular'}
+          testID="account-email"
+        />
+        {member ? (
+          <SettingRow
+            label="Perfil na comunidade"
+            value={status.displayName ?? undefined}
+            onPress={() => router.push(COMMUNITY_PROFILE_ROUTE)}
+            testID="account-display-name"
+          />
         ) : null}
         {!member ? (
           <SettingRow
@@ -150,7 +162,11 @@ function AccountAndPrivacy({
             testID="account-enter"
           />
         ) : null}
-        <AppText variant="caption">Ninguém na comunidade vê o seu e-mail.</AppText>
+        <AppText variant="caption">
+          {email
+            ? 'Ninguém na comunidade vê o seu e-mail.'
+            : 'Sem e-mail, trocar de celular ou apagar o app faz perder esta conta. No perfil você pode deixar um e-mail (opcional).'}
+        </AppText>
       </View>
 
       {notice ? (
@@ -241,8 +257,8 @@ function AccountAndPrivacy({
             <AppText variant="action">Deixar de participar da comunidade</AppText>
             <AppText variant="bodySm">
               Retira o seu consentimento e apaga tudo o que você fez na comunidade: publicações, comentários, Améns,
-              bloqueios e o seu nome. A sua conta e a sua jornada continuam. Para voltar, é preciso um código da
-              igreja.
+              bloqueios e o seu nome. A sua conta e a sua jornada continuam. Para participar de novo, crie o perfil
+              outra vez.
             </AppText>
             <Button
               title="Deixar de participar da comunidade"
@@ -262,11 +278,26 @@ function AccountAndPrivacy({
         <Button
           title="Sair desta conta"
           variant="outline"
-          onPress={leaveAccount}
+          // Conta só do aparelho: sair perde o acesso para sempre. Pede confirmação.
+          onPress={email ? leaveAccount : () => open('signout')}
           loading={busy && sheet === null}
           testID="account-sign-out"
         />
       </View>
+
+      <ConfirmSheet
+        visible={sheet === 'signout'}
+        title="Sair desta conta?"
+        message="Esta conta não tem e-mail: depois de sair, não dá para voltar a ela. Para participar de novo, será preciso criar o perfil outra vez."
+        confirmLabel="Sair mesmo assim"
+        onConfirm={() => {
+          setSheet(null);
+          leaveAccount();
+        }}
+        onClose={() => setSheet(null)}
+        busy={busy}
+        testID="sheet-signout"
+      />
 
       <ConfirmSheet
         visible={sheet === 'purge'}

@@ -39,6 +39,8 @@ function load(env: Partial<Record<(typeof ENV_KEYS)[number], string>>): { api: A
 
 const DEMO_ENV = { EXPO_PUBLIC_DEMO_MODE: 'true', EXPO_PUBLIC_COMMUNITY_ENABLED: 'true', EXPO_PUBLIC_DEMO_DAY: '3' };
 const SHA = 'ab'.repeat(32);
+/** JPEG mínimo sem metadados (SOI, DQT curto, SOS). */
+const CLEAN_JPEG = Uint8Array.from([0xff, 0xd8, 0xff, 0xdb, 0x00, 0x04, 0x00, 0x00, 0xff, 0xda, 0x00, 0x02]);
 
 afterEach(() => {
   g.__DEV__ = ORIGINAL_DEV;
@@ -98,47 +100,48 @@ describe('portão da demonstração', () => {
 });
 
 describe('comunidade de demonstração em memória', () => {
+  let demoAvatarPath = '';
   function setup() {
     g.__DEV__ = true;
     const { demo } = load(DEMO_ENV);
     demo._resetDemoForTests(Date.parse('2026-09-25T12:00:00Z'));
     const api = demo.getDemoCommunityApi()!;
+    demoAvatarPath = demo.DEMO_AVATAR_PATH;
     return { api, demo };
   }
 
   async function join() {
     const ctx = setup();
     ctx.demo.demoSignIn();
-    await expect(ctx.api.redeemInviteCode({ code: 'DEMAX-23456', displayName: 'Davi', confirmsAdult: true })).resolves.toBe(
-      'joined',
-    );
+    await expect(ctx.api.joinCommunity({ displayName: 'Davi' })).resolves.toBeUndefined();
     return ctx;
   }
 
+  /** Perfil completo (C4): foto, nome, 16+ e ministério. A foto fica só na memória. */
+  async function completeProfile(api: NonNullable<ReturnType<DemoModule['getDemoCommunityApi']>>) {
+    await api.setAvatar({ bytes: CLEAN_JPEG, uri: 'file:///cache/eu.jpg' });
+    await api.updateProfile({ name: 'Davi', confirms16: true, ministry: 'Comunicação' });
+  }
+
   async function consent(api: NonNullable<ReturnType<DemoModule['getDemoCommunityApi']>>) {
+    await completeProfile(api);
     await api.acceptTerms({ purpose: 'community_rules', version: 'PENDENTE', sha256: SHA, appVersion: 't' });
     await api.acceptTerms({ purpose: 'community_publish', version: 'PENDENTE', sha256: SHA, appVersion: 't' });
   }
 
-  it('sem o passo de e-mail simulado, não há sessão', async () => {
+  it('sem entrar (conta do aparelho), não há sessão; entrar é direto, sem e-mail (C2)', async () => {
     const { api, demo } = setup();
     expect(demo.getDemoSession()).toBeNull();
     await expect(api.getStatus()).rejects.toMatchObject({ code: 'session_expired' });
     demo.demoSignIn();
-    expect(demo.getDemoSession()?.email).toBe(demo.DEMO_EMAIL_LABEL);
+    expect(demo.getDemoSession()).toEqual({ userId: expect.any(String) });
     await expect(api.getStatus()).resolves.toMatchObject({ isMember: false, needsRules: true, rulesVersion: 'PENDENTE' });
   });
 
-  it('só o código de demonstração entra; código errado dá a mesma resposta do servidor', async () => {
+  it('C3: sem código, a demonstração entra direto', async () => {
     const { api, demo } = setup();
     demo.demoSignIn();
-    await expect(api.redeemInviteCode({ code: 'ABCDE-23456', displayName: 'Davi', confirmsAdult: true })).resolves.toBe(
-      'invalid_code',
-    );
-    await expect(api.redeemInviteCode({ code: 'DEMAX23456', displayName: 'Davi', confirmsAdult: false })).rejects.toMatchObject(
-      { code: 'needs_adult_account' },
-    );
-    await expect(api.redeemInviteCode({ code: 'demax-23456', displayName: 'Davi', confirmsAdult: true })).resolves.toBe('joined');
+    await api.joinCommunity({ displayName: 'Davi' });
     await expect(api.getStatus()).resolves.toMatchObject({ isMember: true, memberStatus: 'active', displayName: 'Davi' });
   });
 
@@ -194,10 +197,49 @@ describe('comunidade de demonstração em memória', () => {
     expect((await api.feedPage()).posts.some((p) => p.postId === ok.id)).toBe(false);
   });
 
-  it('foto não é enviada na demonstração', async () => {
+  it('C4: com as regras e o consentimento, publicar e comentar ainda pedem o perfil completo; Amém não', async () => {
     const { api } = await join();
+    await api.acceptTerms({ purpose: 'community_rules', version: 'PENDENTE', sha256: SHA, appVersion: 't' });
+    await api.acceptTerms({ purpose: 'community_publish', version: 'PENDENTE', sha256: SHA, appVersion: 't' });
+    const [first] = (await api.feedPage()).posts;
+    await expect(api.createPost({ body: 'Oi' })).rejects.toMatchObject({ code: 'needs_profile' });
+    await expect(api.createComment(first.postId, 'Amém')).rejects.toMatchObject({ code: 'needs_profile' });
+    await expect(api.setAmen(first.postId, true)).resolves.toBe(true);
+    await expect(api.getStatus()).resolves.toMatchObject({ canPublish: false, profileComplete: false });
+    await api.setAvatar({ bytes: CLEAN_JPEG, uri: 'file:///cache/eu.jpg' });
+    await api.updateProfile({ confirms16: true, noMinistry: true });
+    const status = await api.getStatus();
+    expect(status.profile).toMatchObject({ displayName: 'Davi', ministry: null, ministryAnswered: true, avatarStatus: 'in_review' });
+    expect(status).toMatchObject({ profileComplete: true, canPublish: true });
+    const post = await api.createPost({ body: 'Primeira vez aqui.' });
+    const mine = (await api.feedPage()).posts.find((p) => p.postId === post.id);
+    expect(mine).toMatchObject({ authorName: 'Davi', authorMinistry: null, authorAvatarPath: demoAvatarPath });
+    const urls = await api.signPhotoUrls([demoAvatarPath]);
+    expect(urls.get(demoAvatarPath)).toBe('file:///cache/eu.jpg');
+  });
+
+  it('N3: e-mail opcional; novidades só com e-mail e desmarcadas por padrão', async () => {
+    const { api } = await join();
+    await expect(api.getStatus()).resolves.toMatchObject({ profile: { contactEmail: null, newsOptIn: false } });
+    await expect(api.setContact({ email: null, wantsNews: true })).rejects.toMatchObject({ code: 'invalid_input' });
+    await expect(api.setContact({ email: 'isso-nao', wantsNews: false })).rejects.toMatchObject({ code: 'invalid_input' });
+    await api.setContact({ email: ' Davi@Exemplo.com ', wantsNews: false });
+    await expect(api.getStatus()).resolves.toMatchObject({ profile: { contactEmail: 'davi@exemplo.com', newsOptIn: false } });
+  });
+
+  it('C6: foto de post funciona na demonstração, só na memória, e vai "em análise" como no real', async () => {
+    const { api, demo } = await join();
     await consent(api);
-    await expect(api.uploadPhoto(new Uint8Array([1]))).rejects.toMatchObject({ code: 'feature_disabled' });
+    await expect(api.uploadPhoto(new Uint8Array([1]))).rejects.toMatchObject({ code: 'photo_not_jpeg' });
+    const path = await api.uploadPhoto(CLEAN_JPEG);
+    const post = await api.createPost({ photoPath: path, day: 3 });
+    expect(post.status).toBe('in_review');
+    const mine = (await api.myPosts()).find((p) => p.postId === post.id);
+    expect(mine).toMatchObject({ photoPath: path, holdReason: 'foto', status: 'in_review' });
+    const urls = await api.signPhotoUrls([path]);
+    expect(urls.get(path)).toBe(`data:image/jpeg;base64,${demo._bytesToBase64ForTests(CLEAN_JPEG)}`);
+    expect(demo._bytesToBase64ForTests(CLEAN_JPEG)).toBe(Buffer.from(CLEAN_JPEG).toString('base64'));
+    expect((await api.feedPage()).posts.some((p) => p.postId === post.id)).toBe(false);
   });
 
   it('Amém devolve só o meu estado; comentários funcionam', async () => {
@@ -237,13 +279,13 @@ describe('comunidade de demonstração em memória', () => {
     expect((await api.feedPage()).posts.some((p) => p.postId === second.postId)).toBe(false);
   });
 
-  it('sair da comunidade apaga o que a pessoa fez e volta ao passo do código', async () => {
+  it('sair da comunidade apaga o que a pessoa fez e volta a não ser membro', async () => {
     const { api, demo } = await join();
     await consent(api);
     await api.createPost({ body: 'Obrigado a todos.' });
     await api.leaveCommunity();
     await expect(api.getStatus()).resolves.toMatchObject({ isMember: false });
-    await expect(api.myPosts()).rejects.toMatchObject({ code: 'needs_invite' });
+    await expect(api.myPosts()).rejects.toMatchObject({ code: 'needs_join' });
     demo.demoSignOut();
     expect(demo.getDemoSession()).toBeNull();
   });

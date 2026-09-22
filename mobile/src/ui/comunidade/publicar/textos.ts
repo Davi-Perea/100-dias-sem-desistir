@@ -105,16 +105,17 @@ export function hasOpenFields(text: string): boolean {
 /* ------------------------------------------------------ frase única (§3) */
 
 /**
- * A frase única sobre quem vê. Idêntica, palavra por palavra, em C3, C4 e B4
- * (rascunho §3; LGPD art. 9º, §1º). Qualquer outra tela que diga quem vê usa ESTA
- * função, nunca uma cópia.
+ * A frase única sobre quem vê, EXATAMENTE como o fundador pediu (feedback de
+ * 2026-09-22, C5; o advogado revisa depois). Idêntica em publicar, no
+ * consentimento, nas regras e depois de concluir (LGPD art. 9º, §1º). Saíram o
+ * "hoje cerca de N pessoas", o "algumas você não conhece" e a menção a 18+.
+ * Qualquer tela que diga quem vê usa ESTA função, nunca uma cópia.
  */
-export function audienceSentence(campos: Record<CampoId, string | null> = CAMPOS): string {
-  return (
-    `Sua publicação aparece, com o seu nome, para as pessoas que entraram na comunidade da ` +
-    `${campo('nomeIgreja', campos)} com um código da igreja — hoje cerca de ${campo('pessoasNaComunidade', campos)} ` +
-    `pessoas maiores de 18 anos. Algumas você não conhece.`
-  );
+export const AUDIENCE_SENTENCE =
+  'Sua publicação aparece com seu nome para as pessoas que entraram na comunidade da Lagoinha Brasília Capital.';
+
+export function audienceSentence(): string {
+  return AUDIENCE_SENTENCE;
 }
 
 /* ------------------------------------------------------------- documentos */
@@ -149,9 +150,7 @@ export function rulesDocument(campos: Record<CampoId, string | null> = CAMPOS): 
         title: 'Um lugar para a igreja ler junto.',
         paragraphs: [
           'Aqui a gente conta o que Deus falou durante a leitura, ora uns pelos outros e se anima a não desistir. ' +
-            'Tudo o que você escreve aparece com o seu nome para as pessoas da igreja que ' +
-            'entraram na comunidade com um código. Algumas você não conhece. Escreva como escreveria para um irmão ' +
-            'na porta do templo.',
+            `${AUDIENCE_SENTENCE} Escreva como escreveria para um irmão na porta do templo.`,
         ],
       },
       {
@@ -275,7 +274,7 @@ export function consentDocument(campos: Record<CampoId, string | null> = CAMPOS)
             'gente pergunte com todas as letras, numa tela só para isso.',
         ],
       },
-      { title: 'Quem vê', paragraphs: [audienceSentence(campos)] },
+      { title: 'Quem vê', paragraphs: [audienceSentence()] },
       {
         title: 'O que você autoriza',
         bullets: [

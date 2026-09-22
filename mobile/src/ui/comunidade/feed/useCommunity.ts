@@ -14,7 +14,7 @@ import { useCommunitySession } from '@/community/useCommunitySession';
  * - `no_server`: a build tem a Comunidade ligada mas não tem nuvem. Estado
  *   honesto, nunca feed falso.
  * - `signed_out`: sem conta de e-mail. A leitura continua sem conta.
- * - `not_member`: tem conta, ainda não entrou com o código da igreja.
+ * - `not_member`: tem conta, ainda não criou o perfil na comunidade.
  * - `suspended`: suspensa ou removida pela moderação.
  * - `ready`: pode ler. Publicar, comentar e dar Amém ainda pedem o aceite das
  *   regras e o consentimento (`needsConsent`).
@@ -64,7 +64,7 @@ export function useCommunity(): { gate: CommunityGate; reload: () => void } {
     );
   }, [api, signedIn]);
 
-  // Na montagem e a cada volta (consentimento, código, conta): o estado pode ter mudado.
+  // Na montagem e a cada volta (consentimento, perfil, conta): o estado pode ter mudado.
   useFocusEffect(
     useCallback(() => {
       load();

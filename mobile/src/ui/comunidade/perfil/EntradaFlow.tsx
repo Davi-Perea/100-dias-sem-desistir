@@ -3,65 +3,46 @@ import { useEffect, useState } from 'react';
 import { BackHandler, View } from 'react-native';
 
 import type { CommunityApi } from '@/community/api';
-import { DEMO_INVITE_CODE, isDemoCommunityApi } from '@/community/demoApi';
 import { CommunityError } from '@/community/errors';
-import type { CommunityStatus } from '@/community/types';
-import { charLength, formatInviteCode, isValidDisplayName, LIMITS, normalizeInviteCode } from '@/community/validation';
+import { authorLine, gapsSentence, profileGaps } from '@/community/profile';
+import type { AvatarStatus, CommunityProfile, CommunityStatus } from '@/community/types';
+import { charLength, cleanText, LIMITS } from '@/community/validation';
 import { BackBar, goBackOrHome } from '@/ui/BackBar';
-import { AppText, Avatar, Block, Button, StateView, StepBar } from '@/ui/components';
+import { AppText, Block, Button, StateView, StepBar } from '@/ui/components';
 import { spacing, useTheme } from '@/ui/theme';
-import { announceNotice } from '@/ui/voce/announce';
 
-import { ActionError, AccountStateView, LineField, ProfileScreen } from './parts';
-import { COMMUNITY_ACCOUNT_ROUTE } from './routes';
+import { ActionError, AccountStateView, ProfileScreen } from './parts';
+import { AgeCheck, AvatarField, BioField, MinistryField, NameField, type MinistryChoice } from './PerfilCampos';
+import { ProfileAvatar } from './ProfileAvatar';
+import { COMMUNITY_ACCOUNT_ROUTE, COMMUNITY_PROFILE_ROUTE } from './routes';
 import { communityMessage, useCommunityAccount } from './useCommunityAccount';
 
 /**
- * Entrada na Comunidade: conta de e-mail (já existe em /conta) → "tenho 18 anos
- * ou mais" → código da igreja → perfil (nome).
+ * Entrada na Comunidade (feedback do fundador de 2026-09-22):
  *
- * O servidor recebe tudo junto numa chamada só (`redeem_invite_code(código,
- * nome, confirma_18)`), então o código é conferido de verdade no último passo.
- * O formato é conferido antes, no aparelho, para não gastar uma das 5
- * tentativas por hora com o que nem tem forma de código. Se o servidor recusar,
- * a pessoa volta ao passo do código com o motivo em palavras.
+ *   entrar sem e-mail (C2: conta ligada ao aparelho, em AccountStateView)
+ *   → entra na comunidade sem código (C3, decisão do fundador de 2026-09-22:
+ *     quem cria o perfil no app entra; feito ao abrir esta tela, que só se abre
+ *     por um toque em "Entrar"/"Criar meu perfil")
+ *   → foto de perfil → nome + "Tenho 16 anos ou mais" → ministério → bio
  *
- * Nada de CPF, telefone ou data de nascimento: a idade é uma declaração, com
- * um toque explícito, sem nada marcado de antemão.
+ * Cada passo do perfil tem "Pular" (C4). Para PUBLICAR, o app e o servidor
+ * exigem nome, foto, ministério (pode ser "Nenhum") e a confirmação de 16+
+ * (C1); o fim da entrada diz o que ainda falta, sem bloquear quem só quer ler.
+ * Não há mais o aviso grande de 18+ (C1).
  *
- * Foto de perfil: o D2 pede "foto opcional", mas o servidor não guarda foto de
- * perfil (COMUNIDADE_V2_ARQUITETURA §9, item 5). A tela mostra como a pessoa vai
- * aparecer (as iniciais) e não oferece um botão que não salvaria nada.
+ * Nada de CPF, telefone ou data de nascimento: a idade é uma declaração, com um
+ * toque explícito, sem nada marcado de antemão.
  */
 
-export const INVALID_CODE_COPY =
-  'Esse código não funcionou. Ele pode estar errado, vencido ou cancelado. Confira com quem te passou ou peça um novo.';
-export const CODE_FORMAT_COPY = 'Confira o código: são 10 letras e números, sem 0, O, 1 ou I.';
-export const UNDER_18_COPY = 'Aqui você acompanha a Jornada. A comunidade é para quem tem 18 anos ou mais.';
-export const NAME_TOO_LONG_COPY = `Use até ${LIMITS.displayName} letras e espaços. O primeiro nome já basta.`;
+export { NAME_TOO_LONG_COPY } from './PerfilCampos';
 
-/** Nome longo demais: dito na tela, na live region (Android) e em voz no iOS. */
-function NameTooLong() {
-  const { colors } = useTheme();
-  useEffect(() => {
-    announceNotice(NAME_TOO_LONG_COPY);
-  }, []);
-  return (
-    <AppText
-      variant="captionStrong"
-      accessibilityLiveRegion="polite"
-      style={{ color: colors.danger }}
-      testID="entrar-nome-longo"
-    >
-      {NAME_TOO_LONG_COPY}
-    </AppText>
-  );
-}
+type Step = 'entrando' | 'foto' | 'nome' | 'ministerio' | 'bio' | 'pronto' | 'suspenso';
 
-type Step = 'idade' | 'menor' | 'codigo' | 'perfil' | 'pronto' | 'suspenso';
-
-const STEP_NUMBER: Partial<Record<Step, number>> = { idade: 1, codigo: 2, perfil: 3 };
-const PREVIOUS: Partial<Record<Step, Step>> = { menor: 'idade', codigo: 'idade', perfil: 'codigo' };
+const STEP_NUMBER: Partial<Record<Step, number>> = { foto: 1, nome: 2, ministerio: 3, bio: 4 };
+const TOTAL_STEPS = 4;
+/** Voltar dentro do perfil. Do primeiro passo do perfil, sai da entrada (já entrou). */
+const PREVIOUS: Partial<Record<Step, Step>> = { nome: 'foto', ministerio: 'nome', bio: 'ministerio' };
 
 export function EntradaFlow() {
   const account = useCommunityAccount();
@@ -72,17 +53,26 @@ export function EntradaFlow() {
 function initialStep(status: CommunityStatus): Step | 'membro' {
   if (status.memberStatus === 'suspended' || status.memberStatus === 'removed') return 'suspenso';
   if (status.isMember) return 'membro';
-  return 'idade';
+  return 'entrando';
+}
+
+export function ministryChoice(profile: CommunityProfile): MinistryChoice {
+  if (!profile.ministryAnswered) return undefined;
+  return profile.ministry ? { none: false, name: profile.ministry } : { none: true };
 }
 
 function Steps({ api, status }: { api: CommunityApi; status: CommunityStatus }) {
   const { colors } = useTheme();
-  const first = initialStep(status);
-  const [step, setStep] = useState<Step | 'membro'>(first);
-  const demo = isDemoCommunityApi(api);
-  const [code, setCode] = useState(() => (demo ? formatInviteCode(DEMO_INVITE_CODE) : ''));
-  const [codeError, setCodeError] = useState<string | null>(null);
-  const [name, setName] = useState('');
+  const [step, setStep] = useState<Step | 'membro'>(() => initialStep(status));
+  const [joinError, setJoinError] = useState<string | null>(null);
+  const [joinAttempt, setJoinAttempt] = useState(0);
+  // O perfil que a pessoa vai montando (espelho local do que já foi salvo).
+  const [profile, setProfile] = useState<CommunityProfile>(status.profile);
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+  const [name, setName] = useState(status.profile.displayName ?? '');
+  const [age, setAge] = useState(status.profile.ageConfirmed);
+  const [ministry, setMinistry] = useState<MinistryChoice>(() => ministryChoice(status.profile));
+  const [bio, setBio] = useState(status.profile.bio ?? '');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -103,52 +93,54 @@ function Steps({ api, status }: { api: CommunityApi; status: CommunityStatus }) 
 
   const header = (
     <View style={{ gap: spacing.md }}>
-      <BackBar
-        onBack={busy ? () => {} : back}
-        rightText={number ? `Passo ${number} de 3` : undefined}
-      />
-      {number ? <StepBar step={number} total={3} /> : null}
+      <BackBar onBack={busy ? () => {} : back} rightText={number ? `Passo ${number} de ${TOTAL_STEPS}` : undefined} />
+      {number ? <StepBar step={number} total={TOTAL_STEPS} /> : null}
     </View>
   );
 
-  const goToCode = () => {
-    setCodeError(null);
-    setStep('codigo');
+  const go = (next: Step) => {
+    setError(null);
+    setStep(next);
   };
 
-  const confirmCode = () => {
-    if (!normalizeInviteCode(code)) {
-      setCodeError(CODE_FORMAT_COPY);
-      return;
-    }
-    setCodeError(null);
-    setStep('perfil');
-  };
-
-  const join = async () => {
+  /** Salva um passo e segue. Erro: fica no passo, com o motivo em palavras. */
+  const save = async (action: () => Promise<void>, next: Step) => {
     setBusy(true);
     setError(null);
     try {
-      const result = await api.redeemInviteCode({ code, displayName: name, confirmsAdult: true });
-      if (result === 'invalid_code') {
-        setCodeError(INVALID_CODE_COPY);
-        setStep('codigo');
-        return;
-      }
-      setStep('pronto');
-    } catch (err) {
-      if (err instanceof CommunityError && err.code === 'blocked_from_community') {
-        setStep('suspenso');
-      } else if (err instanceof CommunityError && err.code === 'rate_limited') {
-        setCodeError('Muitas tentativas de código seguidas. Espere um pouco e tente de novo.');
-        setStep('codigo');
-      } else {
-        setError(communityMessage(err));
-      }
+      await action();
+      setStep(next);
+    } catch (failure) {
+      setError(communityMessage(failure));
     } finally {
       setBusy(false);
     }
   };
+
+  // C3: sem código. Quem chegou aqui sem ser membro entra na hora; a foto (o
+  // primeiro passo) já precisa ser de membro para subir.
+  const joining = step === 'entrando';
+  useEffect(() => {
+    if (!joining) return;
+    let alive = true;
+    api
+      .joinCommunity()
+      .then(() => {
+        if (alive) setStep('foto');
+      })
+      .catch((err: unknown) => {
+        if (!alive) return;
+        if (err instanceof CommunityError && err.code === 'blocked_from_community') setStep('suspenso');
+        else setJoinError(communityMessage(err));
+      });
+    return () => {
+      alive = false;
+    };
+  }, [api, joining, joinAttempt]);
+
+  const skip = (next: Step) => (
+    <Button title="Pular" variant="underline" onPress={() => go(next)} disabled={busy} testID={`entrar-pular-${step}`} />
+  );
 
   if (step === 'membro') {
     return (
@@ -157,15 +149,17 @@ function Steps({ api, status }: { api: CommunityApi; status: CommunityStatus }) 
           kind="empty"
           icon="community"
           title="Você já está na comunidade"
-          message={status.displayName ? `Você aparece como ${status.displayName}.` : undefined}
+          message={status.displayName ? `Você aparece como ${authorLine(status.displayName, status.profile.ministry)}.` : undefined}
           action={
             <View style={{ gap: spacing.md, alignSelf: 'stretch' }}>
               <Button title="Continuar" onPress={goBackOrHome} testID="entrar-continuar" />
               <Button
-                title="Conta e privacidade"
-                variant="underline"
-                onPress={() => router.push(COMMUNITY_ACCOUNT_ROUTE)}
+                title="Editar o perfil"
+                variant="outline"
+                onPress={() => router.push(COMMUNITY_PROFILE_ROUTE)}
+                testID="entrar-editar-perfil"
               />
+              <Button title="Conta e privacidade" variant="underline" onPress={() => router.push(COMMUNITY_ACCOUNT_ROUTE)} />
             </View>
           }
         />
@@ -180,98 +174,69 @@ function Steps({ api, status }: { api: CommunityApi; status: CommunityStatus }) 
           kind="empty"
           icon="lock"
           title="Participação suspensa"
-          message="Sua participação na comunidade está suspensa, e por isso não é possível entrar com outro código. Sua jornada pessoal continua funcionando normalmente."
+          message="Sua participação na comunidade está suspensa, e por isso não é possível entrar de novo. Sua jornada pessoal continua funcionando normalmente."
           action={<Button title="Voltar" variant="outline" onPress={goBackOrHome} />}
         />
       </ProfileScreen>
     );
   }
 
-  if (step === 'menor') {
+  if (step === 'entrando') {
     return (
-      <ProfileScreen back={header} testID="entrar-menor">
-        <AppText variant="display" accessibilityRole="header">
-          A comunidade é para maiores de 18
-        </AppText>
-        <AppText variant="body">{UNDER_18_COPY}</AppText>
-        <Button title="Voltar para a Jornada" onPress={() => router.replace('/')} testID="entrar-menor-voltar" />
+      <ProfileScreen back={header} testID="entrar-entrando">
+        {joinError ? (
+          <StateView
+            kind="error"
+            title="Não foi possível entrar agora"
+            message={joinError}
+            action={
+              <Button
+                title="Tentar de novo"
+                onPress={() => {
+                  setJoinError(null);
+                  setJoinAttempt((n) => n + 1);
+                }}
+                testID="entrar-tentar-de-novo"
+              />
+            }
+          />
+        ) : (
+          <StateView kind="loading" />
+        )}
       </ProfileScreen>
     );
   }
 
-  if (step === 'idade') {
+  if (step === 'foto') {
+    const hasPhoto = profile.avatarStatus === 'in_review' || profile.avatarStatus === 'approved';
     return (
-      <ProfileScreen back={header} testID="entrar-idade">
+      <ProfileScreen back={header} testID="entrar-foto">
         <AppText variant="display" accessibilityRole="header">
-          Você tem 18 anos ou mais?
+          Sua foto de perfil
         </AppText>
         <AppText variant="body">
-          A comunidade é só para quem tem 18 anos ou mais. Não pedimos a sua data de nascimento, nem documento: basta
-          você confirmar.
+          Ela aparece ao lado do seu nome no que você publicar. Para publicar, a foto é necessária.
         </AppText>
-        <View style={{ gap: spacing.md }}>
-          <Button title="Tenho 18 anos ou mais" onPress={goToCode} testID="entrar-adulto" />
-          <Button
-            title="Tenho menos de 18"
-            variant="outline"
-            onPress={() => setStep('menor')}
-            testID="entrar-menor-de-18"
-          />
-        </View>
-      </ProfileScreen>
-    );
-  }
-
-  if (step === 'codigo') {
-    const normalized = normalizeInviteCode(code);
-    return (
-      <ProfileScreen back={header} testID="entrar-codigo">
-        <AppText variant="display" accessibilityRole="header">
-          Código da sua igreja
-        </AppText>
-        <AppText variant="body">
-          Quem te convidou tem um código de 10 letras e números, como ABCDE-23456. Pode digitar com ou sem o traço.
-        </AppText>
-        {demo ? (
-          <AppText variant="caption" testID="entrar-codigo-demo">
-            Demonstração: o código {formatInviteCode(DEMO_INVITE_CODE)} já vem preenchido.
-          </AppText>
-        ) : null}
-        <View style={{ gap: spacing.sm }}>
-          <LineField
-            value={code}
-            onChangeText={(value) => {
-              setCode(value);
-              setCodeError(null);
-            }}
-            accessibilityLabel="Código de entrada da igreja"
-            placeholder="ABCDE-23456"
-            autoCapitalize="characters"
-            maxLength={16}
-            mono
-            onSubmitEditing={confirmCode}
-            testID="entrar-codigo-input"
-          />
-          {normalized ? (
-            <AppText variant="caption" testID="entrar-codigo-formatado">
-              Código: {formatInviteCode(normalized)}
-            </AppText>
-          ) : null}
-        </View>
-        <ActionError message={codeError} testID="entrar-codigo-erro" />
-        <Button
-          title="Continuar"
-          onPress={confirmCode}
-          disabled={code.trim().length === 0}
-          testID="entrar-codigo-continuar"
+        <AvatarField
+          api={api}
+          name={cleanText(name) ?? ''}
+          status={profile.avatarStatus}
+          photoUrl={photoUrl}
+          onSaved={(uri: string, next: AvatarStatus) => {
+            setPhotoUrl(uri);
+            // Espelho local: o caminho de verdade só o servidor sabe; aqui basta "tem foto".
+            setProfile((current) => ({ ...current, avatarStatus: next, avatarPath: current.avatarPath ?? uri }));
+          }}
         />
+        <Button title="Continuar" onPress={() => go('nome')} disabled={!hasPhoto} testID="entrar-foto-continuar" />
+        {skip('nome')}
       </ProfileScreen>
     );
   }
 
-  if (step === 'perfil') {
+  if (step === 'nome') {
     const trimmed = name.trim();
-    const valid = isValidDisplayName(name);
+    const tooLong = charLength(trimmed) > LIMITS.displayName;
     return (
       <ProfileScreen back={header} testID="entrar-perfil">
         <AppText variant="display" accessibilityRole="header">
@@ -280,78 +245,142 @@ function Steps({ api, status }: { api: CommunityApi; status: CommunityStatus }) 
         <AppText variant="body">
           É o nome que aparece no que você publicar e comentar. Não precisa ser o nome completo.
         </AppText>
-        <View style={{ gap: spacing.sm }}>
-          <LineField
-            value={name}
-            onChangeText={(value) => {
-              setName(value);
-              setError(null);
-            }}
-            accessibilityLabel="Seu nome na comunidade"
-            placeholder="Seu nome"
-            autoCapitalize="words"
-            maxLength={LIMITS.displayName * 2}
-            testID="entrar-nome-input"
-          />
-          <AppText
-            variant="caption"
-            testID="entrar-nome-contagem"
-            accessibilityLabel={`${charLength(trimmed)} de ${LIMITS.displayName} caracteres`}
-          >
-            {charLength(trimmed)} de {LIMITS.displayName}
-          </AppText>
-          {charLength(trimmed) > LIMITS.displayName ? (
-            // Sem isto, o botão só fica apagado e a pessoa não sabe por quê.
-            <NameTooLong />
-          ) : null}
-        </View>
-        {trimmed ? (
-          <View
-            style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}
-            accessible
-            accessibilityLabel={`É assim que você aparece: ${trimmed}`}
-            testID="entrar-previa"
-          >
-            <Avatar name={trimmed} size={48} />
-            <View style={{ flex: 1, gap: 2 }}>
-              <AppText variant="caption">É assim que você aparece</AppText>
-              <AppText variant="rowLabel">{trimmed}</AppText>
-            </View>
-          </View>
-        ) : null}
-        <Block tone="blueSoft">
-          <AppText variant="bodySm" style={{ color: colors.onBlueSoft }}>
-            Seu nome só aparece no que você publicar ou comentar. Sua leitura, seu jejum e a sua reflexão privada não
-            têm nome e ficam neste aparelho.
-          </AppText>
-        </Block>
+        <NameField
+          value={name}
+          onChange={(value) => {
+            setName(value);
+            setError(null);
+          }}
+        />
+        <AgeCheck checked={age} onToggle={() => setAge((value) => !value)} />
         <ActionError message={error} testID="entrar-erro" />
         <Button
-          title="Entrar na comunidade"
-          onPress={join}
+          title="Continuar"
+          onPress={() =>
+            save(async () => {
+              await api.updateProfile({ name: trimmed || null, confirms16: age });
+              setProfile((current) => ({
+                ...current,
+                displayName: trimmed || current.displayName,
+                ageConfirmed: current.ageConfirmed || age,
+              }));
+            }, 'ministerio')
+          }
           loading={busy}
-          disabled={!valid}
+          disabled={tooLong || (!trimmed && !age)}
           testID="entrar-confirmar"
+        />
+        {skip('ministerio')}
+      </ProfileScreen>
+    );
+  }
+
+  if (step === 'ministerio') {
+    return (
+      <ProfileScreen back={header} testID="entrar-ministerio">
+        <AppText variant="display" accessibilityRole="header">
+          Seu ministério
+        </AppText>
+        <AppText variant="body">
+          Aparece junto do seu nome, como “Davi · Ministério Comunicação”. Se não serve em nenhum, escolha “Nenhum”.
+        </AppText>
+        {skip('bio')}
+        <MinistryField value={ministry} onChange={setMinistry} />
+        <ActionError message={error} testID="entrar-erro" />
+        <Button
+          title="Continuar"
+          onPress={() =>
+            save(async () => {
+              if (!ministry) return;
+              await api.updateProfile(ministry.none ? { noMinistry: true } : { ministry: ministry.name });
+              setProfile((current) => ({
+                ...current,
+                ministryAnswered: true,
+                ministry: ministry.none ? null : ministry.name,
+              }));
+            }, 'bio')
+          }
+          loading={busy}
+          disabled={!ministry}
+          testID="entrar-ministerio-continuar"
         />
       </ProfileScreen>
     );
   }
 
+  if (step === 'bio') {
+    const cleaned = cleanText(bio);
+    return (
+      <ProfileScreen back={header} testID="entrar-bio">
+        <AppText variant="display" accessibilityRole="header">
+          Uma frase sobre você
+        </AppText>
+        <AppText variant="body">Opcional. Aparece no seu perfil da comunidade.</AppText>
+        <BioField value={bio} onChange={setBio} />
+        <ActionError message={error} testID="entrar-erro" />
+        <Button
+          title="Concluir"
+          onPress={() =>
+            save(async () => {
+              if (!cleaned) return;
+              await api.updateProfile({ bio: cleaned });
+              setProfile((current) => ({ ...current, bio: cleaned }));
+            }, 'pronto')
+          }
+          loading={busy}
+          disabled={!cleaned || charLength(cleaned) > LIMITS.bio}
+          testID="entrar-bio-concluir"
+        />
+        {skip('pronto')}
+      </ProfileScreen>
+    );
+  }
+
   // pronto
+  const shownName = cleanText(profile.displayName);
+  const gaps = gapsSentence(profileGaps(profile));
   return (
     <ProfileScreen testID="entrar-pronto">
       <AppText variant="display" accessibilityRole="header">
         Você entrou na comunidade
       </AppText>
+      {shownName ? (
+        <View
+          style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}
+          accessible
+          accessibilityLabel={`É assim que você aparece: ${authorLine(shownName, profile.ministry)}`}
+          testID="entrar-previa"
+        >
+          <ProfileAvatar name={shownName} uri={photoUrl} size={48} />
+          <View style={{ flex: 1, gap: 2 }}>
+            <AppText variant="caption">É assim que você aparece</AppText>
+            <AppText variant="rowLabel">{authorLine(shownName, profile.ministry)}</AppText>
+          </View>
+        </View>
+      ) : null}
+      {gaps ? (
+        <Block tone="warm" testID="entrar-falta">
+          <View style={{ gap: spacing.md }}>
+            <AppText variant="bodySm">{`${gaps} Para ler, não precisa de nada disso.`}</AppText>
+            <Button
+              title="Completar o perfil"
+              variant="outline"
+              onPress={() => router.replace(COMMUNITY_PROFILE_ROUTE)}
+              testID="entrar-completar"
+            />
+          </View>
+        </Block>
+      ) : null}
       <AppText variant="body">
-        Ler é livre. Antes da primeira publicação, do primeiro comentário ou do primeiro Amém, o app mostra as regras da
-        comunidade e pede o seu consentimento.
+        Antes da primeira publicação ou do primeiro comentário, o app mostra as regras da comunidade e pede o seu
+        consentimento.
       </AppText>
-      <Button
-        title="Continuar"
-        onPress={goBackOrHome}
-        testID="entrar-continuar"
-      />
+      <Block tone="blueSoft">
+        <AppText variant="bodySm" style={{ color: colors.onBlueSoft }}>
+          Sua leitura, seu jejum e as suas anotações não têm nome e ficam neste aparelho.
+        </AppText>
+      </Block>
+      <Button title="Ir para a comunidade" onPress={goBackOrHome} testID="entrar-continuar" />
       <Button title="Conta e privacidade" variant="underline" onPress={() => router.push(COMMUNITY_ACCOUNT_ROUTE)} />
     </ProfileScreen>
   );

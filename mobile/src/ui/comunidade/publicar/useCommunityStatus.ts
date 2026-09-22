@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useFocusEffect } from 'expo-router';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Constants from 'expo-constants';
 
 import { getCommunityApi, type CommunityApi } from '@/community/api';
@@ -16,7 +17,7 @@ export type CommunityStatusState =
   /** COMMUNITY_ENABLED desligado ou nuvem não configurada: o cliente não existe. */
   | { kind: 'unavailable'; message: string }
   | { kind: 'loading' }
-  /** Sem sessão: a Comunidade exige conta de e-mail. */
+  /** Sem sessão (nem a conta ligada ao aparelho): a tela oferece "Entrar na comunidade". */
   | { kind: 'signed_out' }
   | { kind: 'error'; message: string; code: string }
   | { kind: 'ready'; status: CommunityStatus; api: CommunityApi };
@@ -30,7 +31,19 @@ export function useCommunityStatus(): CommunityStatusState & { reload: () => voi
   >(null);
 
   const reload = useCallback(() => setTick((value) => value + 1), []);
+  /** Pergunta de novo sem voltar a "carregando" (a tela continua como está até a resposta). */
+  const [silent, setSilent] = useState(0);
   const userId = session.userId;
+
+  // C6: ao voltar (da entrada, do perfil), pergunta de novo. Sem isto, quem entrava
+  // pela tela de publicar voltava para "Entre na comunidade" mesmo já estando dentro.
+  const focusedOnce = useRef(false);
+  useFocusEffect(
+    useCallback(() => {
+      if (focusedOnce.current) setSilent((value) => value + 1);
+      focusedOnce.current = true;
+    }, []),
+  );
   const key = `${userId ?? 'anon'}#${tick}`;
 
   useEffect(() => {
@@ -48,7 +61,7 @@ export function useCommunityStatus(): CommunityStatusState & { reload: () => voi
     return () => {
       alive = false;
     };
-  }, [api, userId, key]);
+  }, [api, userId, key, silent]);
 
   if (!api) return { kind: 'unavailable', message: communityError('feature_disabled').message, reload };
   if (session.loading) return { kind: 'loading', reload };

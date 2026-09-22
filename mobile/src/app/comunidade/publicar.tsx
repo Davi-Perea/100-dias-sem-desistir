@@ -27,9 +27,11 @@ const COUNTER_FROM = LIMITS.postBody - 200;
 /**
  * C3 · Publicar: texto e uma foto opcional.
  *
- * - Antes do formulário, o fluxo (rascunho legal §1–2): conta de e-mail 18+,
- *   código da igreja, regras aceitas, consentimento dado. O que faltar, a tela
- *   leva até lá ou diz o que é.
+ * - Antes do formulário, o fluxo: entrar (sem e-mail, conta do aparelho),
+ *   entrar criando o perfil (sem código, C3), perfil completo (foto, nome,
+ *   ministério e 16+, C1/C4),
+ *   regras aceitas e consentimento dado (rascunho legal §1–2). O que faltar, a
+ *   tela leva até lá ou diz o que é.
  * - Aviso PERMANENTE acima do campo com a frase única de quem vê (REGRAS 18).
  * - A foto: aviso sobre rosto de outras pessoas e crianças no momento de escolher;
  *   preparada no aparelho (1600 px, JPEG 0,8, sem EXIF/XMP/IPTC) e só enviada
@@ -63,15 +65,13 @@ export default function PublishScreen() {
 
   const step = state.kind === 'ready' ? publishStep(state.status) : null;
 
-  // Regras e consentimento são telas próprias; esta volta depois do aceite.
+  // Perfil, regras e consentimento são telas próprias; esta volta depois.
   const redirected = useRef(false);
   useEffect(() => {
-    if (redirected.current || (step !== 'rules' && step !== 'consent')) return;
+    if (redirected.current || (step !== 'profile' && step !== 'rules' && step !== 'consent')) return;
     redirected.current = true;
-    router.replace({
-      pathname: step === 'rules' ? ROUTES.regras : ROUTES.consentimento,
-      params: flowParams(ROUTES.publicar, day),
-    });
+    const pathname = step === 'profile' ? ROUTES.perfil : step === 'rules' ? ROUTES.regras : ROUTES.consentimento;
+    router.replace({ pathname, params: flowParams(ROUTES.publicar, day) } as never);
   }, [step, day]);
 
   useEffect(() => {
@@ -126,8 +126,9 @@ export default function PublishScreen() {
       // A foto subiu mas o post não foi criado: não deixa arquivo solto.
       if (uploaded) api.discardPhoto(uploaded).catch(() => {});
       const known = toCommunityError(failure);
-      if (known.code === 'needs_consent' || known.code === 'terms_outdated') {
-        // O texto mudou ou o aceite caiu: o status novo leva de volta ao fluxo.
+      if (known.code === 'needs_consent' || known.code === 'terms_outdated' || known.code === 'needs_profile') {
+        // O texto mudou, o aceite caiu ou o perfil ficou incompleto (foto recusada):
+        // o status novo leva de volta ao fluxo.
         redirected.current = false;
         state.reload();
       }
@@ -140,8 +141,8 @@ export default function PublishScreen() {
   /* ------------------------------------------------------ fora do formulário */
 
   if (state.kind !== 'ready' || step !== 'form') {
-    const gateStep = step === 'needs_invite' || step === 'blocked' || step === 'cannot_publish' ? step : undefined;
-    const waiting = step === 'rules' || step === 'consent';
+    const gateStep = step === 'needs_join' || step === 'blocked' || step === 'cannot_publish' ? step : undefined;
+    const waiting = step === 'profile' || step === 'rules' || step === 'consent';
     return (
       <Screen>
         <View style={{ paddingHorizontal: inset - spacing.sm }}>

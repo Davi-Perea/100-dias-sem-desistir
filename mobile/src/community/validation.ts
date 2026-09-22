@@ -7,28 +7,14 @@ export const LIMITS = {
   postBody: 2000,
   commentBody: 1000,
   displayName: 40,
+  /** Bio opcional do perfil (C4). Igual ao check da coluna community_profiles.bio. */
+  bio: 160,
+  ministry: 80,
+  email: 254,
   reportDetails: 500,
   /** Tamanho de página do feed. Precisa ser igual ao `limit 20` de private.community_feed. */
   feedPage: 20,
 } as const;
-
-/** Alfabeto dos códigos de entrada: sem 0/O e 1/I, para ler em voz alta no culto. */
-const INVITE_ALPHABET = /^[A-HJ-NP-Z2-9]{10}$/;
-
-/**
- * Normaliza o que a pessoa digitou ("abcde 23456", "ABCDE-23456") para os 10
- * caracteres que o servidor compara. null = não tem cara de código (nem envia,
- * para não gastar uma das 5 tentativas por hora).
- */
-export function normalizeInviteCode(input: string): string | null {
-  const compact = input.toUpperCase().replace(/[^A-Z0-9]/g, '');
-  return INVITE_ALPHABET.test(compact) ? compact : null;
-}
-
-/** Formato de exibição: XXXXX-XXXXX. */
-export function formatInviteCode(normalized: string): string {
-  return `${normalized.slice(0, 5)}-${normalized.slice(5, 10)}`;
-}
 
 /** Texto aparado, ou null se ficou vazio. */
 export function cleanText(value: string | null | undefined): string | null {

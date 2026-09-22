@@ -2,7 +2,7 @@ import type { Href } from 'expo-router';
 
 import type { CommunityStatus } from '@/community/types';
 
-import { COMMUNITY_ENTRY_ROUTE, MY_POSTS_ROUTE, SIGN_IN_ROUTE } from '../perfil/routes';
+import { COMMUNITY_ENTRY_ROUTE, COMMUNITY_PROFILE_ROUTE, MY_POSTS_ROUTE, SIGN_IN_ROUTE } from '../perfil/routes';
 import { ROUTES as PUBLISH_ROUTES } from '../publicar/fluxo';
 
 /**
@@ -11,10 +11,12 @@ import { ROUTES as PUBLISH_ROUTES } from '../publicar/fluxo';
  * se reaproveitam as constantes delas, para um nome de rota nunca divergir.
  */
 export const COMMUNITY_ROUTES = {
-  /** Conta de e-mail com código, voltando para a Comunidade. */
+  /** Conta de e-mail com código, voltando para a Comunidade (opcional desde 2026-09-22, C2). */
   conta: SIGN_IN_ROUTE,
-  /** Código da igreja, nome e declaração de 18+. */
+  /** Entrar sem e-mail (conta do aparelho), e os passos do perfil (sem código, C3). */
   entrar: COMMUNITY_ENTRY_ROUTE,
+  /** Perfil da comunidade: foto, nome, ministério, bio, 16+ e e-mail opcional. */
+  perfil: COMMUNITY_PROFILE_ROUTE,
   /** C3. A própria tela manda para regras e consentimento quando faltam. */
   publicar: PUBLISH_ROUTES.publicar as Href,
   /** Regras da comunidade, para ler a qualquer momento. */

@@ -111,7 +111,18 @@ describe('feed com fim', () => {
     const { community } = api({ community_feed: { data: [{ ...feedRow(0), author_id: 'vazou', amen_count: 7 }] } });
     const page = await community.feedPage();
     expect(Object.keys(page.posts[0]).sort()).toEqual(
-      ['authorName', 'body', 'dayNumber', 'iSaidAmen', 'isMine', 'photoPath', 'postId', 'publishedAt'].sort(),
+      [
+        'authorAvatarPath',
+        'authorMinistry',
+        'authorName',
+        'body',
+        'dayNumber',
+        'iSaidAmen',
+        'isMine',
+        'photoPath',
+        'postId',
+        'publishedAt',
+      ].sort(),
     );
   });
 });
@@ -196,7 +207,7 @@ describe('denunciar e bloquear a partir do conteúdo', () => {
       create_community_post: { data: [{ post_id: POST, status: 'published' }] },
       create_community_comment: { data: [{ comment_id: COMMENT, status: 'published' }] },
       report_community_content: { data: '50000000-0000-4000-8000-000000000001' },
-      redeem_invite_code: { data: true },
+      join_community: { data: true },
     });
     await community.feedPage();
     await community.createPost({ body: 'a' });
@@ -204,7 +215,7 @@ describe('denunciar e bloquear a partir do conteúdo', () => {
     await community.setAmen(POST, false);
     await community.report({ postId: POST, reason: 'spam' });
     await community.blockAuthor({ commentId: COMMENT });
-    await community.redeemInviteCode({ code: 'ABCDE-23456', displayName: 'Ana', confirmsAdult: true });
+    await community.joinCommunity({ displayName: 'Ana' });
     for (const [, args] of rpc.mock.calls) {
       const keys = Object.keys(args ?? {});
       expect(keys).not.toContain('user_id');
@@ -213,41 +224,24 @@ describe('denunciar e bloquear a partir do conteúdo', () => {
   });
 });
 
-describe('entrada com código e consentimento', () => {
-  test('código é normalizado antes de enviar', async () => {
-    const { community, rpc } = api({ redeem_invite_code: { data: true } });
-    await expect(
-      community.redeemInviteCode({ code: ' abcde 23456 ', displayName: ' Ana ', confirmsAdult: true }),
-    ).resolves.toBe('joined');
-    expect(rpc).toHaveBeenCalledWith('redeem_invite_code', {
-      invite_code: 'ABCDE23456',
-      chosen_name: 'Ana',
-      confirms_adult: true,
-    });
+describe('entrada sem código (C3) e consentimento', () => {
+  test('nome é aparado antes de enviar', async () => {
+    const { community, rpc } = api({ join_community: { data: true } });
+    await expect(community.joinCommunity({ displayName: ' Ana ' })).resolves.toBeUndefined();
+    expect(rpc).toHaveBeenCalledWith('join_community', { chosen_name: 'Ana' });
   });
 
-  test('o que nem tem forma de código não gasta uma das 5 tentativas', async () => {
-    const { community, rpc } = api();
-    await expect(community.redeemInviteCode({ code: '12', displayName: 'Ana', confirmsAdult: true })).resolves.toBe(
-      'invalid_code',
-    );
-    expect(rpc).not.toHaveBeenCalled();
+  test('C1/C3/C4: entra sem código, sem idade e sem nome (o nome vem depois, no perfil)', async () => {
+    const { community, rpc } = api({ join_community: { data: true } });
+    await community.joinCommunity();
+    expect(rpc).toHaveBeenCalledWith('join_community', { chosen_name: null });
+    expect(rpc.mock.calls.flatMap(([, args]) => Object.keys(args ?? {}))).not.toContain('invite_code');
+    await expectCode(community.joinCommunity({ displayName: 'x'.repeat(41) }), 'invalid_input');
   });
 
-  test('sem declarar 18+ não envia', async () => {
-    const { community, rpc } = api();
-    await expectCode(
-      community.redeemInviteCode({ code: 'ABCDE-23456', displayName: 'Ana', confirmsAdult: false }),
-      'needs_adult_account',
-    );
-    expect(rpc).not.toHaveBeenCalled();
-  });
-
-  test('código recusado pelo servidor', async () => {
-    const { community } = api({ redeem_invite_code: { data: false } });
-    await expect(community.redeemInviteCode({ code: 'ABCDE-23456', displayName: 'Ana', confirmsAdult: true })).resolves.toBe(
-      'invalid_code',
-    );
+  test('suspenso ou removido: o servidor recusa com CM004', async () => {
+    const { community } = api({ join_community: { error: { code: 'CM004', message: 'bloqueada' } } });
+    await expectCode(community.joinCommunity(), 'blocked_from_community');
   });
 
   test('aceite manda versão e hash do texto exibido, em minúsculas', async () => {
@@ -303,7 +297,7 @@ describe('Minhas publicações', () => {
 
 describe('erros do servidor viram mensagens seguras', () => {
   test.each([
-    ['CM001', 'needs_invite'],
+    ['CM001', 'needs_join'],
     ['CM002', 'needs_consent'],
     ['CM003', 'rate_limited'],
     ['CM004', 'blocked_from_community'],
@@ -365,5 +359,89 @@ describe('exclusão de conta (Edge Function delete-account)', () => {
       requestServerAccountDeletion(functions({ error: { name: 'FunctionsFetchError', message: 'x' } })),
       'offline',
     );
+  });
+});
+
+describe('perfil (feedback de 2026-09-22: C1, C4, N3)', () => {
+  const CLEAN = Uint8Array.from([0xff, 0xd8, 0xff, 0xdb, 0x00, 0x04, 0x00, 0x00, 0xff, 0xda, 0x00, 0x02]);
+  const EXIF = Uint8Array.from([
+    0xff, 0xd8, 0xff, 0xe1, 0x00, 0x08, 0x45, 0x78, 0x69, 0x66, 0x00, 0x00, 0xff, 0xda, 0x00, 0x02,
+  ]);
+  const PATH = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee.jpg';
+
+  test('status traz o perfil; foto com estado desconhecido nunca vira "aprovada"', async () => {
+    const { community } = api({
+      my_community_status: {
+        data: [
+          {
+            is_member: true,
+            member_status: 'active',
+            display_name: 'Davi',
+            ministry: 'Comunicação',
+            ministry_answered: true,
+            bio: null,
+            avatar_path: PATH,
+            avatar_status: 'algo-novo',
+            age_confirmed: true,
+            contact_email: null,
+            news_opt_in: false,
+            profile_complete: true,
+          },
+        ],
+      },
+    });
+    const status = await community.getStatus();
+    expect(status.profile).toMatchObject({ displayName: 'Davi', ministry: 'Comunicação', avatarStatus: 'in_review' });
+    expect(status.profileComplete).toBe(true);
+  });
+
+  test('passos do perfil: nulo = não mexe; "Nenhum" é no_ministry; bio, nome e ministério com limite', async () => {
+    const { community, rpc } = api();
+    await community.updateProfile({ name: '  Davi ', confirms16: true });
+    expect(rpc).toHaveBeenLastCalledWith('set_community_profile', {
+      new_name: 'Davi',
+      new_ministry: null,
+      no_ministry: false,
+      new_bio: null,
+      clear_bio: false,
+      confirms_16: true,
+    });
+    await community.updateProfile({ noMinistry: true });
+    expect(rpc).toHaveBeenLastCalledWith(
+      'set_community_profile',
+      expect.objectContaining({ no_ministry: true, new_ministry: null }),
+    );
+    await expectCode(community.updateProfile({ ministry: 'Louvor', noMinistry: true }), 'invalid_input');
+    await expectCode(community.updateProfile({ bio: 'b'.repeat(161) }), 'invalid_input');
+    await expectCode(community.updateProfile({ name: 'x'.repeat(41) }), 'invalid_input');
+  });
+
+  test('foto de perfil: recusa metadado antes da rede, sobe com nome aleatório e volta "em análise"', async () => {
+    const { community, rpc, upload } = api({ set_community_avatar: { data: 'in_review' } });
+    await expectCode(community.setAvatar({ bytes: EXIF, uri: 'file:///x.jpg' }), 'photo_has_metadata');
+    expect(upload).not.toHaveBeenCalled();
+    await expect(community.setAvatar({ bytes: CLEAN, uri: 'file:///x.jpg' })).resolves.toBe('in_review');
+    expect(upload).toHaveBeenCalledWith(PATH, CLEAN, { contentType: 'image/jpeg', upsert: false });
+    expect(rpc).toHaveBeenCalledWith('set_community_avatar', { new_path: PATH });
+  });
+
+  test('se o perfil recusa a foto, o arquivo enviado é descartado', async () => {
+    const { community, remove } = api({ set_community_avatar: { error: { code: '22023' } } });
+    await expectCode(community.setAvatar({ bytes: CLEAN, uri: 'file:///x.jpg' }), 'invalid_input');
+    expect(remove).toHaveBeenCalledWith([PATH]);
+  });
+
+  test('N3: e-mail opcional em minúsculas; novidades sem e-mail nem saem do aparelho', async () => {
+    const { community, rpc } = api();
+    await expectCode(community.setContact({ email: null, wantsNews: true }), 'invalid_input');
+    await expectCode(community.setContact({ email: 'sem-arroba', wantsNews: false }), 'invalid_input');
+    expect(rpc).not.toHaveBeenCalled();
+    await community.setContact({ email: ' Davi@Exemplo.com ', wantsNews: true });
+    expect(rpc).toHaveBeenCalledWith('set_community_contact', { new_email: 'davi@exemplo.com', wants_news: true });
+  });
+
+  test('perfil incompleto no servidor (CM007) vira mensagem própria', async () => {
+    const { community } = api({ create_community_post: { error: { code: 'CM007' } } });
+    await expectCode(community.createPost({ body: 'Oi' }), 'needs_profile');
   });
 });

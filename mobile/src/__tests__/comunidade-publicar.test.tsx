@@ -153,6 +153,13 @@ function statusRow(overrides: Record<string, unknown> = {}) {
     publish_consent_version: 'PENDENTE',
     rules_version: 'PENDENTE',
     is_moderator: false,
+
+    ministry: null,
+    ministry_answered: true,
+    avatar_path: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee.jpg',
+    avatar_status: 'in_review',
+    age_confirmed: true,
+    profile_complete: true,
     ...overrides,
   };
 }
@@ -197,16 +204,21 @@ beforeEach(() => {
 /* ------------------------------------------------------------ regras puras */
 
 describe('textos', () => {
-  test('a frase de quem vê é a do rascunho §3, com o campo em aberto entre colchetes', () => {
+  test('C5: a frase de quem vê é EXATAMENTE a do fundador, sem "cerca de N", "algumas você não conhece" nem 18+', () => {
     expect(audienceSentence()).toBe(
-      'Sua publicação aparece, com o seu nome, para as pessoas que entraram na comunidade da ' +
-        '[NOME DA IGREJA] com um código da igreja — hoje cerca de [N] pessoas maiores de 18 anos. Algumas você não ' +
-        'conhece.',
+      'Sua publicação aparece com seu nome para as pessoas que entraram na comunidade da Lagoinha Brasília Capital.',
     );
   });
 
-  test('a mesma frase, palavra por palavra, está no consentimento (C4)', () => {
+  test('a mesma frase, palavra por palavra, está no consentimento e nas regras; as frases antigas saíram', () => {
     expect(termsDocumentText(consentDocument())).toContain(audienceSentence());
+    expect(termsDocumentText(rulesDocument())).toContain(audienceSentence());
+    for (const doc of [rulesDocument(), consentDocument()]) {
+      const text = termsDocumentText(doc);
+      expect(text).not.toMatch(/Algumas você não conhece/);
+      expect(text).not.toMatch(/hoje cerca de/);
+      expect(text).not.toMatch(/18 anos/);
+    }
   });
 
   test('nenhuma nota interna do rascunho vai para a tela', () => {
@@ -246,6 +258,18 @@ describe('fluxo', () => {
     isMember: true,
     memberStatus: 'active' as const,
     displayName: 'Ana',
+    profile: {
+      displayName: 'Ana',
+      ministry: null,
+      ministryAnswered: true,
+      bio: null,
+      avatarPath: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee.jpg',
+      avatarStatus: 'in_review' as const,
+      ageConfirmed: true,
+      contactEmail: null,
+      newsOptIn: false,
+    },
+    profileComplete: true,
     canPublish: true,
     needsPublishConsent: false,
     needsRules: false,
@@ -254,9 +278,10 @@ describe('fluxo', () => {
     isModerator: false,
   };
 
-  test('regras antes do consentimento, e os dois antes do formulário', () => {
-    expect(publishStep({ ...base, isMember: false })).toBe('needs_invite');
+  test('perfil, depois regras, depois consentimento, e tudo antes do formulário', () => {
+    expect(publishStep({ ...base, isMember: false })).toBe('needs_join');
     expect(publishStep({ ...base, memberStatus: 'suspended' })).toBe('blocked');
+    expect(publishStep({ ...base, profileComplete: false, needsRules: true })).toBe('profile');
     expect(publishStep({ ...base, needsRules: true, needsPublishConsent: true })).toBe('rules');
     expect(publishStep({ ...base, needsPublishConsent: true })).toBe('consent');
     expect(publishStep({ ...base, canPublish: false })).toBe('cannot_publish');
@@ -334,18 +359,43 @@ describe('C3 · Publicar', () => {
     expect(screen.queryByTestId('publish-input')).toBeNull();
   });
 
-  test('sem conta: pede o e-mail, sem formulário', async () => {
+  test('sem conta: leva à entrada SEM e-mail (C2, C6: antes mandava para o /conta), sem formulário', async () => {
     useFakeApi();
     mockSignedIn = false;
     await render(<PublishScreen />);
-    expect(screen.getByText('Entre com o seu e-mail')).toBeTruthy();
+    expect(screen.getByText('Entre na comunidade')).toBeTruthy();
+    expect(screen.queryByText(/18 anos/)).toBeNull();
     expect(screen.queryByTestId('publish-input')).toBeNull();
+    await fireEvent.press(screen.getByTestId('gate-sign-in'));
+    expect(mockRouter.push).toHaveBeenCalledWith('/comunidade/entrar');
   });
 
-  test('sem código da igreja: diz o que falta', async () => {
+  test('ainda não entrou: leva a criar o perfil, sem falar em código (C3)', async () => {
     useFakeApi({ my_community_status: { data: [statusRow({ is_member: false })] } });
     await render(<PublishScreen />);
-    expect(await screen.findByText('Para participar, entre com o código da sua igreja.')).toBeTruthy();
+    expect(
+      await screen.findByText('Para participar, crie o seu perfil. Quem cria o perfil entra na comunidade.'),
+    ).toBeTruthy();
+    expect(screen.queryByText(/código/)).toBeNull();
+    await fireEvent.press(screen.getByTestId('gate-join'));
+    expect(mockRouter.push).toHaveBeenCalledWith('/comunidade/entrar');
+  });
+
+  test('C4: perfil incompleto vai para o perfil antes das regras, levando o caminho de volta e o dia', async () => {
+    useFakeApi({
+      my_community_status: {
+        data: [statusRow({ profile_complete: false, can_publish: false, needs_rules: true, avatar_path: null, avatar_status: 'none' })],
+      },
+    });
+    mockParams = { day: '17' };
+    await render(<PublishScreen />);
+    await waitFor(() =>
+      expect(mockRouter.replace).toHaveBeenCalledWith({
+        pathname: '/comunidade/perfil',
+        params: { next: '/comunidade/publicar', day: '17' },
+      }),
+    );
+    expect(screen.queryByTestId('publish-input')).toBeNull();
   });
 
   test('primeira vez: vai para as regras, levando o caminho de volta e o dia', async () => {

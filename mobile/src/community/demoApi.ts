@@ -3,8 +3,12 @@ import { COMMUNITY_ENABLED } from '@/config/features';
 import { isDevBuild } from '@/journey/devBuild';
 
 import type { CommunityApi } from './api';
-import { CommunityError, communityError } from './errors';
+import { communityError } from './errors';
+import { assertPhotoSafeToUpload } from './photos';
+import { EMPTY_PROFILE, isProfileComplete, isValidContactEmail, profileArgs, type ProfileUpdate } from './profile';
 import type {
+  AvatarStatus,
+  CommunityProfile,
   CommunityStatus,
   ContentStatus,
   FeedCursor,
@@ -28,7 +32,6 @@ import {
   isValidDisplayName,
   isValidPostBody,
   LIMITS,
-  normalizeInviteCode,
 } from './validation';
 
 /**
@@ -47,12 +50,15 @@ import {
  *
  * Implementa a MESMA interface de `createCommunityApi` (tipo `CommunityApi`),
  * então as telas não sabem a diferença, a não ser onde perguntam
- * `isDemoCommunityApi` (selo, passo de e-mail simulado, textos PENDENTE).
+ * `isDemoCommunityApi` (selo, textos PENDENTE).
+ *
+ * Desde 2026-09-22 (C2) não há passo de e-mail: a entrada é direta, como a
+ * conta ligada ao aparelho do app real. A foto de perfil fica só na memória
+ * (o arquivo preparado no aparelho), em análise, como no real.
  */
 
-/** Código de entrada aceito na demonstração (formato real: 10 letras/números sem 0, O, 1, I). */
-export const DEMO_INVITE_CODE = 'DEMAX23456';
-export const DEMO_EMAIL_LABEL = 'modo demonstração (sem e-mail)';
+/** Caminho fictício da foto de perfil na demonstração (o arquivo fica no aparelho). */
+export const DEMO_AVATAR_PATH = 'demo-foto-de-perfil.jpg';
 export const DEMO_BADGE = 'Demonstração · nada é enviado';
 /** Aviso nas regras e no consentimento enquanto o texto é rascunho (PENDENTE). */
 export const DEMO_TERMS_NOTICE =
@@ -77,7 +83,8 @@ function demoDay(): number {
 
 /* ------------------------------------------------------------------ sessão */
 
-export type DemoSession = { userId: string; email: string };
+/** Sessão da demonstração: conta ligada ao aparelho, sem e-mail (C2). */
+export type DemoSession = { userId: string };
 
 let session: DemoSession | null = null;
 const listeners = new Set<() => void>();
@@ -97,10 +104,10 @@ export function getDemoSession(): DemoSession | null {
   return session;
 }
 
-/** O passo de e-mail, simulado: nenhum e-mail é enviado, nenhum código é pedido. */
+/** Entrar sem e-mail (C2): na demonstração, direto. */
 export function demoSignIn(): void {
   if (!isCommunityDemo()) return;
-  if (!session) session = { userId: ME, email: DEMO_EMAIL_LABEL };
+  if (!session) session = { userId: ME };
   emit();
 }
 
@@ -114,11 +121,13 @@ export function demoSignOut(): void {
 
 const ME = 'd0000000-0000-4000-8000-000000000001';
 
-type Author = { key: string; name: string };
+type Author = { key: string; name: string; ministry?: string | null };
 type DemoPost = {
   postId: string;
   author: Author;
-  body: string;
+  body: string | null;
+  /** Foto (só na memória, como data URI). */
+  photoPath?: string | null;
   dayNumber: number | null;
   createdAt: string;
   publishedAt: string | null;
@@ -138,7 +147,9 @@ type DemoBlock = { blockId: string; authorKey: string; displayName: string; crea
 
 type State = {
   member: boolean;
-  displayName: string | null;
+  profile: CommunityProfile;
+  /** URI local da foto de perfil preparada (nada é enviado). */
+  avatarUri: string | null;
   rulesAccepted: boolean;
   consentAccepted: boolean;
   posts: DemoPost[];
@@ -241,7 +252,8 @@ function seed(now = Date.now()): State {
 
   return {
     member: false,
-    displayName: null,
+    profile: { ...EMPTY_PROFILE },
+    avatarUri: null,
     rulesAccepted: false,
     consentAccepted: false,
     posts,
@@ -263,6 +275,7 @@ function current(): State {
 /** Só para testes: volta ao estado inicial (sem sessão, dados de exemplo de novo). */
 export function _resetDemoForTests(now?: number): void {
   state = seed(now);
+  demoPhotos.clear();
   session = null;
   emit();
 }
@@ -291,7 +304,7 @@ function blockedKeys(s: State): Set<string> {
 
 function requireMember(s: State) {
   if (!session) throw communityError('session_expired');
-  if (!s.member) throw communityError('needs_invite');
+  if (!s.member) throw communityError('needs_join');
 }
 
 function requireConsent(s: State) {
@@ -305,7 +318,15 @@ function requireId(value: string | undefined): string {
 }
 
 function authorName(s: State, author: Author): string {
-  return isMe(author) ? (s.displayName ?? 'Você') : author.name;
+  return isMe(author) ? (s.profile.displayName ?? 'Você') : author.name;
+}
+
+function authorMinistry(s: State, author: Author): string | null {
+  return isMe(author) ? s.profile.ministry : (author.ministry ?? null);
+}
+
+function requireProfile(s: State) {
+  if (!isProfileComplete(s.profile)) throw communityError('needs_profile');
 }
 
 function findTargetAuthor(s: State, target: ReportTarget): Author {
@@ -320,11 +341,15 @@ function findTargetAuthor(s: State, target: ReportTarget): Author {
 }
 
 function toStatus(s: State): CommunityStatus {
+  const profile = s.member ? { ...s.profile } : { ...EMPTY_PROFILE };
+  const complete = s.member && isProfileComplete(profile);
   return {
     isMember: s.member,
     memberStatus: s.member ? 'active' : null,
-    displayName: s.member ? s.displayName : null,
-    canPublish: s.member && s.rulesAccepted && s.consentAccepted,
+    displayName: profile.displayName,
+    profile,
+    profileComplete: complete,
+    canPublish: s.member && s.rulesAccepted && s.consentAccepted && complete,
     needsPublishConsent: !s.consentAccepted,
     needsRules: !s.rulesAccepted,
     publishConsentVersion: 'PENDENTE',
@@ -333,9 +358,30 @@ function toStatus(s: State): CommunityStatus {
   };
 }
 
-function photosOff(): never {
-  throw new CommunityError('feature_disabled', 'Na demonstração, fotos não são enviadas. Publique só o texto.');
+/**
+ * Fotos de post na demonstração (C6, 2026-09-22): antes eram recusadas ("fotos
+ * não são enviadas"), o que parecia defeito. Agora a foto preparada fica só na
+ * memória, como data URI, e o post vai "em análise" como no app real (toda foto
+ * passa por uma pessoa). Nada sai do aparelho.
+ */
+const demoPhotos = new Map<string, string>();
+const B64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+
+function bytesToBase64(bytes: Uint8Array): string {
+  let out = '';
+  for (let i = 0; i < bytes.length; i += 3) {
+    const a = bytes[i];
+    const b = i + 1 < bytes.length ? bytes[i + 1] : 0;
+    const c = i + 2 < bytes.length ? bytes[i + 2] : 0;
+    const n = (a << 16) | (b << 8) | c;
+    out += B64[(n >> 18) & 63] + B64[(n >> 12) & 63];
+    out += i + 1 < bytes.length ? B64[(n >> 6) & 63] : '=';
+    out += i + 2 < bytes.length ? B64[n & 63] : '=';
+  }
+  return out;
 }
+
+export const _bytesToBase64ForTests = bytesToBase64;
 
 /* ----------------------------------------------------------------- a API */
 
@@ -355,24 +401,69 @@ function createDemoCommunityApi(): CommunityApi {
       else s.consentAccepted = true;
     },
 
-    async redeemInviteCode(input: { code: string; displayName: string; confirmsAdult: boolean }) {
+    /** C3: sem código. Na demonstração, entra direto. */
+    async joinCommunity(input: { displayName?: string | null } = {}) {
       const s = current();
       if (!session) throw communityError('session_expired');
-      const code = normalizeInviteCode(input.code);
-      if (!code) return 'invalid_code' as const;
-      if (!isValidDisplayName(input.displayName)) throw communityError('invalid_input');
-      if (!input.confirmsAdult) throw communityError('needs_adult_account');
-      if (code !== DEMO_INVITE_CODE) return 'invalid_code' as const;
-      s.member = true;
-      s.displayName = input.displayName.trim();
-      return 'joined' as const;
+      const name = cleanText(input.displayName);
+      if (name && !isValidDisplayName(name)) throw communityError('invalid_input');
+      if (!s.member) {
+        s.member = true;
+        s.profile = { ...EMPTY_PROFILE, displayName: name };
+      }
     },
 
     async setDisplayName(name: string) {
       const s = current();
       requireMember(s);
       if (!isValidDisplayName(name)) throw communityError('invalid_input');
-      s.displayName = name.trim();
+      s.profile.displayName = name.trim();
+    },
+
+    async updateProfile(input: ProfileUpdate) {
+      const s = current();
+      requireMember(s);
+      const args = profileArgs(input);
+      const p = s.profile;
+      if (typeof args.new_name === 'string') p.displayName = args.new_name;
+      if (args.no_ministry === true) {
+        p.ministry = null;
+        p.ministryAnswered = true;
+      } else if (typeof args.new_ministry === 'string') {
+        p.ministry = args.new_ministry;
+        p.ministryAnswered = true;
+      }
+      if (args.clear_bio === true) p.bio = null;
+      else if (typeof args.new_bio === 'string') p.bio = args.new_bio;
+      if (args.confirms_16 === true) p.ageConfirmed = true;
+    },
+
+    async setAvatar(photo: { bytes: Uint8Array; uri: string }): Promise<AvatarStatus> {
+      const s = current();
+      requireMember(s);
+      assertPhotoSafeToUpload(photo.bytes);
+      s.avatarUri = photo.uri;
+      s.profile.avatarPath = DEMO_AVATAR_PATH;
+      s.profile.avatarStatus = 'in_review';
+      return 'in_review';
+    },
+
+    async removeAvatar() {
+      const s = current();
+      requireMember(s);
+      s.avatarUri = null;
+      s.profile.avatarPath = null;
+      s.profile.avatarStatus = 'none';
+    },
+
+    async setContact(input: { email: string | null; wantsNews: boolean }) {
+      const s = current();
+      requireMember(s);
+      const email = cleanText(input.email);
+      if (email && !isValidContactEmail(email)) throw communityError('invalid_input');
+      if (!email && input.wantsNews) throw communityError('invalid_input');
+      s.profile.contactEmail = email ? email.toLowerCase() : null;
+      s.profile.newsOptIn = input.wantsNews;
     },
 
     async feedPage(cursor?: FeedCursor | null): Promise<FeedPage> {
@@ -393,10 +484,12 @@ function createDemoCommunityApi(): CommunityApi {
       const posts: FeedPost[] = slice.map((p) => ({
         postId: p.postId,
         body: p.body,
-        photoPath: null,
+        photoPath: p.photoPath ?? null,
         dayNumber: p.dayNumber,
         publishedAt: p.publishedAt ?? '',
         authorName: authorName(s, p.author),
+        authorMinistry: authorMinistry(s, p.author),
+        authorAvatarPath: isMe(p.author) ? s.profile.avatarPath : null,
         isMine: isMe(p.author),
         iSaidAmen: p.amen,
       }));
@@ -441,7 +534,7 @@ function createDemoCommunityApi(): CommunityApi {
         .map((p) => ({
           postId: p.postId,
           body: p.body,
-          photoPath: null,
+          photoPath: p.photoPath ?? null,
           dayNumber: p.dayNumber,
           status: p.status,
           holdReason: p.holdReason,
@@ -456,17 +549,21 @@ function createDemoCommunityApi(): CommunityApi {
     async createPost(input: { body?: string | null; photoPath?: string | null; day?: number | null }): Promise<PublishResult> {
       const s = current();
       requireConsent(s);
-      if (input.photoPath) photosOff();
+      requireProfile(s);
+      const photoPath = input.photoPath ?? null;
+      if (photoPath && !demoPhotos.has(photoPath)) throw communityError('invalid_input');
       const body = cleanText(input.body);
-      if (!body || !isValidPostBody(body)) throw communityError('invalid_input');
+      if ((!body && !photoPath) || !isValidPostBody(body)) throw communityError('invalid_input');
       const day = input.day ?? null;
       if (day !== null && (!Number.isInteger(day) || day < 1 || day > 100)) throw communityError('invalid_input');
-      const hold = holdFor(body);
+      // Como no servidor: toda foto vai para análise; texto só se o filtro segurar.
+      const hold: HoldReason | null = photoPath ? 'foto' : holdFor(body);
       const now = stamp(s);
       const post: DemoPost = {
         postId: newId(s),
         author: { key: 'me', name: '' },
         body,
+        photoPath,
         dayNumber: day,
         createdAt: now,
         publishedAt: hold ? null : now,
@@ -491,6 +588,7 @@ function createDemoCommunityApi(): CommunityApi {
     async createComment(postId: string, body: string): Promise<PublishResult> {
       const s = current();
       requireConsent(s);
+      requireProfile(s);
       const id = requireId(postId);
       const cleaned = cleanText(body);
       if (!isValidCommentBody(cleaned) || !cleaned) throw communityError('invalid_input');
@@ -586,7 +684,8 @@ function createDemoCommunityApi(): CommunityApi {
       const s = current();
       requireMember(s);
       s.member = false;
-      s.displayName = null;
+      s.profile = { ...EMPTY_PROFILE };
+      s.avatarUri = null;
       s.rulesAccepted = false;
       s.consentAccepted = false;
       s.posts = s.posts.filter((p) => !isMe(p.author));
@@ -594,16 +693,30 @@ function createDemoCommunityApi(): CommunityApi {
       s.blocks = [];
     },
 
-    async uploadPhoto(): Promise<string> {
-      return photosOff();
+    /** Guarda a foto JÁ PREPARADA na memória (a mesma barreira de metadados do real). */
+    async uploadPhoto(bytes: Uint8Array): Promise<string> {
+      const s = current();
+      requireConsent(s);
+      assertPhotoSafeToUpload(bytes);
+      const path = `demo-foto-${newId(s).slice(-6)}.jpg`;
+      demoPhotos.set(path, `data:image/jpeg;base64,${bytesToBase64(bytes)}`);
+      return path;
     },
 
-    async discardPhoto() {
-      // Nada foi enviado na demonstração.
+    async discardPhoto(path: string) {
+      demoPhotos.delete(path);
     },
 
-    async signPhotoUrls(): Promise<Map<string, string>> {
-      return new Map();
+    /** A foto de perfil e as fotos de post da própria pessoa, que estão no aparelho. */
+    async signPhotoUrls(paths: (string | null)[]): Promise<Map<string, string>> {
+      const s = current();
+      const urls = new Map<string, string>();
+      if (s.avatarUri && paths.includes(DEMO_AVATAR_PATH)) urls.set(DEMO_AVATAR_PATH, s.avatarUri);
+      for (const path of paths) {
+        const uri = path ? demoPhotos.get(path) : undefined;
+        if (path && uri) urls.set(path, uri);
+      }
+      return urls;
     },
   };
 }

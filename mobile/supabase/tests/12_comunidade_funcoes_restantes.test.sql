@@ -29,6 +29,8 @@ insert into public.community_profiles (user_id, display_name, adult_attested_at)
   ('00000000-0000-4000-8000-0000000012b1', 'Bruno', now()),
   ('00000000-0000-4000-8000-0000000012e1', 'Edu',   now()),
   ('00000000-0000-4000-8000-0000000012d1', 'Mara',  now());
+-- Perfil completo para publicar (C4, 2026-09-22): foto enviada, ministério respondido, 16+ declarado.
+update public.community_profiles set ministry_answered = true, avatar_status = 'in_review', avatar_path = user_id::text || '.jpg';
 insert into public.community_moderators (user_id) values ('00000000-0000-4000-8000-0000000012d1');
 insert into public.consent_records (user_id, purpose, text_version, text_sha256)
 select u, p.purpose, 'v-teste', p.sha
@@ -191,8 +193,8 @@ select throws_ok($$ select * from public.create_community_post(post_body => 'Vol
 select results_eq($$ select is_member, member_status from public.my_community_status() $$,
   $$ values (false, 'suspended'::text) $$, 'o suspenso vê o próprio estado');
 select lives_ok($$ select public.leave_community() $$, 'o suspenso pode sair (apaga o que fez)');
-select throws_ok($$ select public.redeem_invite_code('QUALQUER-1', 'Edu', true) $$, 'CM004', null,
-  'suspenso que saiu não volta com outro código (fica a linha mínima)');
+select throws_ok($$ select public.join_community('Edu') $$, 'CM004', null,
+  'suspenso que saiu não volta criando o perfil de novo (fica a linha mínima)');
 reset role;
 select is((select display_name from public.community_profiles where user_id = '00000000-0000-4000-8000-0000000012e1'),
   'Participante', 'da linha mínima sai o nome');
@@ -263,7 +265,9 @@ reset role;
 
 set local role service_role;
 select results_eq($$ select bucket_id, object_name from public.claim_storage_deletions(10) $$,
-  $$ values ('community-photos'::text, 'a1a10000-0000-4000-8000-000000000001.jpg'::text) $$,
+  -- A foto de perfil do Edu (que saiu da comunidade acima) também foi para a fila (C4, 2026-09-22).
+  $$ values ('community-photos'::text, '00000000-0000-4000-8000-0000000012e1.jpg'::text),
+            ('community-photos'::text, 'a1a10000-0000-4000-8000-000000000001.jpg'::text) $$,
   'a foto recusada entra na fila e o serviço a pega');
 select lives_ok($$ select public.confirm_storage_deletion('community-photos', 'a1a10000-0000-4000-8000-000000000001.jpg') $$,
   'o serviço confirma a exclusão');

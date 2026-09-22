@@ -8,6 +8,7 @@ import { DEMO_TERMS_NOTICE } from '@/community/demoApi';
 import { BackBar, goBackOrHome } from '@/ui/BackBar';
 import { AppText, Button, LoadingCaption, Screen } from '@/ui/components';
 import { availabilityNotice, continueFlow, useTermsAcceptance } from '@/ui/comunidade/publicar/aceite';
+import { COMMUNITY_ENTRY_ROUTE } from '@/ui/comunidade/perfil/routes';
 import { flowParams, parseDay, ROUTES, safeNext } from '@/ui/comunidade/publicar/fluxo';
 import { NoticeBand, TermsBody } from '@/ui/comunidade/publicar/partes';
 import { consentDocument } from '@/ui/comunidade/publicar/textos';
@@ -57,11 +58,14 @@ export default function ConsentScreen() {
     if (state.kind === 'loading') return <LoadingCaption />;
     if (state.kind === 'unavailable') return <NoticeBand text={state.message} colors={colors} testID="consent-notice" />;
     if (state.kind === 'signed_out') {
+      // C6: antes era só um aviso, sem saída. Agora leva à entrada (sem e-mail).
       return (
-        <NoticeBand
-          text="Para publicar, entre com o seu e-mail. A comunidade é para quem tem 18 anos ou mais."
-          colors={colors}
-          testID="consent-notice"
+        <Button
+          title="Entrar na comunidade"
+          variant="yellow"
+          tone="ink"
+          onPress={() => router.push(COMMUNITY_ENTRY_ROUTE)}
+          testID="consent-enter"
         />
       );
     }

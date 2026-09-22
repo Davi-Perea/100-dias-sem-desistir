@@ -1,4 +1,4 @@
-import { useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -7,6 +7,7 @@ import { DEMO_TERMS_NOTICE } from '@/community/demoApi';
 import { BackBar, goBackOrHome } from '@/ui/BackBar';
 import { AppText, Button, LoadingCaption, Screen } from '@/ui/components';
 import { availabilityNotice, continueFlow, useTermsAcceptance } from '@/ui/comunidade/publicar/aceite';
+import { COMMUNITY_ENTRY_ROUTE } from '@/ui/comunidade/perfil/routes';
 import { fitsWithoutScroll, parseDay, reachedEnd, safeNext } from '@/ui/comunidade/publicar/fluxo';
 import { NoticeBand, TermsBody } from '@/ui/comunidade/publicar/partes';
 import { rulesDocument } from '@/ui/comunidade/publicar/textos';
@@ -54,13 +55,8 @@ export default function RulesScreen() {
     if (state.kind === 'loading') return <LoadingCaption />;
     if (state.kind === 'unavailable') return <NoticeBand text={state.message} colors={colors} testID="rules-notice" />;
     if (state.kind === 'signed_out') {
-      return (
-        <NoticeBand
-          text="Para aceitar as regras, entre com o seu e-mail. A comunidade é para quem tem 18 anos ou mais."
-          colors={colors}
-          testID="rules-notice"
-        />
-      );
+      // C6: antes era só um aviso, sem saída. Agora leva à entrada (sem e-mail).
+      return <Button title="Entrar na comunidade" onPress={() => router.push(COMMUNITY_ENTRY_ROUTE)} testID="rules-enter" />;
     }
     if (state.kind === 'error') {
       return (

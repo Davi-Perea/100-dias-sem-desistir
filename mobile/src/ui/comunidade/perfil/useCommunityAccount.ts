@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useFocusEffect } from 'expo-router';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { getCommunityApi, type CommunityApi } from '@/community/api';
 import { CommunityError } from '@/community/errors';
@@ -12,7 +13,8 @@ import { COMMUNITY_ENABLED } from '@/config/features';
  * Cada estado tem uma tela honesta. Nenhum deles inventa dado:
  *   unavailable · a Comunidade está desligada nesta build ou não há servidor
  *   loading     · restaurando a sessão ou perguntando ao servidor
- *   signed_out  · sem conta de e-mail (sessão anônima não conta: o servidor recusa, CM006)
+ *   signed_out  · sem sessão nenhuma. Desde 2026-09-22 (C2) a entrada é sem
+ *                 e-mail: a conta ligada ao aparelho (sessão anônima) vale.
  *   error       · o servidor não respondeu; a mensagem é a humana do cliente, nunca a crua
  *   ready       · temos o estado real vindo de `my_community_status`
  */
@@ -21,7 +23,7 @@ export type CommunityAccount =
   | { kind: 'loading' }
   | { kind: 'signed_out' }
   | { kind: 'error'; message: string; retry: () => void }
-  | { kind: 'ready'; api: CommunityApi; status: CommunityStatus; email: string; reload: () => void };
+  | { kind: 'ready'; api: CommunityApi; status: CommunityStatus; email: string | null; reload: () => void };
 
 export const GENERIC_ERROR = 'Não foi possível falar com a comunidade agora. Tente de novo em instantes.';
 
@@ -40,12 +42,24 @@ export function useCommunityAccount(): CommunityAccount {
   const [tick, setTick] = useState(0);
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   const reload = useCallback(() => setTick((value) => value + 1), []);
+  /** Pergunta de novo sem voltar a "carregando" (a tela continua como está até a resposta). */
+  const [silent, setSilent] = useState(0);
 
   const email = cloud.email;
-  const key = `${cloud.userId ?? email ?? 'none'}#${tick}`;
+  const signedIn = cloud.signedIn && cloud.userId !== null;
+  const key = `${cloud.userId ?? 'none'}#${tick}`;
+
+  // Ao voltar para a tela (do perfil, das regras, de outra aba), o estado pode ter mudado.
+  const focusedOnce = useRef(false);
+  useFocusEffect(
+    useCallback(() => {
+      if (focusedOnce.current) setSilent((value) => value + 1);
+      focusedOnce.current = true;
+    }, []),
+  );
 
   useEffect(() => {
-    if (!api || !email) return;
+    if (!api || !signedIn) return;
     let alive = true;
     api.getStatus().then(
       (status) => {
@@ -58,11 +72,11 @@ export function useCommunityAccount(): CommunityAccount {
     return () => {
       alive = false;
     };
-  }, [api, email, key]);
+  }, [api, signedIn, key, silent]);
 
   if (!api) return { kind: 'unavailable' };
   if (cloud.loading) return { kind: 'loading' };
-  if (!email) return { kind: 'signed_out' };
+  if (!signedIn) return { kind: 'signed_out' };
   // Enquanto a resposta não for DESTA sessão e deste pedido, é carregando.
   if (!loaded || loaded.key !== key) return { kind: 'loading' };
   if (loaded.error !== null) return { kind: 'error', message: loaded.error, retry: reload };

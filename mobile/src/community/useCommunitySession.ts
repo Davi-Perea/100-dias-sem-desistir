@@ -14,8 +14,10 @@ export type CommunitySession = {
   loading: boolean;
   signedIn: boolean;
   userId: string | null;
-  /** E-mail de uma conta de e-mail de verdade (sessão anônima não conta), ou o rótulo da demonstração. */
+  /** E-mail de uma conta de e-mail de verdade. Conta ligada ao aparelho (sessão anônima, C2) não tem. */
   email: string | null;
+  /** Conta ligada ao aparelho (sessão anônima do Supabase, ou a demonstração). */
+  deviceAccount: boolean;
   demo: boolean;
 };
 
@@ -29,7 +31,8 @@ export function useCommunitySession(): CommunitySession {
       loading: false,
       signedIn: demoSession !== null,
       userId: demoSession?.userId ?? null,
-      email: demoSession?.email ?? null,
+      email: null,
+      deviceAccount: demoSession !== null,
       demo: true,
     };
   }
@@ -41,6 +44,7 @@ export function useCommunitySession(): CommunitySession {
     signedIn: cloud.signedIn,
     userId: user?.id ?? null,
     email: user && user.is_anonymous !== true && user.email ? user.email : null,
+    deviceAccount: user?.is_anonymous === true,
     demo: false,
   };
 }

@@ -7,11 +7,12 @@ import { classifyError, cloudError, type CloudErrorCode } from '@/cloud/errors';
  */
 type CommunityOnlyCode =
   | 'feature_disabled'
-  | 'needs_invite'
+  | 'needs_join'
   | 'needs_consent'
   | 'blocked_from_community'
   | 'terms_outdated'
   | 'needs_adult_account'
+  | 'needs_profile'
   | 'invalid_input'
   | 'photo_not_jpeg'
   | 'photo_too_large'
@@ -21,11 +22,12 @@ export type CommunityErrorCode = CloudErrorCode | CommunityOnlyCode;
 
 const MESSAGES: Record<CommunityOnlyCode, string> = {
   feature_disabled: 'A comunidade ainda não está disponível nesta versão do app.',
-  needs_invite: 'Para participar, entre com o código da sua igreja.',
+  needs_join: 'Para participar, crie o seu perfil na comunidade.',
   needs_consent: 'Antes de publicar, leia e aceite as regras e o consentimento.',
   blocked_from_community: 'Sua participação na comunidade está suspensa.',
   terms_outdated: 'O texto foi atualizado. Leia a versão nova para continuar.',
-  needs_adult_account: 'A comunidade é para quem tem 18 anos ou mais e uma conta com e-mail.',
+  needs_adult_account: 'Para publicar, confirme no seu perfil que você tem 16 anos ou mais.',
+  needs_profile: 'Para publicar, complete o seu perfil: foto, nome, ministério e a confirmação de 16 anos ou mais.',
   invalid_input: 'Confira o que você escreveu e tente de novo.',
   photo_not_jpeg: 'Não foi possível preparar esta foto. Tente outra.',
   photo_too_large: 'A foto ficou grande demais. Tente outra.',
@@ -56,12 +58,13 @@ export function communityError(code: CommunityErrorCode): CommunityError {
 }
 
 const SQLSTATE: Record<string, CommunityErrorCode> = {
-  CM001: 'needs_invite',
+  CM001: 'needs_join',
   CM002: 'needs_consent',
   CM003: 'rate_limited',
   CM004: 'blocked_from_community',
   CM005: 'terms_outdated',
   CM006: 'needs_adult_account',
+  CM007: 'needs_profile',
   '22023': 'invalid_input',
 };
 

@@ -32,6 +32,8 @@ from unnest(array['00000000-0000-4000-8000-0000000008a1'::uuid,
                   '00000000-0000-4000-8000-0000000008b1'::uuid,
                   '00000000-0000-4000-8000-0000000008c1'::uuid]) as u
 cross join (values ('community_publish', repeat('a', 64)), ('community_rules', repeat('b', 64))) as p(purpose, sha);
+-- Perfil completo para publicar (C4, 2026-09-22): foto enviada, ministério respondido, 16+ declarado.
+update public.community_profiles set ministry_answered = true, avatar_status = 'in_review', avatar_path = user_id::text || '.jpg';
 
 insert into public.community_posts (id, author_id, body, status, published_at) values
   ('20000000-0000-4000-8000-000000000801', '00000000-0000-4000-8000-0000000008a1', 'Post da Ana',   'published', now()),
