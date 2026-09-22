@@ -86,3 +86,82 @@ processo — no nosso caso, com a Bíblia. Referência só de ESTRUTURA; cores, 
   nunca zera** (decisão do fundador: não punir), "Editar perfil", cartões "Complete seu perfil 1/5", engrenagem para
   os ajustes (a lista atual do Você vai para dentro dela).
 - **F8 Sino**: atividade dentro do app (Amém e comentários nos meus posts), sem notificação push.
+
+## Leitura das lojas (agente "Políticas das lojas", 2026-09-22)
+
+O fundador também pediu, hoje: *"a gente tem que seguir tudo do Google Play e da Apple para publicar e eles não darem
+problema"*. Pesquisa e tabela completa em **`docs/product/CONFORMIDADE_LOJAS.md`** (fontes oficiais com data de acesso
+2026-09-22). Aqui só o que cada item de hoje virou do ponto de vista de loja. Nada de código foi alterado por este agente.
+
+- **C1 (16 anos em vez de 18)** → nenhuma loja exige 18. A Apple só cobra que o questionário etário seja honesto
+  (2.3.6). O que muda é a lei (ECA Digital) e, no Play, a política **Famílias**: se o público-alvo declarado incluir
+  menores de 13, entram lembrete de segurança online, ação de adulto e controle parental. **Recomendação: declarar
+  público 13+** e manter a confirmação leve no perfil, como o C1 propõe.
+- **C2 (sem e-mail para entrar)** → **bom** para a loja: menos dado obrigatório a declarar em "Segurança dos dados" e
+  em "Privacidade do app". Mas continua valendo a exclusão de conta: conta ligada ao aparelho **também é conta**
+  (Apple 5.1.1(v) e Google), e hoje `requestAccountDeletion` só lança erro.
+- **C3 (sem código de igreja)** → não viola regra nenhuma, e tira a única barreira de entrada que existia. Consequência
+  real: mais volume para moderar e mais chance de conteúdo estranho. Aumenta o peso do filtro e do moderador humano.
+- **C4 (foto de perfil e nome obrigatórios para publicar)** → **nome, bio e foto de perfil aparecem para todos**, então
+  passam a ser conteúdo de usuário: o filtro da Apple (1.2) vale para eles também, não só para o post.
+- **C5 (texto de quem vê)** → mantido; não é exigência de loja, é LGPD e honestidade. O revisor lê e gosta.
+- **F3 (Amém com contagem e rostinhos)** + **F4 (comentários)** + feed da igreja inteira → cai na definição literal de
+  **"Social Media"** da Apple ("feeds... views, likes, comments, shares"). Resultado esperado: **13+ no mundo e A16 na
+  App Store do Brasil**, com o selo *Social Media* na página da loja. Isso já valia com Amém sem contagem; a contagem
+  só deixa indiscutível. **É decisão de produto, e o fundador precisa dizer que aceita** (ou reduzir o alcance do feed).
+- **F5 (foto aparece na hora, com filtro automático; sem filtro, aprovação humana)** → é o item mais duro. A guideline
+  1.2 da Apple exige "filtrar material questionável **antes de ser publicado**". O F5 já traz a saída certa dentro
+  dele: ou filtro automático de imagem no servidor antes de a foto ficar visível, ou espera humana. **Hoje o servidor
+  faz a segunda opção de propósito** (toda foto entra como "em análise"). Faltam as telas de "Em análise" e
+  "Não publicado com motivo", que não existem.
+- **F6 (feed da igreja inteira + ministérios)** → é o que determina a classificação acima. Feed pequeno *talvez*
+  ficasse fora de "Social Media", mas a Apple não define "muitos usuários" (**não confirmado**).
+- **F7 (perfil com contador que nunca zera)** → nenhuma implicação de loja. Bom: não é mecânica de uso compulsivo.
+- **F8 (sino sem push)** → bom: evita a regra de notificação excessiva e não pede permissão nova.
+- **N2/N3 (lembretes de ausência, e-mail para novidades)** → o e-mail para novidades precisa de **aceite separado**
+  (LGPD) e, se sair do aparelho, muda a declaração de privacidade das duas lojas: hoje ela é "não coleta nada".
+- **J3 (quantas pessoas estão lendo hoje)** → contagem anônima não cria problema de loja; o que criaria é número
+  inventado apresentado como real.
+- **J6 (todos os dias abertos)** → nenhuma implicação de loja. Ao contrário: ajuda contra "app incompleto" (2.1) e
+  "funcionalidade mínima" (4.2) se o revisor abrir antes de 23/09.
+
+**O recado desagradável, em uma linha:** a Comunidade desenhada hoje **não pode ir no envio desta semana**. Faltam
+coisas que não são de desenho — servidor no ar, moderador humano nomeado, exclusão de conta no app e na web, filtro de
+imagem, regras com aceite. A lista separada (o que bloqueia × o que é recomendação) está em `CONFORMIDADE_LOJAS.md` §7,
+e a lista curta do fundador na §8.
+
+## Integração das frentes (agente "Integração", 2026-09-22)
+
+Registro do que mudou no produto e não estava escrito aqui. Os agentes de cada frente pediram estas linhas;
+nenhum deles era o dono deste documento.
+
+- **B3 Modo de leitura passou a valer** → quem escolheu "Vou ler na minha Bíblia" (na entrada ou em Ajustes →
+  Leitura) abre uma **tela enxuta**: a referência do dia em destaque, a lista dos capítulos e "Concluir leitura".
+  Sem texto bíblico, sem "Aa", sem passar capítulo por capítulo. Um sublinhado "Ler aqui no app" devolve o leitor
+  com texto e passa a ser a preferência. Quem lê no app continua igual.
+- **F7 O contador de dias lidos também no topo da Jornada** → mesma chama, mesmo número e mesmo rótulo falado do
+  Você. Nunca zera: é total de dias lidos, não sequência.
+- **C-07 mudou** → a faixa "aguardando autorização escrita da igreja" **saiu de todas as telas** e virou uma linha
+  discreta no fim de Ajustes, que some sozinha quando o dataset for autorizado. O invariante C-07 do MASTER PRODUCT
+  SPEC ("faixa em toda tela") está desatualizado e precisa do Product Brain. **A trava não mudou**: o build de loja
+  continua sendo recusado enquanto `rights_status` for `pending_authorization`. O aviso de conteúdo **fictício**
+  (fixtures DEV_ONLY) continua em todas as telas, porque as REGRAS §17–18 exigem.
+- **Amém marcado ficou AZUL, não amarelo** → correção de contraste, não escolha de gosto: o amarelo da marca mede
+  1,46:1 sobre o fundo claro do feed, abaixo dos 3:1 da WCAG 1.4.11; a mão sumiria. O desenho voltou a ser **duas
+  mãos em oração**, como pedido.
+- **"Concluído" depois de ler na própria Bíblia** → a tela de ponte dizia sempre "lido aqui no app". Agora diz
+  "lido na sua Bíblia" para quem leu fora do app. Era a única mentira que sobrava no caminho do Dia 1.
+- **[DECISÃO PENDENTE] A foto ainda não publica na hora.** O **servidor segura toda foto em "em análise"**, porque
+  não há filtro automático ligado — que é o caminho seguro previsto no próprio **F5** ("sem filtro configurado, cai
+  para aprovação humana"). Recomendação técnica (mantida): **ligar o filtro automático primeiro**; com ele, a foto
+  limpa já aparece em segundos, que é o efeito que você quer, sem tirar a última barreira antes de uma imagem de
+  usuário virar pública (App Store 1.2). Tirar a barreira sem filtro precisa do seu "ok" explícito.
+  - **Corrigido na revisão final (2026-09-22):** enquanto a decisão não vem, o app tinha passado a **prometer** o que
+    não cumpre — o aviso da foto dizia "a foto aparece para a igreja assim que você publica" e a tela seguinte dizia
+    "o filtro automático segurou a sua foto", sem filtro nenhum ter rodado. Os três textos (aviso da galeria, tela de
+    enviado e o item do aceite) voltaram a ser **verdadeiros nos dois casos** e continuam certos no dia em que o
+    filtro for ligado. Nenhum deles decide a pendência acima; só param de contar um exame que não houve.
+- **[DECISÃO PENDENTE] "Coloque uma foto" no cartão "Complete seu perfil"** não foi acrescentado. A foto já é
+  alcançável pelo Você → "Meu perfil na comunidade", e ela é **opcional**: como passo de uma lista "N/7" ela nunca
+  ficaria feita para quem não quer foto, e o cartão cobraria para sempre uma coisa que o app diz que não é
+  obrigatória. Se você quiser mesmo o passo, ele volta — é decisão sua, não engenharia.

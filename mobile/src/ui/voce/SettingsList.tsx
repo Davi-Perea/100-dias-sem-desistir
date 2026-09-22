@@ -93,7 +93,9 @@ export function SettingsList({
         <SettingRow label="Sobre os 100 dias" onPress={() => router.push('/proposito')} first testID="row-proposito" />
         <SettingRow label="Privacidade" onPress={() => router.push('/privacidade')} testID="row-privacy" />
         <SettingRow
-          label={SUPPORT_EMAIL ? 'Ajuda e contato' : 'Ajuda'}
+          // Espaço em branco conta como ausente (regra em config/contato.ts):
+          // um e-mail só com espaços prometeria contato e abriria uma tela sem ele.
+          label={SUPPORT_EMAIL?.trim() ? 'Ajuda e contato' : 'Ajuda'}
           onPress={() => router.push('/ajuda')}
           testID="row-help"
         />

@@ -20,6 +20,11 @@ import { SubScreen } from '@/ui/voce/SubScreen';
  */
 export default function PrivacyScreen() {
   const cloud = isCloudConfigured();
+  // Nada de rótulo sem valor (regra em config/contato.ts, feedback do fundador
+  // de 2026-09-22): espaço em branco é a MESMA coisa que endereço nenhum. Sem
+  // isto, uma URL só com espaços desenharia "Política de privacidade completa"
+  // e o toque não abriria nada — o mesmo buraco que a Ajuda já fechou.
+  const privacyUrl = PRIVACY_URL?.trim() || null;
 
   const confirmWipe = () =>
     Alert.alert(
@@ -72,13 +77,13 @@ export default function PrivacyScreen() {
         />
       </View>
 
-      {PRIVACY_URL ? (
+      {privacyUrl ? (
         <>
           <Rule />
           <SettingRow
             label="Política de privacidade completa"
             onPress={() => {
-              Linking.openURL(PRIVACY_URL as string).catch(() => {});
+              Linking.openURL(privacyUrl).catch(() => {});
             }}
             first
             testID="privacy-policy-link"

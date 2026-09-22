@@ -6,10 +6,14 @@
 //
 // ─── QUANDO PODE RODAR ────────────────────────────────────────────────────────────────────────────────────────
 // Só DEPOIS da autorização escrita da igreja (content/100-dias-2026/rights.json → npm run content:convert,
-// rights_status = "authorized"). Antes disso toda tela mostra a faixa "Conteúdo real dos 100 Dias, aguardando
-// autorização escrita da igreja para publicação. Não distribuir esta versão." (DevContentBanner), e capturas
-// com essa faixa NÃO podem ir para a loja. O script confere o dataset e se recusa a rodar sem autorização.
-// Também confere a tela: se a faixa aparecer, para com erro.
+// rights_status = "authorized"). O portão é o dataset: o script confere `rights_status` antes de abrir o
+// navegador e se recusa a rodar sem autorização.
+//
+// ATENÇÃO (2026-09-22, feedback do fundador): a faixa de "aguardando autorização" NÃO aparece mais em tela —
+// ela virou uma linha discreta no fim de Ajustes (DevContentBanner só desenha no estado `fixture`). Então a
+// conferência de `content-banner` abaixo não protege mais contra conteúdo não autorizado; quem protege é o
+// `rights_status` acima. O que ela ainda pega é uma captura feita por engano com as fixtures DEV_ONLY, que
+// continuam avisadas — por isso ela fica.
 //
 // ─── COMO RODAR ───────────────────────────────────────────────────────────────────────────────────────────────
 // 1. puppeteer-core fica FORA do projeto (não entra no package.json). Numa pasta temporária:
@@ -106,8 +110,9 @@ try {
   for (const [nome, rota] of ROTAS) {
     await page.goto(URL_BASE + rota, { waitUntil: 'networkidle0', timeout: 60_000 });
     await new Promise((r) => setTimeout(r, 1500)); // fontes e animação de entrada
+    // Hoje isto só dispara com fixtures DEV_ONLY (ver o bloco no topo do arquivo).
     const temFaixa = await page.$('[data-testid="content-banner"]');
-    if (temFaixa) throw new Error(`${nome}: a faixa de conteúdo apareceu; captura não serve para a loja`);
+    if (temFaixa) throw new Error(`${nome}: a faixa de conteúdo fictício apareceu; captura não serve para a loja`);
     const arquivo = path.join(SAIDA, `${nome}.png`);
     await page.screenshot({ path: arquivo, type: 'png' });
     const b = fs.readFileSync(arquivo);

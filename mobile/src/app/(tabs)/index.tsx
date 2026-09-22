@@ -501,7 +501,10 @@ function JourneyTrail({
         // ficava com altura zero.
         ListHeaderComponent={
           <View onLayout={settle(setHeaderHeight)} style={{ gap: spacing.md, paddingBottom: spacing.lg }}>
-            <JourneyHeader />
+            {/* F7/feedback de 2026-09-22: o contador de dias lidos do Você também
+                no topo da Jornada, com o mesmo número (`completedCount`) e o
+                mesmo rótulo falado. Nunca zera e nada cobra de quem faltou. */}
+            <JourneyHeader readCount={journey.completedCount} />
             {/* PROVISÓRIO (pergunta 5 ao designer): a faixa de conteúdo não autorizado
                 (invariante C-07) não tem lugar no desenho; fica compacta, logo abaixo
                 do cabeçalho, enquanto a igreja não autorizar. */}

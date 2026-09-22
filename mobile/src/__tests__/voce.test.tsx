@@ -195,8 +195,10 @@ describe('telas que saem de Você', () => {
     expect(screen.getByTestId('help-rights').props.children.join('')).toMatch(
       /Situação dos direitos: aguardando autorização escrita da igreja\./,
     );
-    // C-07: sem autorização a faixa de aviso é obrigatória.
-    expect(screen.getByTestId('content-banner')).toBeTruthy();
+    // 2026-09-22: a faixa de "aguardando autorização" saiu das telas; a situação
+    // dos direitos continua escrita aqui, e a pendência tem uma linha só, em
+    // Ajustes (faixa-autorizacao).
+    expect(screen.queryByTestId('content-banner')).toBeNull();
   });
 
   test('Meu jejum liga e desliga a participação, e o cap não fala o "·"', async () => {

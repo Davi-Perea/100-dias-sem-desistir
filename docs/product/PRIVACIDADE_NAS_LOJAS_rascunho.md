@@ -6,6 +6,30 @@
   · **HIPÓTESE** = palpite não medido.
 - **Nada no app foi alterado.** Os trechos de configuração abaixo são para o agente que cuida do `app.config.ts`.
 
+> **Atualização de 2026-09-22 (agente "Políticas das lojas").** O feedback do fundador de hoje muda o quadro da §6
+> (versão com Comunidade). O documento de conformidade geral, com a tabela "exigência → o que o app tem hoje → o que
+> falta → quem resolve" e as fontes reverificadas hoje, é **`docs/product/CONFORMIDADE_LOJAS.md`**. O que muda aqui:
+>
+> 1. **Sai o código de igreja (C3) e cai a idade para 16 (C1).** A §6 abaixo ainda descreve "conta 18+, código de
+>    entrada": leia como histórico. O SQL de hoje ainda exige as duas coisas
+>    (`redeem_invite_code`, erro `CM006` "a comunidade é só 18+"), então **código e desenho divergem**.
+> 2. **Entra foto publicada na hora (F5).** Em "Segurança dos dados" e em "Privacidade do app" isso não acrescenta
+>    tipo novo (Fotos e Outro conteúdo do usuário já estavam na §6), mas acrescenta uma obrigação de **revisão**
+>    (Apple 1.2, filtro antes de publicar) e, no Android, a política de permissão de fotos: usar o **seletor do
+>    sistema** em vez de pedir `READ_MEDIA_IMAGES`, ou enviar declaração no Play Console
+>    (https://support.google.com/googleplay/android-developer/answer/14115180, acesso 2026-09-22).
+> 3. **Entra Amém com contagem e comentários (F3/F4).** Em "Atividade no app › Interações" isso já estava previsto.
+>    O efeito novo é de **classificação**, não de privacidade: 13+ global e A16 no Brasil (`CONFORMIDADE_LOJAS.md` §4).
+> 4. **Entra e-mail opcional para novidades (N3).** Se o app passar a enviar e-mail de marketing, isso é **finalidade
+>    diferente** de "gerenciamento de conta": precisa de aceite separado (LGPD) e de declaração própria nas duas lojas.
+> 5. **O §4 (manifesto `PrivacyInfo.xcprivacy`) precisa ser refeito** quando entrar biblioteca de câmera/galeria:
+>    conferir o `PrivacyInfo.xcprivacy` das novas dependências e somar as categorias à lista.
+> 6. **Continua verdadeiro:** a V1 que vai à loja agora é a **V1-A** (sem variáveis de nuvem) e a resposta é
+>    "Dados não coletados" nas duas lojas. Confirmado hoje: `COMMUNITY_ENABLED = false`
+>    (`mobile/src/config/features.ts`), aba escondida (`(tabs)/_layout.tsx:48`), nenhuma tela chama `getCommunityApi`.
+> 7. **Corrigido desde 21/09:** o interruptor "Enviar dados de uso anônimos" citado na §1 **saiu do app** (ver
+>    `LANCAMENTO_EXPRESSO_IOS.md` §4.8); o risco de honestidade daquela seção não existe mais.
+
 ---
 
 ## 0. O achado que muda as respostas: existem DUAS V1, não uma
