@@ -42,10 +42,11 @@ export function BeforeCampaign({
   return (
     <Screen>
       <ScreenScroll gap={spacing.xl}>
+        {/* Antes do Dia 1 não há dia lido: o contador entra com a campanha. */}
         <JourneyHeader />
-        {/* PROVISÓRIO (pergunta 5 ao designer): a faixa de conteúdo não autorizado
-            (invariante C-07) não tem lugar no desenho; fica compacta, logo abaixo
-            do cabeçalho. */}
+        {/* Só o aviso de conteúdo FICTÍCIO (fixtures DEV). A pendência de
+            autorização da igreja não aparece na Jornada — mora em Ajustes, em uma
+            linha (feedback do fundador, 2026-09-22). */}
         <DevContentBanner state={contentState} compact />
 
         <View style={{ gap: spacing.lg }} onLayout={numeral.onLayout} testID="before-start-card">

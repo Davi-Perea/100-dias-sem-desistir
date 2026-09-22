@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { GOALS, type GoalId } from '@/config/goals';
 import { updateSettings, useSettings } from '@/settings/settingsStore';
 import { Button, SAVE_ERROR_COPY, SaveErrorNotice } from '@/ui/components';
+import { CustomGoalRow } from '@/ui/entrada/CustomGoalRow';
 import { GoalRow } from '@/ui/entrada/GoalRow';
 import { useDoveTransition } from '@/ui/entrada/doveContext';
 import { ONBOARDING_STEP, OnboardingStep, StepSupport } from '@/ui/OnboardingStep';
@@ -16,6 +17,10 @@ import { ONBOARDING_STEP, OnboardingStep, StepSupport } from '@/ui/OnboardingSte
  * mesmas marcas. Metas ficam SÓ neste aparelho: "jejuar" e "orar todo dia" são
  * prática religiosa, dado sensível (LGPD art. 5º, II). Nunca em analytics.
  *
+ * A última linha é "Outra meta" (feedback do fundador, 2026-09-22): a pessoa
+ * escreve a dela, até 60 caracteres, guardada junto das outras. Ela sozinha já
+ * libera o "Continuar".
+ *
  * Daqui para a leitura a troca é com a pomba (E5), como em todo passo da entrada.
  */
 export default function GoalsStep() {
@@ -23,6 +28,9 @@ export default function GoalsStep() {
   const flyDove = useDoveTransition();
   const [error, setError] = useState(false);
   const goals = settings?.profile.goals ?? [];
+  const customGoal = settings?.profile.customGoal ?? null;
+  /** "Outra meta" escrita conta como meta: com ela, o "Continuar" já vale. */
+  const chosen = goals.length > 0 || customGoal !== null;
 
   const toggle = (id: GoalId) => {
     setError(false);
@@ -31,6 +39,11 @@ export default function GoalsStep() {
       const nextGoals = current.includes(id) ? current.filter((goal) => goal !== id) : [...current, id];
       return { ...s, profile: { ...s.profile, goals: nextGoals } };
     }).catch(() => setError(true));
+  };
+
+  const changeCustom = (next: string | null) => {
+    setError(false);
+    updateSettings((s) => ({ ...s, profile: { ...s.profile, customGoal: next } })).catch(() => setError(true));
   };
 
   const next = () => flyDove(() => router.push('/onboarding/leitura'));
@@ -49,9 +62,9 @@ export default function GoalsStep() {
       }
       footer={
         <>
-          <Button title="Continuar" onPress={next} disabled={goals.length === 0} testID="goals-continue" />
+          <Button title="Continuar" onPress={next} disabled={!chosen} testID="goals-continue" />
           {/* Com meta marcada, "Pular" contradiria as marcas: fica só "Continuar". */}
-          {goals.length === 0 ? <Button title="Pular" variant="underline" onPress={next} testID="goals-skip" /> : null}
+          {chosen ? null : <Button title="Pular" variant="underline" onPress={next} testID="goals-skip" />}
         </>
       }
     >
@@ -64,6 +77,8 @@ export default function GoalsStep() {
           testID={`goal-${goal.id}`}
         />
       ))}
+      {/* A última linha é a da pessoa: as metas prontas nunca dão conta de todas. */}
+      <CustomGoalRow value={customGoal} onChange={changeCustom} />
     </OnboardingStep>
   );
 }

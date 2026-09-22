@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { View } from 'react-native';
 
-import { GOALS, type GoalId } from '@/config/goals';
+import { GOALS, normalizeCustomGoal, type GoalId } from '@/config/goals';
 import { PROFILE_NAME_MAX, normalizeProfileName, updateSettings, type Profile } from '@/settings/settingsStore';
 
 import { AppText, Cap, SaveErrorNotice } from '../components';
+import { CustomGoalRow } from '../entrada/CustomGoalRow';
 import { TextField } from '../TextField';
 import { spacing } from '../theme';
 import { SubScreen } from './SubScreen';
@@ -52,6 +53,12 @@ export function ProfileForm({
       goals: profile.goals.includes(id) ? profile.goals.filter((g) => g !== id) : [...profile.goals, id],
     }));
 
+  // "Outra meta": a mesma linha e a mesma regra da entrada e de /metas.
+  const changeCustomGoal = (next: string | null) => {
+    const clean = normalizeCustomGoal(next);
+    if (clean !== saved.customGoal) save((profile) => ({ ...profile, customGoal: clean }));
+  };
+
   return (
     <SubScreen title={title} gap={spacing.xl} testID="profile-edit">
       <View style={{ gap: spacing.sm }}>
@@ -93,6 +100,13 @@ export function ProfileForm({
               testID={`profile-goal-${goal.id}`}
             />
           ))}
+          <CustomGoalRow
+            value={saved.customGoal}
+            onChange={changeCustomGoal}
+            row={ToggleRow}
+            testID="profile-goal-custom"
+            fieldTestID="profile-goal-custom-input"
+          />
         </View>
       </View>
 

@@ -1,6 +1,7 @@
 import { ScrollView, useWindowDimensions, View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
+import { hasAnyGoal } from '@/config/goals';
 import type { Marks } from '@/marks/marksStore';
 import type { Settings } from '@/settings/settingsStore';
 
@@ -72,7 +73,8 @@ export function profileSteps({
       title: 'Suas metas',
       phrase: 'O que você quer viver nestes 100 dias?',
       action: 'Escolher metas',
-      done: settings.profile.goals.length > 0,
+      // Uma meta escrita pela pessoa fecha o passo igual a uma pronta.
+      done: hasAnyGoal(settings.profile.goals, settings.profile.customGoal),
     },
     {
       id: 'reminder',

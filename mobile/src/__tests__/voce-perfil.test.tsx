@@ -10,6 +10,7 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-
 
 import YouScreen from '@/app/(tabs)/voce';
 import SettingsScreen from '@/app/ajustes';
+import GoalsScreen from '@/app/metas';
 import EditProfileScreen from '@/app/perfil-editar';
 import { _resetFastingCacheForTests } from '@/fasting/fastingStore';
 import { BUNDLED_CONTENT, loadDataset, resetToBundledContent } from '@/journey/datasetSource';
@@ -241,7 +242,64 @@ describe('F7 · Ajustes e Editar perfil', () => {
     await waitFor(async () => {
       _resetSettingsCacheForTests();
       const saved = await loadSettings();
-      expect(saved.profile).toEqual({ name: 'Maria', goals: ['jejuar'] });
+      expect(saved.profile).toEqual({ name: 'Maria', goals: ['jejuar'], customGoal: null });
     });
+  });
+});
+
+/* ------------------------------------------ "Outra meta" vale nas TRÊS telas */
+
+/**
+ * "Outra meta" (pedido do fundador, 2026-09-22) nasceu na entrada e tinha de
+ * valer também onde as metas são editadas: /metas e /perfil-editar. E, valendo
+ * como meta, precisa CONTAR como meta — senão quem só escreveu a dela vê
+ * "Escolher" em Ajustes e o cartão "Comece por aqui" nunca fecha.
+ */
+describe('"Outra meta" fora da entrada', () => {
+  test('/metas: a linha existe, o campo abre e o texto vai para o aparelho normalizado', async () => {
+    await seedSettings();
+    await render(<GoalsScreen />);
+    await screen.findByTestId('profile-name-input');
+    await fireEvent.press(screen.getByTestId('goal-custom'));
+    await fireEvent.changeText(screen.getByTestId('goal-custom-input'), '  Voltar   a  orar  em  família  ');
+    await waitFor(async () => {
+      _resetSettingsCacheForTests();
+      expect((await loadSettings()).profile.customGoal).toBe('Voltar a orar em família');
+    });
+    // Desmarcar apaga a meta escrita: dado de fé que a pessoa acabou de tirar não fica guardado.
+    await fireEvent.press(screen.getByTestId('goal-custom'));
+    await waitFor(async () => {
+      _resetSettingsCacheForTests();
+      expect((await loadSettings()).profile.customGoal).toBeNull();
+    });
+  });
+
+  test('/perfil-editar: a mesma linha, no ritmo de Você, e a meta pronta não se perde', async () => {
+    await seedSettings({ profile: { name: 'Davi', goals: ['jejuar'] } });
+    await render(<EditProfileScreen />);
+    await screen.findByTestId('profile-edit-name');
+    await fireEvent.press(screen.getByTestId('profile-goal-custom'));
+    await fireEvent.changeText(screen.getByTestId('profile-goal-custom-input'), 'Ler com meu filho');
+    await waitFor(async () => {
+      _resetSettingsCacheForTests();
+      const saved = await loadSettings();
+      expect(saved.profile).toEqual({ name: 'Davi', goals: ['jejuar'], customGoal: 'Ler com meu filho' });
+    });
+  });
+
+  test('só a meta própria já conta: Ajustes diz "1 meta" e não "Escolher"', async () => {
+    await seedSettings({ profile: { name: 'Davi', goals: [], customGoal: 'Não desistir' } });
+    await render(<SettingsScreen />);
+    await screen.findByTestId('row-goals');
+    expect(screen.getByText('1 meta')).toBeTruthy();
+    expect(screen.queryByLabelText(/Minhas metas.*Escolher/)).toBeNull();
+  });
+
+  test('só a meta própria fecha o passo "Suas metas" do "Complete seu perfil"', async () => {
+    await seedSettings({ profile: { name: 'Davi', goals: [], customGoal: 'Não desistir' } });
+    await render(<YouScreen />);
+    await screen.findByTestId('complete-profile');
+    expect(screen.queryByText('Suas metas')).toBeNull();
+    expect(screen.getByText('Seu ministério')).toBeTruthy();
   });
 });

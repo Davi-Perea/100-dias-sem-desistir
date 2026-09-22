@@ -259,7 +259,7 @@ describe('E4 · "Como podemos te chamar?"', () => {
     await waitFor(() => expect(mockRouter.push).toHaveBeenCalledWith('/onboarding/metas'));
     expect(getCachedSettings()?.profile.name).toBe('Davi Lima');
     const stored = JSON.parse((await AsyncStorage.getItem(SETTINGS_KEY)) ?? '{}');
-    expect(stored.profile).toEqual({ name: 'Davi Lima', goals: [] });
+    expect(stored.profile).toEqual({ name: 'Davi Lima', goals: [], customGoal: null });
   });
 
   test('"Pular" segue sem gravar e sem apagar um nome já gravado', async () => {
@@ -348,8 +348,8 @@ describe('E4 · "Quais são suas metas para estes 100 dias?"', () => {
 
 describe('settings.profile: formato compartilhado e normalização', () => {
   test('padrão', () => {
-    expect(DEFAULT_SETTINGS.profile).toEqual({ name: null, goals: [] });
-    expect(normalizeSettings({}).profile).toEqual({ name: null, goals: [] });
+    expect(DEFAULT_SETTINGS.profile).toEqual({ name: null, goals: [], customGoal: null });
+    expect(normalizeSettings({}).profile).toEqual({ name: null, goals: [], customGoal: null });
   });
 
   test('descarta metas desconhecidas e repetidas; limpa e corta o nome', () => {
@@ -357,13 +357,14 @@ describe('settings.profile: formato compartilhado e normalização', () => {
     expect(
       normalizeSettings({ profile: { name: '  Ana   Clara ', goals: ['jejuar', 'nada', 'jejuar', 3, 'conhecer-mais'] } })
         .profile,
-    ).toEqual({ name: 'Ana Clara', goals: ['jejuar', 'conhecer-mais'] });
+    ).toEqual({ name: 'Ana Clara', goals: ['jejuar', 'conhecer-mais'], customGoal: null });
     expect(normalizeSettings({ profile: { name: long, goals: 'jejuar' } }).profile).toEqual({
       name: 'x'.repeat(PROFILE_NAME_MAX),
       goals: [],
+      customGoal: null,
     });
     expect(normalizeSettings({ profile: { name: '   ' } }).profile.name).toBeNull();
-    expect(normalizeSettings({ profile: 'lixo' }).profile).toEqual({ name: null, goals: [] });
+    expect(normalizeSettings({ profile: 'lixo' }).profile).toEqual({ name: null, goals: [], customGoal: null });
   });
 
   test('ids e rótulos das metas', () => {

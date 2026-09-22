@@ -1,6 +1,7 @@
 import { router } from 'expo-router';
 
 import { SUPPORT_EMAIL } from '@/config/contato';
+import { countGoals } from '@/config/goals';
 import { fastingKeptCount, type FastingLog } from '@/fasting/fastingStore';
 import { reflectionCount, type Reflections } from '@/reflections/reflectionsStore';
 import type { Settings } from '@/settings/settingsStore';
@@ -36,7 +37,8 @@ export function SettingsList({
   fasting: FastingLog | null;
 }) {
   const kept = fastingKeptCount(fasting);
-  const goalCount = settings.profile.goals.length;
+  // "Outra meta" escrita conta como meta: quem só escreveu a dela não pode ver "Escolher".
+  const goalCount = countGoals(settings.profile.goals, settings.profile.customGoal);
 
   return (
     <>
