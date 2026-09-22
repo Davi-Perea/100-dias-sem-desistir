@@ -68,10 +68,8 @@ mandar de volta**.
 6. **[VOCÊ] Dados do revisor:** nome, sobrenome, telefone `+55 ...`, nome legal para o copyright, nome da igreja como
    deve aparecer na loja.
    **Me mande:** esses dados. Eu preencho o `store.config.json` e rodo `metadata:lint`.
-7. **[VOCÊ] Autorizar o commit** das mudanças de hoje (`main`) e dizer se quer o merge do branch `comunidade-v2` agora
-   ou depois do envio. **Minha recomendação:** commit no `main` hoje; merge **depois** do envio à Apple, para não mexer
-   no build.
-   **Me mande:** "pode commitar" (e, se quiser, "pode fazer o merge").
+7. ~~Autorizar o commit~~ **Feito:** tudo está commitado no `main` e no branch `comunidade-v2`. A Comunidade só entra no
+   `main` **depois** do envio à Apple, para não mexer no build da V1.
 
 ### Terça (22/09), com a Apple aprovada e a autorização em mãos
 
