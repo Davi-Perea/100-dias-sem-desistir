@@ -1,4 +1,4 @@
-import { Image, Linking, View } from 'react-native';
+import { Alert, Image, Linking, View } from 'react-native';
 
 import type { ContentStatus, MyPost } from '@/community/types';
 import { AppText, Block, Button } from '@/ui/components';
@@ -127,7 +127,13 @@ export function MyPostCard({
               onPress={() => {
                 const subject = encodeURIComponent('Pedido de revisão de publicação');
                 const body = encodeURIComponent(`Publicação de ${context || 'data não informada'}.`);
-                Linking.openURL(`mailto:${email}?subject=${subject}&body=${body}`).catch(() => {});
+                // Sem app de e-mail no aparelho, o toque não pode morrer calado: diz o endereço.
+                Linking.openURL(`mailto:${email}?subject=${subject}&body=${body}`).catch(() => {
+                  Alert.alert(
+                    'Não deu para abrir o e-mail',
+                    `Escreva para ${email}, dizendo a data da publicação: ${context || 'data não informada'}.`,
+                  );
+                });
               }}
               testID={`my-post-appeal-${post.postId}`}
             />

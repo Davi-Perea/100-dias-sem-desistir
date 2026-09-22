@@ -1,7 +1,8 @@
 -- =============================================================================
 -- COMUNIDADE (V2) — 2/3: regras de visibilidade e a superfície de RPC
 --
--- NÃO EXECUTADO: não há banco nem Supabase CLI nesta máquina (2026-09-21).
+-- EXECUTADO em 2026-09-21 num Postgres local (PGlite, mobile/scripts/sql/run-supabase-sql.mjs): passa.
+-- Ainda NÃO EXECUTADO no Supabase real (sem Docker/CLI nesta máquina): o primeiro db reset continua obrigatório.
 -- Rodar com: supabase db reset && supabase test db
 --
 -- Padrão (igual à fundação, D3/D5): implementação SECURITY DEFINER em `private`
@@ -47,11 +48,28 @@ $$;
 revoke all on function private.is_community_member(uuid) from public, anon, authenticated;
 
 -- Moderador da comunidade ou administrador do app.
+-- Moderar exige conta ativa: a do app (profiles.account_status) e, se a pessoa
+-- tem perfil na comunidade, o perfil também (suspenso ou removido não modera).
+-- O admin do app é isento da checagem do perfil da comunidade (com ou sem perfil,
+-- suspenso ou não, continua moderando): assim ninguém da comunidade consegue
+-- desarmar a administração. A conta do app ativa vale para todos. O app esconde a
+-- moderação nesses casos (canModerate), mas a regra de verdade é esta.
 create or replace function private.is_community_moderator()
 returns boolean language sql stable security definer set search_path = '' as $$
   select (select auth.uid()) is not null and (
     exists (select 1 from public.community_moderators m where m.user_id = (select auth.uid()))
     or private.is_app_admin()
+  )
+  and not exists (
+    select 1 from public.profiles p
+    where p.user_id = (select auth.uid()) and p.account_status <> 'active'
+  )
+  and (
+    private.is_app_admin()
+    or not exists (
+      select 1 from public.community_profiles cp
+      where cp.user_id = (select auth.uid()) and cp.status <> 'active'
+    )
   );
 $$;
 revoke all on function private.is_community_moderator() from public, anon, authenticated;
@@ -1306,6 +1324,16 @@ begin
   end if;
   if target_user = v_uid then
     raise exception 'ninguém modera a si mesmo' using errcode = '42501';
+  end if;
+  -- Mudar o estado de quem modera (moderador ou admin do app) é só da administração.
+  -- Vale também para reativar: um moderador não desfaz a suspensão que o admin deu a
+  -- outro. Sem isso, suspender tira o poder de moderar (is_community_moderator) e um
+  -- moderador desarmaria os outros e o admin que participa da comunidade.
+  if not private.is_app_admin() and (
+    exists (select 1 from public.community_moderators m where m.user_id = target_user)
+    or exists (select 1 from public.app_admins a where a.user_id = target_user)
+  ) then
+    raise exception 'só a administração suspende moderação' using errcode = '42501';
   end if;
   begin
     v_reason := decision_reason::public.community_report_reason;

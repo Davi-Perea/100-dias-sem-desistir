@@ -8,6 +8,7 @@ import { charLength, cleanText, LIMITS } from '@/community/validation';
 import { BackBar, goBackOrHome } from '@/ui/BackBar';
 import { TextField } from '@/ui/TextField';
 import { AppText, Block, Button, Screen, StateView } from '@/ui/components';
+import { LimitNote } from '@/ui/comunidade/LimitNote';
 import { MY_POSTS_ROUTE } from '@/ui/comunidade/perfil/routes';
 import { flowParams, parseDay, publishStep, ROUTES, sentCopy, type Sent } from '@/ui/comunidade/publicar/fluxo';
 import { pickFromLibrary, preparePhoto, type PreparedPhoto } from '@/ui/comunidade/publicar/foto';
@@ -349,18 +350,7 @@ export default function PublishScreen() {
         selectionColor={colors.text}
         testID="publish-input"
       />
-      {length >= COUNTER_FROM ? (
-        <AppText
-          variant="caption"
-          style={overLimit ? { color: colors.danger } : undefined}
-          accessibilityLiveRegion="polite"
-          testID="publish-counter"
-        >
-          {overLimit
-            ? `Passou do limite de ${LIMITS.postBody} caracteres (${length}).`
-            : `${length} de ${LIMITS.postBody} caracteres`}
-        </AppText>
-      ) : null}
+      <LimitNote length={length} max={LIMITS.postBody} nearFrom={COUNTER_FROM} testID="publish-counter" />
     </View>
   );
 

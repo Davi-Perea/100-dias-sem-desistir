@@ -12,7 +12,12 @@ import CommunityAccountScreen from '@/app/comunidade/conta-e-privacidade';
 import EntrarScreen from '@/app/comunidade/entrar';
 import MyPostsScreen from '@/app/comunidade/minhas-publicacoes';
 import { createCommunityApi, type CommunityClient } from '@/community/api';
-import { CODE_FORMAT_COPY, INVALID_CODE_COPY, UNDER_18_COPY } from '@/ui/comunidade/perfil/EntradaFlow';
+import {
+  CODE_FORMAT_COPY,
+  INVALID_CODE_COPY,
+  NAME_TOO_LONG_COPY,
+  UNDER_18_COPY,
+} from '@/ui/comunidade/perfil/EntradaFlow';
 import { AX5, resetViewport, setViewport } from './support/viewport';
 
 jest.mock('expo-crypto', () => ({
@@ -281,6 +286,19 @@ describe('entrada: 18+ → código → perfil', () => {
     expect(screen.getByText(/mostra as regras da comunidade e pede o seu consentimento/)).toBeTruthy();
   });
 
+  test('nome longo demais: a tela diz por que o botão não funciona', async () => {
+    await toCodeStep();
+    await fireEvent.changeText(screen.getByTestId('entrar-codigo-input'), 'ABCDE-23456');
+    await fireEvent.press(screen.getByTestId('entrar-codigo-continuar'));
+    expect(screen.queryByTestId('entrar-nome-longo')).toBeNull();
+    await fireEvent.changeText(screen.getByTestId('entrar-nome-input'), 'M'.repeat(41));
+    expect(screen.getByTestId('entrar-nome-longo').props.children).toBe(NAME_TOO_LONG_COPY);
+    expect(screen.getByTestId('entrar-nome-longo').props.accessibilityLiveRegion).toBe('polite');
+    expect(screen.getByTestId('entrar-confirmar').props.accessibilityState.disabled).toBe(true);
+    await fireEvent.changeText(screen.getByTestId('entrar-nome-input'), 'Maria');
+    expect(screen.queryByTestId('entrar-nome-longo')).toBeNull();
+  });
+
   test('código sem forma de código: avisa no aparelho e não gasta tentativa', async () => {
     await toCodeStep();
     await fireEvent.changeText(screen.getByTestId('entrar-codigo-input'), 'OI123');
@@ -484,7 +502,7 @@ describe('Conta e privacidade', () => {
     await fireEvent.press(screen.getByTestId('sheet-unblock-confirm'));
     await waitFor(() => expect(screen.queryByText('Carlos')).toBeNull());
     expect(calls('unblock_community_member')).toEqual([['unblock_community_member', { target_block: B1 }]]);
-    expect(screen.getByTestId('account-notice').props.children).toBe('Carlos foi desbloqueado.');
+    expect(screen.getByTestId('account-notice').props.children).toBe('Você desbloqueou Carlos.');
   });
 
   test('"Apagar tudo o que publiquei" revoga o consentimento de publicar, depois de confirmar', async () => {

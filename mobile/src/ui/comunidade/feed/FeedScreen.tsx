@@ -1,5 +1,5 @@
 import { router, useFocusEffect } from 'expo-router';
-import { type ReactNode, useState } from 'react';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, View } from 'react-native';
 
 import type { CommunityApi } from '@/community/api';
@@ -11,6 +11,7 @@ import { useJourney } from '@/journey/useJourney';
 import { useOnline } from '@/net/useOnline';
 import { AppText, Button, DevContentBanner, OfflineBanner, Rule, SaveErrorNotice, Screen } from '@/ui/components';
 import { MAX_CONTENT_WIDTH, MIN_TOUCH, spacing, useTheme } from '@/ui/theme';
+import { announceNotice } from '@/ui/voce/announce';
 
 import { ReportSheet, type SheetTarget } from '../sheets/ReportSheet';
 import { FeedEmpty, FeedEnd, FeedError, FeedSkeleton, GateView } from './FeedStates';
@@ -21,6 +22,9 @@ import { useFeed } from './useFeed';
 
 /** Calha das telas de lista e feed (TELAS, convenções): 20. */
 const FEED_GUTTER = 20;
+/** Dito ao voltar das regras e do consentimento: o toque que levou até lá não foi gravado. */
+export const AFTER_CONSENT_FEED = 'Pronto. Agora você pode dizer Amém e comentar. Toque de novo no Amém que você queria.';
+
 const COLUMN = { flex: 1, width: '100%', maxWidth: MAX_CONTENT_WIDTH + FEED_GUTTER * 2, alignSelf: 'center' } as const;
 
 /**
@@ -213,7 +217,20 @@ function ReadyFeed({
   useFocusEffect(feed.onFocus);
 
   const gated = needsConsent(status);
-  const openConsent = () => router.push(consentHref(status));
+  // O Amém que levou às regras não é gravado sozinho (nada sai sem um toque
+  // depois do aceite). Ao voltar, a tela diz isso, para o toque não parecer perdido.
+  const askedConsent = useRef(false);
+  const [consentNotice, setConsentNotice] = useState<string | null>(null);
+  useEffect(() => {
+    if (!askedConsent.current || gated) return;
+    askedConsent.current = false;
+    setConsentNotice(AFTER_CONSENT_FEED);
+    announceNotice(AFTER_CONSENT_FEED);
+  }, [gated]);
+  const openConsent = () => {
+    askedConsent.current = true;
+    router.push(consentHref(status));
+  };
 
   let list: ReactNode;
   const state = feed.state;
@@ -241,7 +258,14 @@ function ReadyFeed({
             card={card}
             gutter={FEED_GUTTER}
             photoUrl={card.photoPath ? feed.photos.get(card.photoPath) : undefined}
-            onAmen={(next) => (gated ? openConsent() : feed.toggleAmen(card.postId, next))}
+            onAmen={(next) => {
+              if (gated) {
+                openConsent();
+                return;
+              }
+              setConsentNotice(null);
+              feed.toggleAmen(card.postId, next);
+            }}
             onComments={() => router.push(commentsHref(card.postId))}
             onMore={() =>
               setSheet({
@@ -288,6 +312,11 @@ function ReadyFeed({
           <DevContentBanner state={journey.contentState} compact />
           {!online ? <OfflineNotice /> : null}
           {feed.notice ? <SaveErrorNotice message={feed.notice} testID="feed-notice" /> : null}
+          {consentNotice ? (
+            <AppText variant="rowLabel" accessibilityLiveRegion="polite" testID="feed-consent-notice">
+              {consentNotice}
+            </AppText>
+          ) : null}
         </View>
         {list}
         {state.phase === 'ready' ? (

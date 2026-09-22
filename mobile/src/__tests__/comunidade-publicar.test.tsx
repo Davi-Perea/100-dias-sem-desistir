@@ -427,6 +427,10 @@ describe('C3 · Publicar', () => {
     await fireEvent.changeText(await screen.findByTestId('publish-input'), 'a'.repeat(LIMITS.postBody + 1));
     expect(screen.getByTestId('publish-send').props.accessibilityState.disabled).toBe(true);
     expect(screen.getByTestId('publish-counter')).toBeTruthy();
+    expect(screen.getByTestId('publish-counter-sentence').props.children).toBe(
+      'Passou do limite de 2.000 caracteres. Apague um pouco para poder enviar.',
+    );
+    expect(screen.getByTestId('publish-counter-sentence').props.accessibilityLiveRegion).toBe('polite');
   });
 
   test('foto: aviso de rosto e criança ANTES da galeria; sobe só ao publicar; fica "Em análise"', async () => {

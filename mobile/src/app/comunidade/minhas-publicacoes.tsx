@@ -9,6 +9,7 @@ import { MyPostCard } from '@/ui/comunidade/perfil/MyPostCard';
 import { AccountStateView, ConfirmSheet, ProfileScreen } from '@/ui/comunidade/perfil/parts';
 import { communityMessage, useCommunityAccount } from '@/ui/comunidade/perfil/useCommunityAccount';
 import { spacing } from '@/ui/theme';
+import { announceNotice } from '@/ui/voce/announce';
 
 /**
  * Minhas publicações: todas as da pessoa, em qualquer estado, com o motivo em
@@ -87,6 +88,7 @@ function MyPosts({ api }: { api: CommunityApi }) {
           : current,
       );
       setNotice('Publicação apagada.');
+      announceNotice('Publicação apagada.');
       setTarget(null);
     } catch (error) {
       setDeleteError(communityMessage(error, 'Não foi possível apagar agora. Tente de novo.'));

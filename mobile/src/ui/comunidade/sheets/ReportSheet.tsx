@@ -11,7 +11,12 @@ import { MIN_TOUCH, spacing } from '@/ui/theme';
 import { announceNotice } from '@/ui/voce/announce';
 
 import { humanError } from '../feed/useCommunity';
+import { LimitNote } from '../LimitNote';
 import { reasonOptions, receiptCode, reviewPromise, URGENT_REASONS, type ReportSubject } from './motivos';
+
+const EMERGENCY_NOTE =
+  'Se alguém corre perigo agora, procure um serviço de emergência. A equipe da comunidade não substitui ' +
+  'atendimento de emergência.';
 
 /**
  * C5: denunciar e bloquear, a mesma folha para publicação e comentário
@@ -185,7 +190,8 @@ export function ReportSheet({
 
     case 'reason': {
       const options = reasonOptions(state.subject, target.kind === 'post' && target.hasPhoto);
-      const tooLong = charLength(state.details.trim()) > LIMITS.reportDetails;
+      const detailsLength = charLength(state.details.trim());
+      const tooLong = detailsLength > LIMITS.reportDetails;
       title = state.subject === 'person' ? `Denunciar ${name}` : `Denunciar ${thisNoun}`;
       body = (
         <View style={{ gap: spacing.md }}>
@@ -198,15 +204,23 @@ export function ReportSheet({
                 label={option.label}
                 description={option.description}
                 selected={state.reason === option.reason}
-                onPress={() => setState({ ...state, reason: option.reason })}
+                onPress={() => {
+                  setState({ ...state, reason: option.reason });
+                  // O aviso de emergência aparece abaixo da lista: no iOS, dito na hora.
+                  if (option.reason === 'risco_a_vida' && state.reason !== 'risco_a_vida') announceNotice(EMERGENCY_NOTE);
+                }}
                 testID={`reason-${option.reason}`}
               />
             ))}
           </View>
           {state.reason === 'risco_a_vida' ? (
-            <AppText variant="bodySm" accessibilityRole="alert" testID="reason-emergency">
-              Se alguém corre perigo agora, procure um serviço de emergência. A equipe da comunidade não substitui
-              atendimento de emergência.
+            <AppText
+              variant="bodySm"
+              accessibilityRole="alert"
+              accessibilityLiveRegion="polite"
+              testID="reason-emergency"
+            >
+              {EMERGENCY_NOTE}
             </AppText>
           ) : null}
           <TextField
@@ -217,11 +231,18 @@ export function ReportSheet({
             accessibilityLabel="Detalhes da denúncia, opcional"
             testID="reason-details"
           />
-          {tooLong ? (
-            <AppText variant="caption" testID="reason-too-long">
-              {`Use até ${LIMITS.reportDetails} caracteres.`}
+          <LimitNote
+            length={detailsLength}
+            max={LIMITS.reportDetails}
+            nearFrom={LIMITS.reportDetails - 50}
+            testID={tooLong ? 'reason-too-long' : 'reason-limit'}
+          />
+          {state.reason ? null : (
+            // O botão fica apagado até escolher: a tela diz por quê.
+            <AppText variant="caption" testID="reason-needed">
+              Escolha um motivo acima para poder enviar.
             </AppText>
-          ) : null}
+          )}
           <Button
             title="Enviar denúncia"
             disabled={!state.reason || tooLong}

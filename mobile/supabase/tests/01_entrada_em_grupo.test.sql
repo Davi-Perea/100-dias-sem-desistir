@@ -1,5 +1,6 @@
 -- =============================================================================
--- NÃO EXECUTADO: não há banco nem Supabase CLI nesta máquina (2026-09-21).
+-- EXECUTADO em 2026-09-21 num Postgres local (PGlite, mobile/scripts/sql/run-supabase-sql.mjs): passa.
+-- Ainda NÃO EXECUTADO no Supabase real (sem Docker/CLI nesta máquina): o primeiro db reset continua obrigatório.
 -- Rodar com: supabase test db   (pgTAP; cada arquivo roda numa transação desfeita)
 --
 -- D1: ninguém entra sozinho em grupo. D4: removido/que saiu não volta sozinho.

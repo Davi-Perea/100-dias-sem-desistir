@@ -14,12 +14,14 @@ import { radius, spacing, useGutter, useTheme } from '@/ui/theme';
 
 import type { HistoryEntry, ModerationApi, OpenReport, QueueItem, SuspendTarget } from './moderacaoApi';
 import { NOTE_MAX } from './moderacaoApi';
+import { canModerate } from './acesso';
 import { HOLD_LABEL, KIND_LABEL, REASON_GUIDANCE, REASON_LABEL, dueLabel, timeAgo } from './rotulos';
 
 /**
  * Fila de moderação dentro do app (Comunidade V2). Só quem tem papel de
  * moderador no servidor chega aqui: o papel vem de `my_community_status`
- * (`is_moderator`); sem ele a tela chama `onNotModerator` (a rota redireciona).
+ * (`is_moderator`), e a conta do moderador suspensa ou removida perde o acesso
+ * (`canModerate`); sem ele a tela chama `onNotModerator` (a rota redireciona).
  * A checagem daqui só evita mostrar uma tela inútil: toda RPC de moderação
  * recusa quem não modera e grava a decisão em `community_moderation_actions`.
  *
@@ -125,7 +127,7 @@ export function ModerationQueueScreen({ community, moderation, onNotModerator, n
       community
         .getStatus()
         .then(async (status) => {
-          if (!status.isModerator) {
+          if (!canModerate(status)) {
             setPhase('denied');
             deniedRef.current();
             return;

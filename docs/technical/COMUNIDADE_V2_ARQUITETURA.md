@@ -1,7 +1,8 @@
 # Comunidade (V2): arquitetura do servidor
 
 - **Data:** 2026-09-21. **Autor:** Claude (Principal Mobile Engineer + Technical Architect).
-- **Estado:** SQL e cliente escritos. **NÃO EXECUTADO**: não há banco nem Supabase CLI nesta máquina. Nada disto vai
+- **Estado:** SQL e cliente escritos. SQL **executado num Postgres local** (PGlite, §12); ainda **NÃO EXECUTADO no
+  Supabase real** (sem Docker/CLI nesta máquina). Nada disto vai
   para a V1. As telas só chamam o cliente com `COMMUNITY_ENABLED` ligado (`mobile/src/config/features.ts`), e ele
   continua `false`.
 - **Decisões que valem aqui** (do fundador, 2026-09-21, no lugar da ratificação do Product Brain): a V1 vai para a loja
@@ -147,8 +148,8 @@ código para achar o que vazou) e nomeia moderadores (`admin_set_community_moder
 
 ## 9. O que NÃO foi feito (e precisa existir antes de ligar)
 
-1. **Rodar tudo num banco:** `supabase start`, `supabase db reset`, `supabase test db`. Os pgTAP 07–10 e as três
-   migrations nunca rodaram. Suposições a conferir: o papel `postgres` lê e insere em `storage.objects`; o
+1. **Rodar tudo no Supabase real:** `supabase start`, `supabase db reset`, `supabase test db`. Feito em parte: as
+   migrations e os pgTAP 01–13 rodam no PGlite (§12); no Supabase real, ainda não. Suposições a conferir: o papel `postgres` lê e insere em `storage.objects`; o
    `pgcrypto` fica em `extensions`; e os códigos de erro próprios (`CM001`…`CM006`) chegam ao cliente pelo PostgREST no
    campo `code`.
 2. **Edge Functions:** `delete-account` (a V1 também precisa dela, como item D-6), `drain-storage-deletions` (cron) e
@@ -189,3 +190,117 @@ pastoral + 1 responsável legal**, treinados, com a escala de 20/12 a 03/01 fech
 que recebem os códigos, e quem os revoga. O **texto final** do consentimento e das regras, revisado por advogado: a
 versão e o sha256 de cada texto vão para `community_settings` e substituem `PENDENTE`. A promessa de prazo da tela C5
 (24 h ou 48 h). O que acontece com o feed depois de 31/12.
+
+## 12. Execução
+
+**2026-09-21: o SQL rodou pela primeira vez, num Postgres local.** Isto substitui o "NÃO EXECUTADO" do cabeçalho e o
+item 1 do §9 **só em parte**: o primeiro `supabase db reset && supabase test db` num projeto de verdade continua
+obrigatório antes de ligar.
+
+**Como rodar** (Node, sem Docker nem Supabase CLI):
+
+```
+cd mobile
+npm i --no-save @electric-sql/pglite      # ou PGLITE_DIR=<pasta com node_modules/@electric-sql/pglite>
+node scripts/sql/run-supabase-sql.mjs [--only 07,11] [--log saida.txt]
+```
+
+`mobile/scripts/sql/` tem três arquivos:
+
+- `supabase-stubs.sql` monta o mínimo do Supabase: os papéis `anon`, `authenticated` e `service_role` (este com
+  BYPASSRLS), os grants padrão em `public`, `auth.users` com `auth.uid()`, `auth.jwt()` e `auth.role()` lendo
+  `request.jwt.claims`, `storage.buckets` e `storage.objects` com RLS e `storage.foldername()`, `vault.decrypted_secrets`
+  vazio e `net.http_post` falso.
+- `mini-pgtap.sql` traz as asserções do pgTAP que os testes usam, com a mesma semântica: `plan`, `ok`, `is`, `isnt`,
+  `matches`, `throws_ok`, `lives_ok`, `is_empty`, `results_eq` e `finish`. O PGlite não tem pgTAP, então os `.test.sql`
+  rodam **sem tradução**.
+- `run-supabase-sql.mjs` aplica as 6 migrations em ordem e roda os 12 arquivos de teste.
+
+**Fidelidade.** As migrations e os testes rodam **conectados** como `supa_postgres`, que faz o papel do `postgres` do
+Supabase. Ele **não** é superusuário, tem BYPASSRLS e é dono dos objetos. Por isso as funções SECURITY DEFINER rodam com
+os mesmos limites de privilégio do projeto real. Rodando como superusuário, os testes passariam por motivos errados.
+
+**Diferenças conhecidas (INFERÊNCIA, conferir no primeiro `supabase test db`):**
+
+- O PGlite 0.5.8 roda Postgres **18.3**, e o projeto usa 17.
+- `create extension pg_net` e `create extension pgtap` viram no-op. O harness avisa na saída.
+- A posse das tabelas do Storage foi modelada assim: `supabase_storage_admin` é o dono e `postgres` é membro desse
+  papel. Assim o `create policy` em `storage.objects` passa, como passa no Supabase (supabase/cli#96, visto em
+  2026-09-21). O harness também aceitaria um `ALTER TABLE storage.objects`, que o Supabase recusa. Nenhuma migration faz
+  isso.
+- Não testado aqui: o PostgREST (se `CM001`…`CM006` chegam no campo `code`), a Storage API de verdade (quem grava
+  `owner_id`) e o Vault de verdade.
+
+**Resultado:** as 6 migrations aplicam sem erro. Das 247 asserções em 12 arquivos, **247 passam**:
+
+| Arquivos | Asserções | O que cobrem |
+|---|---|---|
+| 01–06 (fundação) | 37 | grupos, colunas de perfil, funções privadas, RLS, service_role, remoção |
+| 07–10 (Comunidade) | 91 | visibilidade, Amém e bloqueio, moderação e exclusão, entrada e consentimento |
+| 11 (novo) | 58 | invariantes trocando papel e claims (lista abaixo) |
+| 12 (novo) | 61 | executa as RPCs que nenhum teste chamava (PL/pgSQL só é validado quando roda) |
+
+O arquivo 11 prova estas invariantes:
+
+- Ninguém entra em grupo alheio nem põe outra pessoa num grupo, nem o líder.
+- O colega de grupo não lê a linha nem a `age_band` do outro. O líder de outro grupo não vê nem remove ninguém.
+- `anon` não chama nenhuma RPC. `authenticated` não chama as funções `service_*` nem `purge`, e não lê as tabelas de
+  `private`.
+- Um post ou comentário em análise só aparece para o autor. Amém, denúncia e bloqueio nesse conteúdo respondem sempre
+  igual e não servem de oráculo.
+- Ninguém lê a contagem de Amém, nem a moderação.
+- Denúncia urgente de comentário tira o comentário do ar na hora. "Risco à vida" só passa para o topo da fila.
+- Amém, comentário e upload exigem consentimento **na versão vigente**. Sessão anônima não publica nem sobe foto.
+- Revogar o consentimento apaga o conteúdo e **mantém os bloqueios**.
+- A exclusão de conta pelo caminho da Edge Function apaga tudo em cascata, dos dois lados do bloqueio. A exclusão
+  direta em `auth.users` também não trava com Amém, comentário ou bloqueio vivos.
+
+**Os testes pegam defeito?** Fiz um teste de mutação, com o script no scratchpad da sessão, fora do projeto. Foram 16
+mutações, e cada uma quebra uma invariante numa cópia das migrations:
+
+- o feed ignora o bloqueio;
+- o `user_id` do Amém fica legível;
+- o Amém é gravado sem consentimento;
+- a denúncia urgente não tira do ar;
+- revogar apaga os bloqueios;
+- a `age_band` fica legível;
+- o colega vê o perfil;
+- o usuário drena a fila do Storage;
+- o conteúdo em análise fica visível;
+- o Amém trava a exclusão de conta;
+- a força bruta no código passa;
+- o upload passa sem consentimento;
+- quem foi removido volta sozinho;
+- a entrada passa sem declarar 18+;
+- a sessão anônima publica;
+- o feed mostra conteúdo em análise.
+
+**As 16 foram pegas.** Duas mutações escaparam na primeira rodada, e cada uma virou teste novo:
+
+- A exclusão direta de uma conta com Amém vivo não era testada. Hoje é a seção J do arquivo 11.
+- A sessão anônima numa conta que já tinha consentimento não era testada. Hoje está na seção G do arquivo 11.
+
+**pg_net e Vault.** Conferi à parte, porque o Vault real não aceita INSERT direto num `.test.sql`:
+
+- Sem os segredos, publicar não chama nada.
+- Com a URL e um segredo de 40 caracteres, um texto limpo chama `…/moderate-text` uma vez. O corpo leva só
+  `{action, kind, id}`, sem o texto.
+- Texto segurado não chama a função.
+- Segredo com menos de 32 caracteres não chama.
+- Se o `http_post` falhar, a publicação continua.
+
+**Correções nas migrations:** nenhuma de lógica, porque nada quebrou. Mudou só o cabeçalho das 4 migrations da
+Comunidade e dos testes 01–10. Agora diz "executado no PGlite; ainda NÃO EXECUTADO no Supabase real". O marcador
+"NÃO EXECUTADO" continua ali porque `src/__tests__/comunidade-sql.test.ts` o exige.
+
+**Correção posterior (integração, 2026-09-21):** `private.is_community_moderator()` passou a exigir conta ativa:
+`profiles.account_status = 'active'` e, se existe perfil na comunidade, `community_profiles.status = 'active'`. O admin do
+app sem perfil na comunidade continua moderando. Antes, um moderador suspenso ou removido continuava chamando as RPCs
+de moderação. Coberto por `13_moderador_conta_ativa.test.sql` (10 asserções, junto com o caso do Amém com
+consentimento e sem as regras aceitas, CM002). Resultado com ele: 257/257.
+
+**Observado, sem correção (não quebra invariante):**
+
+- Quando o conteúdo denunciado sai (a pessoa revoga ou apaga), a denúncia continua `open`, com `post_id` e
+  `comment_id` nulos. Ela some da fila, mas continua em `community_open_reports`, e a moderação fecha à mão.
+- `private.campaign_day()` devolve 1 antes de 23/09. Quem postar antes do início pode marcar "dia 1".

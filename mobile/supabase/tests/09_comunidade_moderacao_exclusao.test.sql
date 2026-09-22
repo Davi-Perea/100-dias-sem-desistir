@@ -1,12 +1,13 @@
 -- =============================================================================
--- NÃO EXECUTADO: não há banco nem Supabase CLI nesta máquina (2026-09-21).
+-- EXECUTADO em 2026-09-21 num Postgres local (PGlite, mobile/scripts/sql/run-supabase-sql.mjs): passa.
+-- Ainda NÃO EXECUTADO no Supabase real (sem Docker/CLI nesta máquina): o primeiro db reset continua obrigatório.
 -- Rodar com: supabase test db
 --
 -- Moderação híbrida: foto só aparece depois de aprovação humana; denúncia de
 -- criança ou de rosto de terceiro tira do ar na hora; só moderação decide; o autor
 -- vê o motivo. Exclusão de conta: cascata + foto na fila do Storage.
 --
--- SUPOSIÇÃO a conferir no primeiro `supabase test db`: o papel postgres consegue
+-- SUPOSIÇÃO (confirmada no PGlite com postgres não superusuário; conferir no Supabase real): o papel postgres consegue
 -- inserir em storage.objects (preparação do teste) e ler a tabela nas funções.
 -- =============================================================================
 begin;

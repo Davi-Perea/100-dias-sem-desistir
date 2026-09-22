@@ -7,12 +7,13 @@
  * que o campo de comentário nunca vem pré-preenchido. Não prova o servidor.
  */
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
-import { Keyboard } from 'react-native';
+import { AccessibilityInfo, Keyboard } from 'react-native';
 
 import CommunityTab from '@/app/(tabs)/juntos';
 import PostCommentsRoute from '@/app/comunidade/post/[id]';
 import { createCommunityApi, type CommunityApi, type CommunityClient } from '@/community/api';
-import { FeedScreen } from '@/ui/comunidade/feed/FeedScreen';
+import { AFTER_CONSENT_COMMENT } from '@/ui/comunidade/feed/CommentsScreen';
+import { AFTER_CONSENT_FEED, FeedScreen } from '@/ui/comunidade/feed/FeedScreen';
 import { postMeta, relativeTime } from '@/ui/comunidade/feed/tempo';
 
 /* ------------------------------------------------------------------ mocks */
@@ -25,6 +26,13 @@ const mockRouter = {
   canGoBack: () => true,
 };
 let mockParams: Record<string, string> = {};
+const mockFocused = new Set<() => void>();
+/** A pessoa volta para a tela (das regras e do consentimento, por exemplo). */
+async function refocus() {
+  await act(async () => {
+    mockFocused.forEach((callback) => callback());
+  });
+}
 
 jest.mock('expo-router', () => {
   const { useEffect } = jest.requireActual('react') as typeof import('react');
@@ -34,8 +42,15 @@ jest.mock('expo-router', () => {
     },
     useLocalSearchParams: () => mockParams,
     useSegments: () => [],
-    // Foco = montagem, como na primeira vez que a aba aparece.
-    useFocusEffect: (callback: () => void) => useEffect(() => callback(), [callback]),
+    // Foco = montagem, como na primeira vez que a aba aparece. `refocus()` simula a volta à tela.
+    useFocusEffect: (callback: () => void) =>
+      useEffect(() => {
+        mockFocused.add(callback);
+        callback();
+        return () => {
+          mockFocused.delete(callback);
+        };
+      }, [callback]),
     Stack: { Screen: () => null },
     Link: ({ children }: { children: unknown }) => children,
   };
@@ -330,6 +345,27 @@ describe('C1: feed', () => {
     expect(mockRouter.push).toHaveBeenCalledWith('/comunidade/consentimento');
   });
 
+  test('voltando do aceite, o feed diz que o Amém ainda não foi dado (nada é gravado sozinho)', async () => {
+    const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility').mockImplementation(() => {});
+    const { rpc, handlers } = setup({ my_community_status: { data: [{ ...READY_STATUS, needs_publish_consent: true }] } });
+    await render(<FeedScreen />);
+    await waitFor(() => expect(screen.getByTestId(`post-amen-${POST(0)}`)).toBeTruthy());
+    await fireEvent.press(screen.getByTestId(`post-amen-${POST(0)}`));
+    expect(screen.queryByTestId('feed-consent-notice')).toBeNull();
+
+    handlers.my_community_status = { data: [READY_STATUS] };
+    await refocus();
+    await waitFor(() => expect(screen.getByTestId('feed-consent-notice')).toBeTruthy());
+    expect(screen.getByTestId('feed-consent-notice').props.children).toBe(AFTER_CONSENT_FEED);
+    expect(announce).toHaveBeenCalledWith(AFTER_CONSENT_FEED);
+    expect(calls(rpc, 'set_amen')).toHaveLength(0);
+
+    // O próximo Amém já vai, e o aviso sai.
+    await fireEvent.press(screen.getByTestId(`post-amen-${POST(0)}`));
+    await waitFor(() => expect(calls(rpc, 'set_amen')).toHaveLength(1));
+    expect(screen.queryByTestId('feed-consent-notice')).toBeNull();
+  });
+
   test('feed com fim: menos de uma página mostra "Fim" e não oferece mais nada', async () => {
     const { rpc } = setup();
     await render(<FeedScreen />);
@@ -548,6 +584,72 @@ describe('C6: comentários', () => {
     expect(screen.getByTestId('comment-too-long')).toBeTruthy();
     expect(screen.getByTestId('comment-send').props.accessibilityState).toMatchObject({ disabled: true });
     expect(calls(rpc, 'create_community_comment')).toHaveLength(0);
+  });
+
+  test('limite do comentário é dito ao leitor de tela: perto, passou e voltou a caber', async () => {
+    const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility').mockImplementation(() => {});
+    mockParams = { id: POST(0) };
+    setup({ community_post_comments: { data: [] } });
+    await render(<PostCommentsRoute />);
+    await waitFor(() => expect(screen.getByTestId('comment-input')).toBeTruthy());
+    const input = screen.getByTestId('comment-input');
+
+    await fireEvent.changeText(input, 'a'.repeat(899));
+    expect(screen.queryByTestId('comment-limit')).toBeNull();
+    expect(announce).not.toHaveBeenCalled();
+
+    await fireEvent.changeText(input, 'a'.repeat(950));
+    const near = screen.getByTestId('comment-limit-sentence');
+    expect(near.props.children).toBe('Perto do limite de 1.000 caracteres.');
+    expect(near.props.accessibilityLiveRegion).toBe('polite');
+    expect(screen.getByTestId('comment-limit-count').props.children).toBe('950 de 1.000 caracteres');
+    expect(announce).toHaveBeenLastCalledWith('Perto do limite de 1.000 caracteres.');
+
+    // Digitar mais uma letra no mesmo estado não repete a frase.
+    await fireEvent.changeText(input, 'a'.repeat(951));
+    expect(announce).toHaveBeenCalledTimes(1);
+
+    await fireEvent.changeText(input, 'a'.repeat(1001));
+    const over = screen.getByTestId('comment-too-long-sentence');
+    expect(over.props.children).toBe('Passou do limite de 1.000 caracteres. Apague um pouco para poder enviar.');
+    expect(over.props.accessibilityLiveRegion).toBe('polite');
+    expect(announce).toHaveBeenLastCalledWith(
+      'Passou do limite de 1.000 caracteres. Apague um pouco para poder enviar.',
+    );
+
+    await fireEvent.changeText(input, 'curto');
+    expect(screen.queryByTestId('comment-too-long')).toBeNull();
+    expect(announce).toHaveBeenLastCalledWith('Agora o texto cabe no limite.');
+  });
+
+  test('voltando do aceite, o comentário continua no campo e a tela diz que ainda não foi enviado', async () => {
+    const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility').mockImplementation(() => {});
+    mockParams = { id: POST(0) };
+    const { rpc, handlers } = setup({
+      my_community_status: { data: [{ ...READY_STATUS, needs_rules: true, needs_publish_consent: true }] },
+      community_post_comments: { data: [] },
+    });
+    await render(<PostCommentsRoute />);
+    await waitFor(() => expect(screen.getByTestId('comment-input')).toBeTruthy());
+    await fireEvent.changeText(screen.getByTestId('comment-input'), 'Amém, irmã!');
+    await fireEvent.press(screen.getByTestId('comment-send'));
+    expect(mockRouter.push).toHaveBeenCalledWith('/comunidade/regras');
+
+    handlers.my_community_status = { data: [READY_STATUS] };
+    await refocus();
+    await waitFor(() => expect(screen.getByTestId('comment-notice')).toBeTruthy());
+    expect(screen.getByTestId('comment-notice').props.children).toBe(AFTER_CONSENT_COMMENT);
+    expect(announce).toHaveBeenCalledWith(AFTER_CONSENT_COMMENT);
+    expect(screen.getByTestId('comment-input').props.value).toBe('Amém, irmã!');
+    expect(calls(rpc, 'create_community_comment')).toHaveLength(0);
+  });
+
+  test('sem comentários: a tela diz onde escrever', async () => {
+    mockParams = { id: POST(0) };
+    setup({ community_post_comments: { data: [] } });
+    await render(<PostCommentsRoute />);
+    await waitFor(() => expect(screen.getByTestId('comments-empty')).toBeTruthy());
+    expect(screen.getByText('Para comentar, escreva no campo lá embaixo e toque em Enviar.')).toBeTruthy();
   });
 
   test('teclado aberto: a legenda sai, o campo e o Enviar continuam (fonte grande em telefone pequeno)', async () => {

@@ -64,7 +64,8 @@
     "content:convert": "node scripts/convert-100-dias.mjs",
     "content:check": "node scripts/convert-100-dias.mjs --check",
     "bible:convert": "node scripts/convert-biblia-livre.mjs",
-    "bible:check": "node scripts/convert-biblia-livre.mjs --check"
+    "bible:check": "node scripts/convert-biblia-livre.mjs --check",
+    "db:test:local": "node scripts/sql/run-supabase-sql.mjs"
   },
   "private": true,
   "jest": {

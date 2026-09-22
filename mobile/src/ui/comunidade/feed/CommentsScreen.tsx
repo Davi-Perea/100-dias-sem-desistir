@@ -1,5 +1,5 @@
 import { router, useFocusEffect } from 'expo-router';
-import { type ReactNode, useCallback, useRef, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import { KeyboardAvoidingView, Pressable, ScrollView, TextInput, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -18,8 +18,13 @@ import { FeedError, FeedSkeleton, GateView } from './FeedStates';
 import { consentHref } from './rotas';
 import { relativeTime } from './tempo';
 import { humanError, needsConsent, useCommunity } from './useCommunity';
+import { LimitNote } from '../LimitNote';
 
 const GUTTER = 20;
+/** O aviso de limite aparece 100 caracteres antes dos 1.000 do servidor. */
+const COMMENT_NEAR_FROM = LIMITS.commentBody - 100;
+/** Dito ao voltar das regras e do consentimento: nada foi enviado sozinho. */
+export const AFTER_CONSENT_COMMENT = 'Pronto. Seu comentário ainda não foi enviado: toque em Enviar para mandar.';
 
 /**
  * C6 · Comentários de uma publicação: lista e campo.
@@ -107,13 +112,26 @@ function ReadyComments({ postId, api, status }: { postId: string; api: Community
     }, [load]),
   );
 
+  // Foi aceitar regras/consentimento a partir daqui: ao voltar, a tela diz que
+  // o comentário (que continua no campo) ainda não saiu — nada sai sem um toque.
+  const askedConsent = useRef(false);
+  const gated = needsConsent(status);
+  useEffect(() => {
+    if (!askedConsent.current || gated) return;
+    askedConsent.current = false;
+    setNotice(AFTER_CONSENT_COMMENT);
+    announceNotice(AFTER_CONSENT_COMMENT);
+  }, [gated]);
+
   const cleaned = cleanText(text);
-  const tooLong = cleaned !== null && charLength(cleaned) > LIMITS.commentBody;
+  const length = cleaned === null ? 0 : charLength(cleaned);
+  const tooLong = length > LIMITS.commentBody;
   const canSend = cleaned !== null && !tooLong && !sending;
 
   async function send() {
     if (!cleaned || tooLong) return;
-    if (needsConsent(status)) {
+    if (gated) {
+      askedConsent.current = true;
       router.push(consentHref(status));
       return;
     }
@@ -165,6 +183,9 @@ function ReadyComments({ postId, api, status }: { postId: string; api: Community
         <AppText variant="body" style={{ textAlign: 'center' }}>
           Ninguém comentou ainda.
         </AppText>
+        <AppText variant="caption" style={{ textAlign: 'center', marginTop: spacing.xs }}>
+          Para comentar, escreva no campo lá embaixo e toque em Enviar.
+        </AppText>
       </View>
     );
   } else {
@@ -207,7 +228,7 @@ function ReadyComments({ postId, api, status }: { postId: string; api: Community
               onSend={send}
               canSend={canSend}
               sending={sending}
-              tooLong={tooLong}
+              length={length}
               error={error}
               notice={notice}
               bottomInset={insets.bottom}
@@ -291,7 +312,7 @@ function Composer({
   onSend,
   canSend,
   sending,
-  tooLong,
+  length,
   error,
   notice,
   bottomInset,
@@ -301,7 +322,8 @@ function Composer({
   onSend: () => void;
   canSend: boolean;
   sending: boolean;
-  tooLong: boolean;
+  /** Caracteres do texto, contados como o servidor conta. */
+  length: number;
   error: string | null;
   notice: string | null;
   bottomInset: number;
@@ -333,11 +355,12 @@ function Composer({
         </AppText>
       ) : null}
       {error ? <SaveErrorNotice message={error} testID="comment-error" /> : null}
-      {tooLong ? (
-        <AppText variant="caption" testID="comment-too-long">
-          {`Use até ${LIMITS.commentBody.toLocaleString('pt-BR')} caracteres.`}
-        </AppText>
-      ) : null}
+      <LimitNote
+        length={length}
+        max={LIMITS.commentBody}
+        nearFrom={COMMENT_NEAR_FROM}
+        testID={length > LIMITS.commentBody ? 'comment-too-long' : 'comment-limit'}
+      />
       {keyboard ? null : (
         <AppText variant="caption" testID="comment-visibility-note">
           Aparece com o seu nome para as pessoas da comunidade.

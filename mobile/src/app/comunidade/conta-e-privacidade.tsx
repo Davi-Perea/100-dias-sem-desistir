@@ -18,6 +18,7 @@ import {
 } from '@/ui/comunidade/perfil/parts';
 import { communityMessage, useCommunityAccount } from '@/ui/comunidade/perfil/useCommunityAccount';
 import { spacing } from '@/ui/theme';
+import { announceNotice } from '@/ui/voce/announce';
 
 /**
  * Conta e privacidade da Comunidade.
@@ -99,7 +100,11 @@ function AccountAndPrivacy({
     try {
       await action();
       setSheet(null);
-      if (done) setNotice(done);
+      if (done) {
+        setNotice(done);
+        // accessibilityRole alert não fala sozinho no iOS.
+        announceNotice(done);
+      }
       after?.();
     } catch (error) {
       setSheetError(
@@ -300,7 +305,7 @@ function AccountAndPrivacy({
           if (!unblockTarget) return;
           run(
             () => api.unblock(unblockTarget.blockId),
-            `${unblockTarget.displayName} foi desbloqueado.`,
+            `Você desbloqueou ${unblockTarget.displayName}.`,
             () => setBlocks((current) => (current ?? []).filter((b) => b.blockId !== unblockTarget.blockId)),
           );
         }}

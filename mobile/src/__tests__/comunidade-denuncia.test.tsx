@@ -273,6 +273,17 @@ describe('C5 na publicação de outra pessoa', () => {
     expect(screen.getByTestId('reason-emergency')).toBeTruthy();
   });
 
+  test('sem motivo escolhido, a folha diz por que Enviar está apagado', async () => {
+    setup();
+    await render(<FeedScreen />);
+    const sheet = await openPostSheet(1);
+    await fireEvent.press(sheet.getByTestId('sheet-report-content'));
+    expect(screen.getByTestId('reason-needed')).toBeTruthy();
+    expect(screen.getByTestId('report-send').props.accessibilityState).toMatchObject({ disabled: true });
+    await fireEvent.press(screen.getByTestId('reason-spam'));
+    expect(screen.queryByTestId('reason-needed')).toBeNull();
+  });
+
   test('detalhe longo demais não é enviado', async () => {
     const { rpc } = setup();
     await render(<FeedScreen />);

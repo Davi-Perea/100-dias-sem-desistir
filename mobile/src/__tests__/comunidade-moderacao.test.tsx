@@ -12,6 +12,7 @@ import { Alert } from 'react-native';
 
 import { createCommunityApi, type CommunityClient } from '@/community/api';
 import { CommunityError } from '@/community/errors';
+import { canModerate } from '@/ui/comunidade/moderacao/acesso';
 import { createModerationApi } from '@/ui/comunidade/moderacao/moderacaoApi';
 import { ModerationQueueScreen } from '@/ui/comunidade/moderacao/ModerationQueueScreen';
 import { dueLabel, timeAgo } from '@/ui/comunidade/moderacao/rotulos';
@@ -290,6 +291,25 @@ describe('tela da fila', () => {
     await waitFor(() => expect(onNotModerator).toHaveBeenCalledTimes(1));
     expect(called(rpc, 'community_moderation_queue')).toHaveLength(0);
     expect(called(rpc, 'community_open_reports')).toHaveLength(0);
+  });
+
+  test.each(['suspended', 'removed'])(
+    'moderador com a própria conta %s na comunidade também é mandado embora, sem consultar a fila',
+    async (memberStatus) => {
+      const { rpc, onNotModerator } = await renderQueue({
+        my_community_status: { data: [{ is_member: false, member_status: memberStatus, is_moderator: true }] },
+      });
+      await waitFor(() => expect(onNotModerator).toHaveBeenCalledTimes(1));
+      expect(called(rpc, 'community_moderation_queue')).toHaveLength(0);
+    },
+  );
+
+  test('canModerate: o papel vale para membro ativo e para quem modera sem perfil (admin)', () => {
+    expect(canModerate({ isModerator: true, memberStatus: 'active' })).toBe(true);
+    expect(canModerate({ isModerator: true, memberStatus: null })).toBe(true);
+    expect(canModerate({ isModerator: true, memberStatus: 'suspended' })).toBe(false);
+    expect(canModerate({ isModerator: true, memberStatus: 'removed' })).toBe(false);
+    expect(canModerate({ isModerator: false, memberStatus: 'active' })).toBe(false);
   });
 
   test('erro ao abrir mostra o F5 com saída, sem texto técnico', async () => {

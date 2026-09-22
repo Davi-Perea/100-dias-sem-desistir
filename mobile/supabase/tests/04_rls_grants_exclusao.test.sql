@@ -1,5 +1,6 @@
 -- =============================================================================
--- NÃO EXECUTADO: não há banco nem Supabase CLI nesta máquina (2026-09-21).
+-- EXECUTADO em 2026-09-21 num Postgres local (PGlite, mobile/scripts/sql/run-supabase-sql.mjs): passa.
+-- Ainda NÃO EXECUTADO no Supabase real (sem Docker/CLI nesta máquina): o primeiro db reset continua obrigatório.
 -- Rodar com: supabase test db
 --
 -- RLS em toda tabela; anon sem privilégio de tabela; nenhuma policy aberta;

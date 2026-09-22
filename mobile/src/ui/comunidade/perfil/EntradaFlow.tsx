@@ -10,6 +10,7 @@ import { charLength, formatInviteCode, isValidDisplayName, LIMITS, normalizeInvi
 import { BackBar, goBackOrHome } from '@/ui/BackBar';
 import { AppText, Avatar, Block, Button, StateView, StepBar } from '@/ui/components';
 import { spacing, useTheme } from '@/ui/theme';
+import { announceNotice } from '@/ui/voce/announce';
 
 import { ActionError, AccountStateView, LineField, ProfileScreen } from './parts';
 import { COMMUNITY_ACCOUNT_ROUTE } from './routes';
@@ -37,6 +38,25 @@ export const INVALID_CODE_COPY =
   'Esse código não funcionou. Ele pode estar errado, vencido ou cancelado. Confira com quem te passou ou peça um novo.';
 export const CODE_FORMAT_COPY = 'Confira o código: são 10 letras e números, sem 0, O, 1 ou I.';
 export const UNDER_18_COPY = 'Aqui você acompanha a Jornada. A comunidade é para quem tem 18 anos ou mais.';
+export const NAME_TOO_LONG_COPY = `Use até ${LIMITS.displayName} letras e espaços. O primeiro nome já basta.`;
+
+/** Nome longo demais: dito na tela, na live region (Android) e em voz no iOS. */
+function NameTooLong() {
+  const { colors } = useTheme();
+  useEffect(() => {
+    announceNotice(NAME_TOO_LONG_COPY);
+  }, []);
+  return (
+    <AppText
+      variant="captionStrong"
+      accessibilityLiveRegion="polite"
+      style={{ color: colors.danger }}
+      testID="entrar-nome-longo"
+    >
+      {NAME_TOO_LONG_COPY}
+    </AppText>
+  );
+}
 
 type Step = 'idade' | 'menor' | 'codigo' | 'perfil' | 'pronto' | 'suspenso';
 
@@ -280,6 +300,10 @@ function Steps({ api, status }: { api: CommunityApi; status: CommunityStatus }) 
           >
             {charLength(trimmed)} de {LIMITS.displayName}
           </AppText>
+          {charLength(trimmed) > LIMITS.displayName ? (
+            // Sem isto, o botão só fica apagado e a pessoa não sabe por quê.
+            <NameTooLong />
+          ) : null}
         </View>
         {trimmed ? (
           <View
