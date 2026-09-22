@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useCallback, useEffect, useState } from 'react';
 
+import { isGoalId, type GoalId } from '@/config/goals';
 import { isDevBuild } from '@/journey/devBuild';
 import { createWriteQueue } from '@/progress/writeQueue';
 import { READER_FONT_DEFAULT, normalizeReaderFontSize } from '@/reader/readerFontSize';
@@ -9,6 +10,11 @@ import { READER_FONT_DEFAULT, normalizeReaderFontSize } from '@/reader/readerFon
 
 export type ReadingMode = 'in_app' | 'own_bible' | 'both';
 export type ReminderSlot = 'morning' | 'afternoon' | 'evening' | 'custom' | 'none';
+
+/** Limite do nome: cabe em qualquer saudação sem quebrar a tela. */
+export const PROFILE_NAME_MAX = 40;
+
+export type Profile = { name: string | null; goals: GoalId[] };
 
 export type Settings = {
   onboardingCompleted: boolean;
@@ -38,6 +44,12 @@ export type Settings = {
   /** Aviso local diário às 12h com quem conduz o altar de hoje. Opt-in. */
   altarReminder: boolean;
   /**
+   * Perfil local da entrada (E4): como a pessoa quer ser chamada e as metas
+   * dela para os 100 dias. SÓ neste aparelho, nunca em analytics ou servidor
+   * (metas como "jejuar" são dado de fé). Não é o perfil da comunidade.
+   */
+  profile: Profile;
+  /**
    * Ferramentas de desenvolvimento. Em build de release são descartadas na carga
    * e na gravação, e o useJourney as ignora (DIA-01/PER-01): nada de DEV vale na loja.
    * R4-15: "Carregamento lento" e "Falha ao carregar" saíram — nada os lia.
@@ -59,8 +71,25 @@ export const DEFAULT_SETTINGS: Settings = {
   milestonesKept: [],
   ministry: null,
   altarReminder: false,
+  profile: { name: null, goals: [] },
   dev: { dayOverride: null },
 };
+
+/**
+ * Nome: espaços das pontas e repetidos saem, vazio vira null, corta no limite.
+ * Exportada para a tela aplicar a mesma regra antes de gravar.
+ */
+export function normalizeProfileName(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const clean = value.replace(/\s+/g, ' ').trim();
+  return clean.length > 0 ? Array.from(clean).slice(0, PROFILE_NAME_MAX).join('').trim() : null;
+}
+
+function normalizeProfile(value: unknown): Profile {
+  const p = (value && typeof value === 'object' ? value : {}) as Record<string, unknown>;
+  const goals = Array.isArray(p.goals) ? p.goals.filter(isGoalId) : [];
+  return { name: normalizeProfileName(p.name), goals: Array.from(new Set(goals)) };
+}
 
 let cache: Settings | null = null;
 const listeners = new Set<() => void>();
@@ -111,6 +140,7 @@ export function normalizeSettings(raw: unknown): Settings {
       : [],
     ministry: typeof r.ministry === 'string' && r.ministry.length > 0 ? r.ministry : null,
     altarReminder: bool(r.altarReminder, d.altarReminder),
+    profile: normalizeProfile(r.profile),
     // Em release, nada de DEV sobrevive (DIA-01/PER-01).
     dev: {
       dayOverride:

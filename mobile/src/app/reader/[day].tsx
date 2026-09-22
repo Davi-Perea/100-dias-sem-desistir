@@ -1,12 +1,11 @@
 import * as Haptics from 'expo-haptics';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams, type Href } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AccessibilityInfo, Platform, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { track } from '@/analytics/analytics';
 import { expandChapters, parseReference } from '@/bible/references';
-import { COMMUNITY_ENABLED } from '@/config/features';
 import { getDay } from '@/journey/datasetSource';
 import { formatDayDate } from '@/journey/officialDay';
 import { useJourney } from '@/journey/useJourney';
@@ -228,14 +227,10 @@ export default function ReaderScreen() {
       await setDayCompleted(journey.campaign.id, dayNumber, true);
       if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       track({ name: 'reading_completed', dayNumber, mode: 'in_app' });
-      // B4 ('depois de concluir') só existe com a Comunidade ligada. Sem ela
-      // (a V1) o leitor fecha como sempre. PROVISÓRIO (perguntas 4 e 8 ao
-      // designer): a ordem do B4 com o marco ainda não está desenhada.
-      if (COMMUNITY_ENABLED) {
-        router.replace({ pathname: '/comunidade/depois/[day]', params: { day: String(dayNumber) } });
-      } else {
-        goBackOrHome();
-      }
+      // Feedback de 2026-09-22: concluir leva à tela de conclusão do dia (com
+      // confete). Com a Comunidade ligada, o "Continuar" de lá segue para o B4.
+      // `replace`: voltar de lá não reabre o leitor já concluído.
+      router.replace(`/concluido/${dayNumber}` as Href);
     } catch {
       // PER-02: não gravou, nada mudou; fica no leitor com o aviso.
       setSaveFailed(true);
@@ -265,9 +260,17 @@ export default function ReaderScreen() {
   // "Voltar" só aparece no último. PROVISÓRIO (decisão do engenheiro,
   // 2026-09-21: o TELAS diz "ou 'Voltar' se o dia já está concluído" sem dizer
   // em qual capítulo; "Voltar" em todos prendia a releitura no capítulo 1).
+  // J6: com os dias futuros abertos, ler adiantado não conclui (progresso e
+  // marcos só contam o dia que já chegou). No último capítulo fica "Voltar" e
+  // a frase diz a partir de quando o dia pode ser concluído, como no A3.
+  const completable = journey.isDayCompletable(dayNumber);
+  const futureNote =
+    isLastChapter && !done && !completable
+      ? `Você poderá concluir este dia a partir de ${formatDayDate(dayNumber, journey.campaign)}.`
+      : undefined;
   const primary: ReaderPrimary = !isLastChapter
     ? nextChapter
-    : done
+    : done || !completable
       ? { title: 'Voltar', onPress: goBackOrHome, testID: 'reader-complete' }
       : { title: 'Concluir leitura', icon: 'check', onPress: completeDay, loading: busy, testID: 'reader-complete' };
 
@@ -335,7 +338,13 @@ export default function ReaderScreen() {
               <>
                 {/* Mesma composição da aba Bíblia (ChapterText), com o título de
                     salmo (Passage.heading) antes do versículo 1. */}
-                <ChapterText verses={passage.verses} heading={passage.heading} fontSize={fontSize} />
+                <ChapterText
+                  verses={passage.verses}
+                  heading={passage.heading}
+                  fontSize={fontSize}
+                  book={current.book}
+                  chapter={current.chapter}
+                />
                 {/* PROVISÓRIO (LACUNAS C29): atribuição exigida pela licença, no
                     fim do capítulo e acima do rodapé medido. */}
                 <AppText variant="caption" style={{ marginTop: spacing.lg }} testID="reader-attribution">
@@ -372,6 +381,7 @@ export default function ReaderScreen() {
         bottomPadding={Math.max(40, insets.bottom)}
         onHeight={setFooterHeight}
         saveFailed={saveFailed}
+        note={futureNote}
       />
 
       {hasLicensedText ? (

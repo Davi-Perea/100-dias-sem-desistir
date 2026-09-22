@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { View } from 'react-native';
 
 import { useJourney } from '@/journey/useJourney';
+import { absenceEnabled, absenceScheduled, withAbsencePreference } from '@/reminders/absencePref';
 import {
   cancelDailyReminder,
   formatTime,
@@ -10,6 +11,7 @@ import {
   listScheduledReminders,
   scheduleDailyReminder,
   scheduleTestNotification,
+  syncAbsenceReminders,
   syncAltarReminders,
 } from '@/reminders/reminders';
 import { updateSettings, useSettings, type ReminderSlot } from '@/settings/settingsStore';
@@ -21,8 +23,8 @@ import { SubScreen } from '@/ui/voce/SubScreen';
 import { ToggleRow } from '@/ui/voce/ToggleRow';
 
 /**
- * Lembretes (D1 → aqui): a leitura diária e o aviso do altar das 12h30.
- * Notificações locais, sem conta e sem rede.
+ * Lembretes (D1 → aqui): a leitura diária, o aviso do altar das 12h30 e os
+ * avisos de ausência (N2). Notificações locais, sem conta e sem rede.
  *
  * PROVISÓRIO (pergunta 12 ao designer): tela não desenhada. O horário é o
  * seletor único (`ReminderTimePicker`, o mesmo do onboarding): horários prontos
@@ -38,6 +40,7 @@ export default function ReminderScreen() {
   const [scheduled, setScheduled] = useState<number>(0);
   const [busy, setBusy] = useState(false);
   const [altarNotice, setAltarNotice] = useState<string | null>(null);
+  const [absenceNotice, setAbsenceNotice] = useState<string | null>(null);
   const supported = isReminderSupported();
 
   // A contagem de agendamentos é ferramenta de conferência: só em __DEV__.
@@ -128,6 +131,32 @@ export default function ReminderScreen() {
     await updateSettings((s) => ({ ...s, altarReminder: false }));
   };
 
+  // Avisos de ausência (N2). Mesma forma do altar: o gesto de ligar é o único
+  // que pode pedir a permissão; recusa volta a preferência para desligado.
+  const absenceOn = absenceEnabled(settings);
+  const dailyOn = settings.reminder.slot !== 'none';
+  const toggleAbsence = () => applyAbsence().catch(() => setAbsenceNotice(SAVE_ERROR_COPY));
+
+  const applyAbsence = async () => {
+    if (absenceOn) {
+      setAbsenceNotice(null);
+      await updateSettings((s) => withAbsencePreference(s, false));
+      await syncAbsenceReminders(false, journey.campaign, new Date());
+      return;
+    }
+    await updateSettings((s) => withAbsencePreference(s, true));
+    // Com o lembrete diário ligado, ele já faz o papel: nada novo é agendado.
+    const result = await syncAbsenceReminders(absenceScheduled(true, dailyOn), journey.campaign, new Date(), {
+      requestPermission: true,
+    });
+    if (result.ok) {
+      setAbsenceNotice(null);
+      return;
+    }
+    setAbsenceNotice(result.reason);
+    await updateSettings((s) => withAbsencePreference(s, false));
+  };
+
   return (
     <SubScreen title="Lembretes" gap={spacing.lg}>
       <View style={{ gap: spacing.xs }}>
@@ -180,7 +209,26 @@ export default function ReminderScreen() {
       </View>
 
       {/*
-        A contagem de agendamentos e o teste de 5 s são ferramenta de conferência
+        N2 (2026-09-22): no máximo dois avisos, texto sem culpa e com como
+        desligar (limite contra notificação excessiva). PROVISÓRIO (decisão do
+        engenheiro: cópia sem desenho).
+      */}
+      <View style={{ gap: spacing.sm }}>
+        <Cap>Se eu sumir</Cap>
+        <ToggleRow
+          label="Avisar se eu ficar sem abrir"
+          caption="No máximo dois avisos: 1 dia e 7 dias depois da última vez que você abrir o app. Só durante os 100 dias. Com o lembrete diário ligado, ele já faz esse papel."
+          checked={absenceOn}
+          onToggle={toggleAbsence}
+          notice={absenceNotice}
+          first
+          testID="absence-reminder-toggle"
+          noticeTestID="absence-reminder-notice"
+        />
+      </View>
+
+      {/*
+        A contagem de agendamentos e o teste de 10 s são ferramenta de conferência
         técnica (LACUNAS P31; o F5 pede nenhuma informação técnica na tela): só
         aparecem em __DEV__, nunca na build de release.
       */}
@@ -189,12 +237,15 @@ export default function ReminderScreen() {
           <View style={{ gap: spacing.sm }}>
             <AppText variant="caption">{scheduled} agendamento(s) ativo(s) no sistema.</AppText>
             <Button
-              title="Testar agora (5 s)"
+              title="Mandar um lembrete de teste em 10 s"
               variant="underline"
               disabled={!supported || busy}
+              testID="reminder-test-10s"
               onPress={async () => {
-                const result = await scheduleTestNotification(5);
-                report(result.ok ? 'Notificação de teste em 5 segundos.' : result.reason);
+                // 10 s dá tempo de bloquear a tela ou ir para outro app e ver
+                // como o aviso chega fora do app (N1).
+                const result = await scheduleTestNotification(10);
+                report(result.ok ? 'Lembrete de teste em 10 segundos. Pode bloquear a tela.' : result.reason);
                 await refresh();
               }}
             />

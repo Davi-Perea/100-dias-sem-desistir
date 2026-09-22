@@ -186,22 +186,21 @@ describe('leitor: o que acontece ao concluir', () => {
     await fireEvent.press(screen.getByTestId('reader-complete'));
   }
 
-  test('desligada: fecha o leitor como na V1, sem B4', async () => {
+  // Feedback de 2026-09-22: concluir leva sempre à tela de conclusão (confete);
+  // com a Comunidade ligada, o "Continuar" de lá segue para o B4 (ver /concluido).
+  test('desligada: troca o leitor pela tela de conclusão do dia', async () => {
     await completeReading();
-    await waitFor(() => expect(mockRouter.back).toHaveBeenCalled());
-    expect(mockRouter.replace).not.toHaveBeenCalled();
+    await waitFor(() => expect(mockRouter.replace).toHaveBeenCalledWith(`/concluido/${TODAY}`));
+    expect(mockRouter.back).not.toHaveBeenCalled();
   });
 
-  test('ligada: troca o leitor pelo B4 do mesmo dia', async () => {
+  test('ligada: também passa pela tela de conclusão (o B4 vem depois dela)', async () => {
     mockEnabled = true;
     await completeReading();
-    await waitFor(() =>
-      expect(mockRouter.replace).toHaveBeenCalledWith({
-        pathname: '/comunidade/depois/[day]',
-        params: { day: String(TODAY) },
-      }),
+    await waitFor(() => expect(mockRouter.replace).toHaveBeenCalledWith(`/concluido/${TODAY}`));
+    expect(mockRouter.replace).not.toHaveBeenCalledWith(
+      expect.objectContaining({ pathname: '/comunidade/depois/[day]' }),
     );
-    expect(mockRouter.back).not.toHaveBeenCalled();
   });
 });
 

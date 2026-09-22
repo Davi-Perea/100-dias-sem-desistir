@@ -253,9 +253,11 @@ describe('Marco e Dia 100: o numeral conhece as duas coisas que o esticam', () =
     return style;
   }
 
-  test('com fonte padrão, o tamanho exato do desenho (E3 180/160/−10, E4 150/136/−8)', async () => {
-    expect(await numeralStyle(25, 1)).toMatchObject({ fontSize: 180, lineHeight: 160, letterSpacing: -10 });
-    expect(await numeralStyle(100, 1)).toMatchObject({ fontSize: 150, lineHeight: 136, letterSpacing: -8 });
+  test('com fonte padrão, o tamanho exato do desenho (E3 180/−10, E4 150/−8)', async () => {
+    // Entrelinha: a do desenho (160, 136) é menor que a altura natural da Schibsted 800
+    // (1,234em) e recortava o topo dos dígitos (mesmo defeito do J1). Vale a natural.
+    expect(await numeralStyle(25, 1)).toMatchObject({ fontSize: 180, lineHeight: 223, letterSpacing: -10 });
+    expect(await numeralStyle(100, 1)).toMatchObject({ fontSize: 150, lineHeight: 186, letterSpacing: -8 });
   });
 
   test('cede tamanho em tela estreita com fonte grande, e cabe na largura útil', async () => {

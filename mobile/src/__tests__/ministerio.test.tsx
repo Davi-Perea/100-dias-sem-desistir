@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 
 import YouScreen from '@/app/(tabs)/voce';
 import MinistryScreen from '@/app/ministerio';
@@ -187,7 +187,8 @@ describe('Você: comunidade e ministério', () => {
     await waitFor(() => expect(screen.getByTestId('row-ministry')).toBeTruthy());
 
     expect(screen.queryByTestId('row-group')).toBeNull();
-    expect(screen.getByText('Escolher')).toBeTruthy();
+    // 'Minhas metas' também mostra 'Escolher': a conferência fica na linha do ministério.
+    expect(within(screen.getByTestId('row-ministry')).getByText('Escolher')).toBeTruthy();
     await fireEvent.press(screen.getByTestId('row-ministry'));
     expect(mockRouter.push).toHaveBeenCalledWith('/ministerio');
 
@@ -208,7 +209,7 @@ describe('Você: comunidade e ministério', () => {
     expect(screen.getByTestId('row-ministry').props.accessibilityLabel).toBe('Meu ministério, Kids');
     // A identidade saiu do Você: o ministério aparece só como valor da linha.
     expect(screen.getAllByText('Kids')).toHaveLength(1);
-    expect(screen.queryByText('Escolher')).toBeNull();
+    expect(within(screen.getByTestId('row-ministry')).queryByText('Escolher')).toBeNull();
   });
 
   // O aviso do altar mudou do Você para a tela de Lembretes (2026-09-21):

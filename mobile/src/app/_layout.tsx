@@ -180,6 +180,8 @@ function AppRoot() {
           options={{ headerShown: false, presentation: 'modal' }}
         />
         <Stack.Screen name="marco/[day]" options={{ headerShown: false, presentation: 'fullScreenModal' }} />
+        {/* J5 · "Dia N concluído": tela cheia, com o próprio "Continuar". */}
+        <Stack.Screen name="concluido/[day]" options={{ headerShown: false, presentation: 'fullScreenModal' }} />
         <Stack.Screen name="reflexoes" options={{ headerShown: false }} />
         <Stack.Screen name="jejum" options={{ headerShown: false }} />
         <Stack.Screen name="aparencia" options={{ headerShown: false }} />

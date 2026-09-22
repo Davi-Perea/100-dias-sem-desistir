@@ -5,7 +5,15 @@ import { getCampaign } from '@/journey/datasetSource';
 import { daysForMinistry } from '@/journey/ministries';
 import { useSettings } from '@/settings/settingsStore';
 
-import { syncAltarReminders, syncDailyReminder, syncMinistryReminders, type SyncOptions } from './reminders';
+import { absenceEnabled, absenceScheduled } from './absencePref';
+import {
+  simulatedCampaignDay,
+  syncAbsenceReminders,
+  syncAltarReminders,
+  syncDailyReminder,
+  syncMinistryReminders,
+  type SyncOptions,
+} from './reminders';
 
 /** Sincronização de fundo: nunca abre o diálogo de permissão. */
 const BACKGROUND: SyncOptions = { requestPermission: false };
@@ -23,6 +31,11 @@ const BACKGROUND: SyncOptions = { requestPermission: false };
  * quê. Ele agenda o que já está permitido e desiste em silêncio do resto; quem
  * pede é a tela onde a pessoa marcou o lembrete, e é lá que o motivo de uma
  * recusa aparece. As chamadas passam pela fila de `reminders.ts`, uma por vez.
+ *
+ * Os avisos de ausência (N2) contam a partir da última abertura: são refeitos
+ * em TODA abertura e volta ao primeiro plano, e nunca chegam a quem abre o app
+ * todo dia. Com dia simulado (demonstração, painel DEV), a leitura diária é
+ * agendada a partir de hoje, na data real (N1).
  */
 export function useReminderSync() {
   const settings = useSettings();
@@ -33,6 +46,9 @@ export function useReminderSync() {
   const hour = settings?.reminder.hour ?? 0;
   const minute = settings?.reminder.minute ?? 0;
   const dailyOn = slot !== 'none';
+  const absenceOn = settings ? absenceEnabled(settings) : false;
+  // Muda com o dia do painel DEV; em release é sempre null.
+  const devDay = settings?.dev.dayOverride ?? null;
 
   useEffect(() => {
     if (!ready) return;
@@ -40,7 +56,7 @@ export function useReminderSync() {
       syncDailyReminder(dailyOn ? { hour, minute } : null, getCampaign(), new Date(), BACKGROUND).catch(() => {});
     syncDaily();
     return onForeground(syncDaily);
-  }, [ready, dailyOn, hour, minute]);
+  }, [ready, dailyOn, hour, minute, devDay]);
 
   useEffect(() => {
     if (!ready) return;
@@ -56,6 +72,18 @@ export function useReminderSync() {
     syncAltar();
     return onForeground(syncAltar);
   }, [ready, altarEnabled]);
+
+  // N2: o lembrete diário já avisa todo dia; com ele ligado, a ausência não agenda.
+  const absenceActive = absenceScheduled(absenceOn, dailyOn);
+  useEffect(() => {
+    if (!ready) return;
+    const syncAbsence = () =>
+      syncAbsenceReminders(absenceActive, getCampaign(), new Date(), BACKGROUND, simulatedCampaignDay()).catch(
+        () => {},
+      );
+    syncAbsence();
+    return onForeground(syncAbsence);
+  }, [ready, absenceActive, devDay]);
 }
 
 /** Roda `run` sempre que o app volta a ficar ativo; devolve a limpeza do efeito. */

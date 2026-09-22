@@ -26,6 +26,8 @@ import { ToggleRow } from '@/ui/voce/ToggleRow';
 
 const mockParams: { current: Record<string, string> } = { current: {} };
 
+// Reanimated não carrega no Jest sem o módulo nativo (ver support/reanimatedVoceMock).
+jest.mock('react-native-reanimated', () => jest.requireActual('./support/reanimatedVoceMock'));
 jest.mock('expo-router', () => ({
   router: { push: jest.fn(), replace: jest.fn(), back: jest.fn(), canGoBack: jest.fn(() => true) },
   useLocalSearchParams: () => mockParams.current,

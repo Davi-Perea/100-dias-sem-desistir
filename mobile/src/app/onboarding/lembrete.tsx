@@ -6,7 +6,7 @@ import { cancelDailyReminder, scheduleDailyReminder } from '@/reminders/reminder
 import { DEFAULT_SETTINGS, updateSettings, useSettings, type ReminderSlot } from '@/settings/settingsStore';
 import { AppText, Button, SAVE_ERROR_COPY } from '@/ui/components';
 import { ReminderTimePicker } from '@/ui/lembrete/ReminderTimePicker';
-import { OnboardingStep, StepSupport } from '@/ui/OnboardingStep';
+import { ONBOARDING_STEP, OnboardingStep, StepSupport } from '@/ui/OnboardingStep';
 
 const LATER = 'Você pode seguir sem lembrete e ativar depois em Você.';
 /**
@@ -16,7 +16,7 @@ const LATER = 'Você pode seguir sem lembrete e ativar depois em Você.';
 const DENIED_NOTICE = `Permissão de notificações negada. ${LATER}`;
 
 /**
- * Passo 3 de 3 · lembrete, no molde do F2. É o ÚLTIMO passo: o "Continuar"
+ * Passo 4 de 4 · lembrete, no molde do F2. É o ÚLTIMO passo: o "Continuar"
  * daqui faz o que a antiga tela "Tudo pronto" fazia — grava
  * `onboardingCompleted`, dispara `onboarding_completed` e abre a casa.
  *
@@ -76,8 +76,8 @@ export default function ReminderOnboardingScreen() {
 
   const finish = async () => {
     if (settings) {
-      // Jejum nunca entra em analytics (PER-06): é prática religiosa, dado
-      // sensível pela LGPD art. 5º, II.
+      // Jejum, nome e metas nunca entram em analytics (PER-06): prática
+      // religiosa é dado sensível pela LGPD art. 5º, II, e o nome é pessoal.
       track({
         name: 'onboarding_completed',
         readingMode: settings.readingMode ?? 'unset',
@@ -96,7 +96,7 @@ export default function ReminderOnboardingScreen() {
 
   return (
     <OnboardingStep
-      step={3}
+      step={ONBOARDING_STEP.lembrete}
       title="Quando você quer ser lembrado da sua leitura?"
       support={
         <>

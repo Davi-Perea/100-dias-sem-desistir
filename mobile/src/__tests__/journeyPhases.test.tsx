@@ -9,6 +9,21 @@ import { useJourney } from '@/journey/useJourney';
 import { _resetCompletionsCacheForTests, COMPLETIONS_PREFIX, setDayCompleted } from '@/progress/completionsStore';
 import { _resetSettingsCacheForTests, SETTINGS_KEY } from '@/settings/settingsStore';
 
+/**
+ * J6 · chave única FUTURE_DAYS_OPEN (config/features.ts). Os casos deste arquivo
+ * rodam com a chave DESLIGADA (o comportamento de antes: dia futuro trancado);
+ * os casos com ela ligada ligam `mockFutureOpen` no próprio teste.
+ */
+let mockFutureOpen = false;
+// Getter de verdade (defineProperty): num literal com spread, o Babel avalia o
+// getter uma vez só, na criação do mock, e a chave ficaria congelada.
+jest.mock('@/config/features', () => {
+  const mocked = { ...jest.requireActual('@/config/features') };
+  Object.defineProperty(mocked, 'FUTURE_DAYS_OPEN', { get: () => mockFutureOpen, enumerable: true });
+  return mocked;
+});
+
+
 const CAMPAIGN_ID = 'dev-fixture-campaign';
 const DAY_MS = 86_400_000;
 
@@ -36,6 +51,7 @@ async function mountOnDay(day: number) {
 }
 
 beforeEach(async () => {
+  mockFutureOpen = false;
   await AsyncStorage.clear();
   await AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify({ onboardingCompleted: true }));
   _resetSettingsCacheForTests();
@@ -175,5 +191,28 @@ describe('gating de conteúdo futuro', () => {
     const locked = [18, 19, 50, 100].filter((d) => !result.current.isDayUnlocked(d));
     expect(locked).toEqual([18, 19, 50, 100]);
     expect(getCampaign().total_days).toBe(100);
+  });
+});
+
+describe('gating com FUTURE_DAYS_OPEN ligada (J6)', () => {
+  beforeEach(() => {
+    mockFutureOpen = true;
+  });
+
+  test('todo dia da campanha abre; concluir só até hoje', async () => {
+    const { result } = await mountOnDay(17);
+    expect([18, 19, 50, 100].every((d) => result.current.isDayUnlocked(d))).toBe(true);
+    expect(result.current.isDayUnlocked(101)).toBe(false);
+    expect(result.current.isDayCompletable(17)).toBe(true);
+    expect(result.current.isDayCompletable(18)).toBe(false);
+    // Hoje continua sendo o dia da igreja.
+    expect(result.current.dayState(17)).toBe('today');
+    expect(result.current.dayState(18)).toBe('future');
+  });
+
+  test('antes da campanha, nenhum dia abre mesmo com a chave', async () => {
+    const { result } = await mountOnDay(0);
+    expect(result.current.isDayUnlocked(1)).toBe(false);
+    expect(result.current.isDayUnlocked(100)).toBe(false);
   });
 });

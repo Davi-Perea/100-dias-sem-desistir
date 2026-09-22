@@ -2,7 +2,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { StyleSheet } from 'react-native';
 
-import JejumStep from '@/app/onboarding/jejum';
 import WelcomeScreen from '@/app/onboarding/index';
 import LeituraStep from '@/app/onboarding/leitura';
 import LembreteStep from '@/app/onboarding/lembrete';
@@ -110,10 +109,9 @@ describe('F1 · boas-vindas', () => {
     expect(title.props.accessibilityRole).toBe('header');
     expect(title.props.accessibilityLabel).toBe('100 dias sem desistir');
     expect(flat(title)).toMatchObject({ fontFamily: faces.sg800, fontSize: 50, lineHeight: 50, letterSpacing: -2.4 });
+    // E1 (2026-09-22): texto provisório do engenheiro até o Davi mandar o dele.
     expect(
-      screen.getByText(
-        'A igreja inteira lê a mesma coisa, no mesmo dia. Você não é obrigado a nada — pode só ler, pode só orar, pode voltar depois de faltar.',
-      ),
+      screen.getByText('Cem dias de Palavra, oração e consagração junto com a sua igreja.'),
     ).toBeTruthy();
     expect(flat(screen.getByTestId('welcome-body'))).toMatchObject({ fontFamily: faces.ss400, fontSize: 20, lineHeight: 32 });
   });
@@ -146,10 +144,10 @@ describe('F1 · boas-vindas', () => {
     expect(mockStatusBar).toHaveBeenCalledWith({ style: 'dark' });
   });
 
-  test('"Começar" vai direto ao passo 1, sem muro de login', async () => {
+  test('"Começar" vai direto ao passo 1 (nome), sem muro de login', async () => {
     await render(<WelcomeScreen />);
     await fireEvent.press(screen.getByTestId('onboarding-start'));
-    expect(mockRouter.push).toHaveBeenCalledWith('/onboarding/leitura');
+    expect(mockRouter.push).toHaveBeenCalledWith('/onboarding/nome');
   });
 
   test('"Já tenho perfil" só aparece com nuvem (sem ela, /conta só diria "indisponível")', async () => {
@@ -167,12 +165,12 @@ describe('F1 · boas-vindas', () => {
 
 /* -------------------------------------------------------------------- F2 */
 
-describe('F2 · passo 1, como você vai ler', () => {
+describe('F2 · passo 3, como você vai ler', () => {
   test('voltar, passo, título 800 34/38 e as três opções exatas', async () => {
     await seedSettings();
     await render(<LeituraStep />);
     expect(screen.getByRole('button', { name: 'Voltar' })).toBeTruthy();
-    expect(screen.getByText('Passo 1 de 3')).toBeTruthy();
+    expect(screen.getByText('Passo 3 de 4')).toBeTruthy();
     const title = screen.getByTestId('onboarding-step-title');
     expect(title.props.children).toBe('Como você pretende ler na maioria dos dias?');
     expect(title.props.accessibilityRole).toBe('header');
@@ -180,7 +178,8 @@ describe('F2 · passo 1, como você vai ler', () => {
     for (const label of ['Ler no app', 'Usar a minha Bíblia', 'Vou alternar']) {
       expect(screen.getByRole('radio', { name: label })).toBeTruthy();
     }
-    expect(screen.getByText('Ler na Bíblia impressa não é pior. Dá para mudar depois quando quiser.')).toBeTruthy();
+    // E2: a frase de apoio de baixo saiu.
+    expect(screen.queryByText(/Bíblia impressa não é pior/)).toBeNull();
   });
 
   test('"Continuar" desabilitado até escolher; a escolha fica gravada', async () => {
@@ -199,7 +198,7 @@ describe('F2 · passo 1, como você vai ler', () => {
     expect(flat(screen.getByTestId('onboarding-mode-own_bible')).borderWidth).toBe(2.5);
     expect(flat(screen.getByTestId('onboarding-mode-in_app')).borderWidth).toBe(1.5);
     await fireEvent.press(screen.getByTestId('reading-continue'));
-    expect(mockRouter.push).toHaveBeenCalledWith('/onboarding/jejum');
+    expect(mockRouter.push).toHaveBeenCalledWith('/onboarding/lembrete');
   });
 
   test('voltar sem pilha leva às boas-vindas', async () => {
@@ -211,24 +210,11 @@ describe('F2 · passo 1, como você vai ler', () => {
   });
 });
 
-describe('F2 · passo 2, jejum no mesmo molde', () => {
-  test('só a decisão de participar; nada de perguntar do que jejua', async () => {
-    await seedSettings();
-    await render(<JejumStep />);
-    expect(screen.getByText('Passo 2 de 3')).toBeTruthy();
-    await fireEvent.press(screen.getByTestId('fasting-yes'));
-    await waitFor(() => expect(getCachedSettings()?.fastingEnabled).toBe(true));
-    expect(screen.queryByText(/alimento|duração|motivo|método/i)).toBeNull();
-    await fireEvent.press(screen.getByTestId('fasting-continue'));
-    expect(mockRouter.push).toHaveBeenCalledWith('/onboarding/lembrete');
-  });
-});
-
-describe('F2 · passo 3, lembrete', () => {
+describe('F2 · passo 4, lembrete', () => {
   test('não pede permissão ao abrir; só ao escolher um horário', async () => {
     await seedSettings();
     await render(<LembreteStep />);
-    expect(screen.getByText('Passo 3 de 3')).toBeTruthy();
+    expect(screen.getByText('Passo 4 de 4')).toBeTruthy();
     expect(mockReminders.scheduleDailyReminder).not.toHaveBeenCalled();
 
     await fireEvent.press(screen.getByTestId('onboarding-reminder-0700'));

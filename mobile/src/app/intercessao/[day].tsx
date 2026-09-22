@@ -190,7 +190,8 @@ export default function IntercessionScreen() {
 
   const dateLabel = formatDayDate(day, journey.campaign);
 
-  // A4: o bloqueio é da ROTA (REGRAS 7). Nada do dia é renderizado — nem monte,
+  // A4: o bloqueio é da ROTA (REGRAS 7). Com a chave J6 (FUTURE_DAYS_OPEN) todo dia
+  // da campanha abre e este ramo só vale antes de 23/09. Nada do dia é renderizado — nem monte,
   // nem ênfase, nem passos —, só o número e a data.
   if (!journey.isDayUnlocked(day)) {
     // Sem pilha (lembrete, deep link) não há Jornada atrás para a folha cobrir:

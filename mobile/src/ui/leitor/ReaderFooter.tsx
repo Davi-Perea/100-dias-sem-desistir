@@ -1,6 +1,6 @@
 import { Pressable, View } from 'react-native';
 
-import { Button, SaveErrorNotice } from '@/ui/components';
+import { AppText, Button, SaveErrorNotice } from '@/ui/components';
 import { Icon, type IconName } from '@/ui/icons';
 import { BUTTON_MIN_HEIGHT, MIN_TOUCH, radius, spacing, useTheme } from '@/ui/theme';
 
@@ -52,6 +52,7 @@ export function ReaderFooter({
   bottomPadding,
   onHeight,
   saveFailed = false,
+  note,
 }: {
   primary: ReaderPrimary;
   isFirstChapter: boolean;
@@ -62,6 +63,8 @@ export function ReaderFooter({
   onHeight: (height: number) => void;
   /** "Concluir leitura" não gravou (PER-02): o aviso fica logo acima do primário. */
   saveFailed?: boolean;
+  /** Frase curta acima do primário (J6: dia futuro que ainda não pode ser concluído). */
+  note?: string;
 }) {
   const { colors } = useTheme();
   const fit = useOneLineFit();
@@ -86,6 +89,11 @@ export function ReaderFooter({
         borderTopColor: colors.border,
       }}
     >
+      {note ? (
+        <AppText variant="caption" testID="reader-future-note">
+          {note}
+        </AppText>
+      ) : null}
       {saveFailed ? <SaveErrorNotice testID="reader-save-error" /> : null}
       <View
         testID="reader-footer-box"

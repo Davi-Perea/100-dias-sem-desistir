@@ -16,6 +16,8 @@ import { setBibleProvider, type BibleTextProvider } from '@/reader/provider';
 import { _resetReflectionsCacheForTests, saveReflection } from '@/reflections/reflectionsStore';
 import { _resetSettingsCacheForTests, loadSettings, SETTINGS_KEY } from '@/settings/settingsStore';
 
+// Reanimated não carrega no Jest sem o módulo nativo (ver support/reanimatedVoceMock).
+jest.mock('react-native-reanimated', () => jest.requireActual('./support/reanimatedVoceMock'));
 jest.mock('expo-router', () => ({
   router: { push: jest.fn(), replace: jest.fn(), back: jest.fn(), canGoBack: jest.fn(() => true) },
   useLocalSearchParams: () => ({}),

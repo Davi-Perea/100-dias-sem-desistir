@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { render, screen, waitFor } from '@testing-library/react-native';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 
 import ReaderScreen from '@/app/reader/[day]';
 import ReflectionScreen from '@/app/reflexao/[day]';
@@ -13,6 +13,21 @@ import { _resetReflectionsCacheForTests } from '@/reflections/reflectionsStore';
 import { devBibleProvider } from '@/reader/devProvider';
 import { setBibleProvider, type BibleTextProvider } from '@/reader/provider';
 import { _resetSettingsCacheForTests, SETTINGS_KEY } from '@/settings/settingsStore';
+
+/**
+ * J6 · chave única FUTURE_DAYS_OPEN (config/features.ts). Os casos deste arquivo
+ * rodam com a chave DESLIGADA (o comportamento de antes: dia futuro trancado);
+ * os casos com ela ligada ligam `mockFutureOpen` no próprio teste.
+ */
+let mockFutureOpen = false;
+// Getter de verdade (defineProperty): num literal com spread, o Babel avalia o
+// getter uma vez só, na criação do mock, e a chave ficaria congelada.
+jest.mock('@/config/features', () => {
+  const mocked = { ...jest.requireActual('@/config/features') };
+  Object.defineProperty(mocked, 'FUTURE_DAYS_OPEN', { get: () => mockFutureOpen, enumerable: true });
+  return mocked;
+});
+
 
 /** Parâmetro de rota do caso corrente; lido tarde, na chamada do hook. */
 let mockDay = '17';
@@ -105,10 +120,18 @@ const licensed: BibleTextProvider = {
   }),
 };
 
+/** Anda o leitor até o último capítulo (onde fica o gesto de concluir). */
+async function goToLastChapter() {
+  for (let i = 0; i < 40 && screen.queryByTestId('reader-next'); i++) {
+    await fireEvent.press(screen.getByTestId('reader-next'));
+  }
+}
+
 const TODAY = 17;
 const FUTURE = 40;
 
 beforeEach(async () => {
+  mockFutureOpen = false;
   await AsyncStorage.clear();
   _resetCompletionsCacheForTests();
   _resetReflectionsCacheForTests();
@@ -196,5 +219,67 @@ describe('reflexão de um dia que ainda não abriu', () => {
     await waitFor(() => expect(screen.getByTestId('reflection-save')).toBeTruthy());
     expect(screen.getByText(labelOf(TODAY))).toBeTruthy();
     expect(screen.getByText(/salva neste aparelho/)).toBeTruthy();
+  });
+});
+
+/**
+ * J6 · com a chave FUTURE_DAYS_OPEN ligada (decisão do fundador, 2026-09-22), o
+ * dia futuro abre como os outros: sem cadeado no leitor nem na reflexão.
+ */
+describe('com FUTURE_DAYS_OPEN ligada', () => {
+  beforeEach(() => {
+    mockFutureOpen = true;
+  });
+
+  test('o leitor do dia futuro abre e pede a passagem ao provedor', async () => {
+    setBibleProvider(licensed);
+    mockDay = String(FUTURE);
+    await render(<ReaderScreen />);
+    await waitFor(() => expect(mockGetPassage).toHaveBeenCalled());
+    expect(screen.queryByTestId('locked-day-screen')).toBeNull();
+    expect(screen.getByTestId('reader-footer')).toBeTruthy();
+  });
+
+  test('sem texto licenciado, o dia futuro abre o guia', async () => {
+    mockDay = String(FUTURE);
+    await render(<ReaderScreen />);
+    await waitFor(() => expect(screen.getByTestId('reader-guide')).toBeTruthy());
+    expect(screen.queryByTestId('locked-day-screen')).toBeNull();
+  });
+
+  test('a reflexão do dia futuro abre com a referência daquele dia', async () => {
+    mockDay = String(FUTURE);
+    await render(<ReflectionScreen />);
+    await waitFor(() => expect(screen.getByTestId('reflection-save')).toBeTruthy());
+    expect(screen.queryByTestId('locked-day-screen')).toBeNull();
+    expect(screen.getByText(labelOf(FUTURE))).toBeTruthy();
+  });
+
+  // Integração (leitor): ler adiantado não conclui; progresso e marcos só contam o dia que chegou.
+  test('no leitor do dia futuro não há Concluir leitura, só a data em que o dia poderá ser concluído', async () => {
+    mockDay = String(FUTURE);
+    await render(<ReaderScreen />);
+    await waitFor(() => expect(screen.getByTestId('reader-guide')).toBeTruthy());
+    await goToLastChapter();
+    expect(screen.queryByText('Concluir leitura')).toBeNull();
+    expect(screen.getByTestId('reader-future-note')).toHaveTextContent(
+      /^Você poderá concluir este dia a partir de \d{2}\/\d{2}\/\d{4}\.$/,
+    );
+    expect(screen.getByText('Voltar')).toBeTruthy();
+  });
+
+  test('no leitor do dia de hoje Concluir leitura continua e não há a frase do dia futuro', async () => {
+    await render(<ReaderScreen />);
+    await waitFor(() => expect(screen.getByTestId('reader-guide')).toBeTruthy());
+    await goToLastChapter();
+    expect(screen.getByText('Concluir leitura')).toBeTruthy();
+    expect(screen.queryByTestId('reader-future-note')).toBeNull();
+  });
+
+  test('um número fora da campanha continua sem abrir', async () => {
+    mockDay = '101';
+    await render(<ReaderScreen />);
+    await waitFor(() => expect(screen.queryByTestId('reader-footer')).toBeNull());
+    expect(screen.queryByTestId('reader-guide')).toBeNull();
   });
 });

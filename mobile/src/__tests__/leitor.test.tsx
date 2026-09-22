@@ -198,7 +198,7 @@ describe('B1 · leitor', () => {
     await waitFor(() => expect(screen.getByTestId('content-banner')).toBeTruthy());
   });
 
-  test('capítulo a capítulo até "Concluir leitura", que conclui e fecha', async () => {
+  test('capítulo a capítulo até "Concluir leitura", que conclui e leva à conclusão', async () => {
     await render(<ReaderScreen />);
     const total = chaptersOf(TODAY).length;
     await waitFor(() => expect(screen.getByTestId('reader-footer')).toBeTruthy());
@@ -211,7 +211,8 @@ describe('B1 · leitor', () => {
     expect(screen.getByLabelText('Concluir leitura')).toBeTruthy();
 
     await fireEvent.press(screen.getByTestId('reader-complete'));
-    await waitFor(() => expect(mockRouter.back).toHaveBeenCalled());
+    // B4: concluir leva à tela de conclusão do dia (Jornada), não fecha o leitor.
+    await waitFor(() => expect(mockRouter.replace).toHaveBeenCalledWith(`/concluido/${TODAY}`));
     _resetCompletionsCacheForTests();
     expect(isDayCompleted(await loadCompletions(campaignId), TODAY)).toBe(true);
   });

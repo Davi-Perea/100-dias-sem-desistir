@@ -12,6 +12,7 @@ import { AppText, Button, Screen, ScreenScroll, SettingRow, StateView } from '@/
 import { ModerationEntry } from '@/ui/comunidade/moderacao/ModerationEntry';
 import { spacing } from '@/ui/theme';
 import { ProgressBlock } from '@/ui/voce/ProgressBlock';
+import { StartHereCard, type StartStepId } from '@/ui/voce/StartHereCard';
 import { RowGroup } from '@/ui/voce/SubScreen';
 
 const READING_MODE_LABEL: Record<string, string> = {
@@ -36,7 +37,17 @@ const READING_MODE_LABEL: Record<string, string> = {
  * - "Altar de hoje": abria Comunidade, que fica fora da V1; com ela saiu a faixa C-07
  *   daqui, porque esta tela deixou de mostrar conteúdo da igreja;
  * - o interruptor do aviso do altar das 12h30: foi para Lembretes (/lembrete).
+ *
+ * V1 (feedback do fundador, 2026-09-22): cartão "Comece por aqui" (nome, metas,
+ * lembrete; some com os três feitos) e as linhas "Minhas metas" e "Minhas
+ * anotações". Nome e metas saem de settings.profile, só neste aparelho.
  */
+const START_ROUTES: Record<StartStepId, () => void> = {
+  name: () => router.push({ pathname: '/metas', params: { secao: 'nome' } }),
+  goals: () => router.push('/metas'),
+  reminder: () => router.push('/lembrete'),
+};
+
 export default function YouScreen() {
   const journey = useJourney();
   const settings = useSettings();
@@ -57,6 +68,7 @@ export default function YouScreen() {
       ? 'Desligado'
       : `${String(reminder.hour).padStart(2, '0')}:${String(reminder.minute).padStart(2, '0')}`;
   const kept = fastingKeptCount(fasting);
+  const goalCount = settings.profile.goals.length;
 
   return (
     <Screen>
@@ -64,6 +76,9 @@ export default function YouScreen() {
         <AppText variant="screenTitle" accessibilityRole="header" testID="voce-title">
           Você
         </AppText>
+
+        {/* ------------------------------------------------- comece por aqui */}
+        <StartHereCard settings={settings} onOpen={(step) => START_ROUTES[step]()} />
 
         {/* ---------------------------------------------------- meu progresso */}
         <ProgressBlock
@@ -81,6 +96,14 @@ export default function YouScreen() {
             onPress={() => router.push('/reflexoes')}
             first
             testID="row-reflections"
+          />
+          {/* B2: marca-texto e anotações ficam só no aparelho. */}
+          <SettingRow label="Minhas anotações" onPress={() => router.push('/anotacoes')} testID="row-notes" />
+          <SettingRow
+            label="Minhas metas"
+            value={goalCount === 0 ? 'Escolher' : `${goalCount} ${goalCount === 1 ? 'meta' : 'metas'}`}
+            onPress={() => router.push('/metas')}
+            testID="row-goals"
           />
           <SettingRow
             label="Meu ministério"

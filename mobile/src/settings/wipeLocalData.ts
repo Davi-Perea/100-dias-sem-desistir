@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { clearRecordedEvents } from '@/analytics/analytics';
 import { wipeAllFasting } from '@/fasting/fastingStore';
+import { wipeAllMarks } from '@/marks/marksStore';
 import { wipeAllCompletions } from '@/progress/completionsStore';
 import { wipeAllReflections } from '@/reflections/reflectionsStore';
 
@@ -20,7 +21,13 @@ import { wipeSettings } from './settingsStore';
  * fluxo próprio, que deve chamar esta função como último passo local.
  */
 export async function wipeLocalData(): Promise<void> {
-  await Promise.all([wipeAllCompletions(), wipeAllReflections(), wipeAllFasting(), wipeSettings()]);
+  await Promise.all([
+    wipeAllCompletions(),
+    wipeAllReflections(),
+    wipeAllFasting(),
+    wipeAllMarks(),
+    wipeSettings(),
+  ]);
   const rest = await AsyncStorage.getAllKeys();
   if (rest.length > 0) await AsyncStorage.multiRemove(rest);
   clearRecordedEvents();

@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { isCloudConfigured } from '@/cloud/config';
 import { Dove } from '@/ui/brand';
 import { AppText, Button, Screen } from '@/ui/components';
+import { useDoveTransition } from '@/ui/entrada/doveContext';
 import { fixedPalette, MAX_CONTENT_WIDTH, spacing, useGutter } from '@/ui/theme';
 
 /**
@@ -17,14 +18,19 @@ import { fixedPalette, MAX_CONTENT_WIDTH, spacing, useGutter } from '@/ui/theme'
  * da superfície (`fixedPalette('yellow')`): parágrafo #3F3D38 (7,42:1), título
  * #111111 (12,92:1), primário tinta com rótulo branco.
  *
- * Sem muro de login: "Começar" vai direto para o passo 1.
+ * Sem muro de login: "Começar" vai direto para o passo 1, com a pomba (E5).
+ *
+ * E1: texto do fundador (2026-09-22), sem acréscimos.
  */
+const WELCOME_BODY = 'Cem dias de Palavra, oração e consagração junto com a sua igreja.';
+
 const YELLOW = fixedPalette('yellow');
 
 export default function WelcomeScreen() {
   const insets = useSafeAreaInsets();
   const inset = useGutter();
   const focused = useIsFocused();
+  const flyDove = useDoveTransition();
 
   // PROVISÓRIO (pergunta 12 ao designer): "Já tenho perfil" não tem tela de
   // destino no desenho. O portão do _layout raiz já deixa /conta abrir antes do
@@ -78,8 +84,7 @@ export default function WelcomeScreen() {
             style={{ fontSize: 20, lineHeight: 32, color: YELLOW.textSecondary }}
             testID="welcome-body"
           >
-            A igreja inteira lê a mesma coisa, no mesmo dia. Você não é obrigado a nada — pode só ler, pode só orar,
-            pode voltar depois de faltar.
+            {WELCOME_BODY}
           </AppText>
         </ScrollView>
 
@@ -87,7 +92,9 @@ export default function WelcomeScreen() {
           <Button
             title="Começar"
             tone="yellow"
-            onPress={() => router.push('/onboarding/leitura')}
+            // A pomba sai preta: ela nasce sobre o amarelo fixo, onde a branca
+            // sumiria no tema escuro. Depois da troca, acompanha o tema.
+            onPress={() => flyDove(() => router.push('/onboarding/nome'), { toneBefore: 'black' })}
             testID="onboarding-start"
           />
           {showSignIn ? (

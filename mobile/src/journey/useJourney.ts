@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 
 import { demoDay } from '@/config/demo';
+import { FUTURE_DAYS_OPEN } from '@/config/features';
 import {
   completedCount,
   isDayCompleted,
@@ -51,8 +52,13 @@ export type JourneySnapshot = {
   reached: Milestone[];
   todayDay: JourneyDay | null;
   dayState: (dayNumber: number) => DayState;
-  /** Conteúdo de dias futuros permanece indisponível até o dia oficial (spec §8). */
+  /**
+   * Se o dia abre. Com `FUTURE_DAYS_OPEN` (config/features.ts), todo dia da
+   * campanha abre desde o Dia 1 oficial; sem ela, só até o dia oficial (spec §8).
+   */
   isDayUnlocked: (dayNumber: number) => boolean;
+  /** Se o dia pode ser CONCLUÍDO: só hoje e os dias que já passaram, com ou sem a chave J6. */
+  isDayCompletable: (dayNumber: number) => boolean;
   ready: boolean;
 };
 
@@ -90,7 +96,14 @@ export function useJourney(): JourneySnapshot {
    * Antes da campanha começar, NENHUM dia abre — inclusive o Dia 1. O clamp do dia
    * oficial serve para exibição; ele não pode virar permissão de leitura antecipada.
    */
-  const isDayUnlocked = (dayNumber: number) => phase !== 'before_start' && dayNumber <= officialDay;
+  const isDayCompletable = (dayNumber: number) =>
+    phase !== 'before_start' && dayNumber >= 1 && dayNumber <= officialDay;
+  // J6: a chave é lida na chamada (e não copiada num valor do módulo) para os
+  // testes cobrirem os dois valores.
+  const isDayUnlocked = (dayNumber: number) =>
+    FUTURE_DAYS_OPEN
+      ? phase !== 'before_start' && dayNumber >= 1 && dayNumber <= campaign.total_days
+      : isDayCompletable(dayNumber);
 
   const dayState = (dayNumber: number): DayState => {
     if (isDayCompleted(completions, dayNumber)) return 'completed';
@@ -117,6 +130,7 @@ export function useJourney(): JourneySnapshot {
     todayDay: phase === 'before_start' ? null : getDay(officialDay),
     dayState,
     isDayUnlocked,
+    isDayCompletable,
     ready: completions !== null && settings !== null,
   };
 }
