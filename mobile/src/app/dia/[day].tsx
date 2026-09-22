@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { View } from 'react-native';
 
 import { formatReference } from '@/bible/references';
+import { holdMilestones, releaseMilestones } from '@/journey/celebration';
 import { isFastingKept, setFastingKept, useFasting } from '@/fasting/fastingStore';
 import { getDay } from '@/journey/datasetSource';
 import { altarOfDay } from '@/journey/ministries';
@@ -43,6 +44,10 @@ import { BRAND_YELLOW, MIN_TOUCH, spacing } from '@/ui/theme';
  *
  * Dia futuro: o bloqueio é da ROTA (REGRAS 7). Link direto, histórico e deep
  * link chegam no cadeado do A4 antes de qualquer leitura do conteúdo do dia.
+ * Com a chave J6 (`FUTURE_DAYS_OPEN`, config/features.ts) todo dia da campanha
+ * abre; o dia futuro se lê, mas só se conclui quando chegar (`isDayCompletable`).
+ *
+ * J5: concluir aqui leva à tela "Dia N concluído" (/concluido/[day]).
  */
 export default function DayScreen() {
   const params = useLocalSearchParams<{ day: string }>();
@@ -96,6 +101,8 @@ export default function DayScreen() {
   // dia passado (ou depois da campanha) o desenho diria "hoje" de um dia que não
   // é hoje; ali fica "Conduziu" e "neste dia".
   const isToday = journey.phase === 'running' && day === journey.officialDay;
+  const completable = journey.isDayCompletable(day);
+  const isFuture = !completable;
   // Nunca nome de líder, nem com autorização (REGRAS 3): o altar diz só o ministério.
   const altar = altarOfDay(day);
   const steps = flowSteps().length;
@@ -103,6 +110,19 @@ export default function DayScreen() {
   const save = (kind: 'completion' | 'fasting', write: () => Promise<unknown>) => {
     setSaveFailed(null);
     write().catch(() => setSaveFailed(kind));
+  };
+
+  /** J5: gravado, abre a celebração; o marco (se houver) espera ela sair. */
+  const complete = () => {
+    setSaveFailed(null);
+    holdMilestones();
+    setDayCompleted(journey.campaign.id, day, true).then(
+      () => router.push({ pathname: '/concluido/[day]', params: { day: String(day) } }),
+      () => {
+        releaseMilestones();
+        setSaveFailed('completion');
+      },
+    );
   };
 
   const openReader = () => router.push({ pathname: '/reader/[day]', params: { day: String(day) } });
@@ -162,13 +182,14 @@ export default function DayScreen() {
             accessibilityLabel={`Desfazer a conclusão do dia ${day}`}
             testID="day-undo"
           />
+        ) : completable ? (
+          <Button title="Concluir leitura" variant="underline" onPress={complete} testID="day-complete" />
         ) : (
-          <Button
-            title="Concluir leitura"
-            variant="underline"
-            onPress={() => save('completion', () => setDayCompleted(journey.campaign.id, day, true))}
-            testID="day-complete"
-          />
+          // J6: o dia futuro abre para leitura, mas concluir antes da hora mexeria no
+          // progresso e nos marcos. A frase diz quando.
+          <AppText variant="caption" testID="day-future-note">
+            {`Você poderá concluir este dia a partir de ${dateLabel}.`}
+          </AppText>
         )}
         {saveFailed === 'completion' ? <SaveErrorNotice testID="day-save-error" /> : null}
 
@@ -211,7 +232,7 @@ export default function DayScreen() {
           {altar ? (
             <DayLinkRow
               title="Altar das 12h30"
-              subtitle={`${isToday ? 'Hoje conduz' : 'Conduziu'}: ${altar.ministry}`}
+              subtitle={`${isToday ? 'Hoje conduz' : isFuture ? 'Conduz' : 'Conduziu'}: ${altar.ministry}`}
               testID="day-altar"
             />
           ) : null}
@@ -231,7 +252,8 @@ export default function DayScreen() {
 
         {/* O jejum aparece para quem optou por ele (como no app de hoje). REGRAS §5.4:
             a superfície foi desenhada para sair sem refazer a tela. */}
-        {settings.fastingEnabled ? (
+        {/* J6: jejum de um dia que ainda não chegou não se marca. */}
+        {settings.fastingEnabled && !isFuture ? (
           <FastingRow
             // CORREÇÃO: mesmo motivo do altar — num dia passado, não é 'hoje'.
             title={isToday ? 'Cumpri meu jejum hoje' : 'Cumpri meu jejum neste dia'}

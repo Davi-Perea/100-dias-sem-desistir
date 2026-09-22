@@ -11,6 +11,21 @@ import { _resetFastingCacheForTests, loadFasting } from '@/fasting/fastingStore'
 import { _resetReflectionsCacheForTests } from '@/reflections/reflectionsStore';
 import { _resetSettingsCacheForTests, SETTINGS_KEY } from '@/settings/settingsStore';
 
+/**
+ * J6 · chave única FUTURE_DAYS_OPEN (config/features.ts). Os casos deste arquivo
+ * rodam com a chave DESLIGADA (o comportamento de antes: dia futuro trancado);
+ * os casos com ela ligada ligam `mockFutureOpen` no próprio teste.
+ */
+let mockFutureOpen = false;
+// Getter de verdade (defineProperty): num literal com spread, o Babel avalia o
+// getter uma vez só, na criação do mock, e a chave ficaria congelada.
+jest.mock('@/config/features', () => {
+  const mocked = { ...jest.requireActual('@/config/features') };
+  Object.defineProperty(mocked, 'FUTURE_DAYS_OPEN', { get: () => mockFutureOpen, enumerable: true });
+  return mocked;
+});
+
+
 let mockParams: { day: string } = { day: '17' };
 
 jest.mock('expo-router', () => ({
@@ -55,6 +70,7 @@ async function openDay(day: number) {
 }
 
 beforeEach(async () => {
+  mockFutureOpen = false;
   await AsyncStorage.clear();
   _resetCompletionsCacheForTests();
   _resetFastingCacheForTests();

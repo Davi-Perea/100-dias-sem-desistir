@@ -16,6 +16,7 @@ import { updateSettings, useSettings } from '@/settings/settingsStore';
 import { ARRIVAL_NUMERAL, MILESTONE_NUMERAL, NUMERAL_MAX_SCALE, numeralSize } from '@/ui/altar/milestoneNumeral';
 import { Dove } from '@/ui/brand';
 import { HundredDayRuler } from '@/ui/HundredDayRuler';
+import { safeNumeralLineHeight } from '@/ui/jornada/displayNumeral';
 import { AppText, Button, DevContentBanner, Screen, ScreenScroll, StateView } from '@/ui/components';
 import { faces, fixedPalette, spacing, useGutter } from '@/ui/theme';
 
@@ -181,7 +182,7 @@ export default function MilestoneScreen() {
             variant="milestone"
             style={{
               fontSize: numeral.size,
-              lineHeight: numeral.lineHeight,
+              lineHeight: safeNumeralLineHeight(numeral),
               letterSpacing: numeral.letterSpacing,
               color: YELLOW.onAccent,
             }}
@@ -289,7 +290,7 @@ export default function MilestoneScreen() {
           variant="milestone"
           style={{
             fontSize: numeral.size,
-            lineHeight: numeral.lineHeight,
+            lineHeight: safeNumeralLineHeight(numeral),
             letterSpacing: numeral.letterSpacing,
             color: INK.accent,
           }}

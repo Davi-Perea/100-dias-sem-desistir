@@ -26,6 +26,21 @@ import { TODAY_NODE_OFFSET, todayNodeOffset } from '@/ui/jornada/JourneyRows';
 import { openingIndex, openingOffset } from '@/ui/jornada/opening';
 
 /**
+ * J6 · chave única FUTURE_DAYS_OPEN (config/features.ts). Os casos deste arquivo
+ * rodam com a chave DESLIGADA (o comportamento de antes: dia futuro trancado);
+ * os casos com ela ligada ligam `mockFutureOpen` no próprio teste.
+ */
+let mockFutureOpen = false;
+// Getter de verdade (defineProperty): num literal com spread, o Babel avalia o
+// getter uma vez só, na criação do mock, e a chave ficaria congelada.
+jest.mock('@/config/features', () => {
+  const mocked = { ...jest.requireActual('@/config/features') };
+  Object.defineProperty(mocked, 'FUTURE_DAYS_OPEN', { get: () => mockFutureOpen, enumerable: true });
+  return mocked;
+});
+
+
+/**
  * Correções do grupo G1 (Jornada): R0-1..17 e R4-3, com as decisões D-1, D-2,
  * D-3, D-7 e D-8. Os casos do painel concluído e da acolhida sem número estão
  * em todayScreen.test.tsx; os do A3, em jornadaDia.test.tsx.
@@ -107,6 +122,7 @@ async function seedSettings(patch: Record<string, unknown> = {}) {
 }
 
 beforeEach(async () => {
+  mockFutureOpen = false;
   await AsyncStorage.clear();
   _resetCompletionsCacheForTests();
   _resetFastingCacheForTests();

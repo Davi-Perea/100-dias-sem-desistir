@@ -35,6 +35,15 @@ jest.mock('react-native-safe-area-context', () => {
 
 jest.mock('expo-keep-awake', () => ({ useKeepAwake: jest.fn() }));
 
+// FUTURE_DAYS_OPEN (J6) ligada abre os dias futuros; estes casos presumem o cadeado,
+// então a chave fica desligada aqui (getter real: o spread do Babel congelaria o valor).
+const mockFutureOpen = false;
+jest.mock('@/config/features', () => {
+  const mocked = { ...jest.requireActual('@/config/features') };
+  Object.defineProperty(mocked, 'FUTURE_DAYS_OPEN', { get: () => mockFutureOpen, enumerable: true });
+  return mocked;
+});
+
 const mockRouter = jest.requireMock('expo-router').router as {
   push: jest.Mock;
   replace: jest.Mock;

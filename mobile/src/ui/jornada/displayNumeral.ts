@@ -25,6 +25,27 @@ export const FINISHED_NUMERAL: NumeralSpec = { size: 54, lineHeight: 52, letterS
 export { NUMERAL_MAX_SCALE };
 
 /**
+ * J1 (feedback 2026-09-22, "Dia 3 de 100" cortado): a entrelinha do desenho
+ * (58/54, 50/48, 52/52, 54/52) é MENOR que a altura natural da Schibsted 800.
+ * Medido na tabela `hhea` de SchibstedGrotesk_800ExtraBold.ttf: ascent 2000,
+ * descent 528, unitsPerEm 2048, isto é, 1,234em. Com entrelinha menor que isso,
+ * o Android tira a diferença do topo da linha (CustomLineHeightSpan) e o iOS
+ * também recorta a caixa: o alto do "D" e o pingo do "i" somem.
+ *
+ * CORREÇÃO TÉCNICA: o numeral de exibição tem uma linha só, então a entrelinha
+ * do desenho não aproxima linha nenhuma; ela só encolhe a caixa. A caixa passa a
+ * ter no mínimo a altura natural da fonte (o desenho continua valendo quando
+ * for maior). Vale para qualquer largura e qualquer escala de fonte, porque o
+ * sistema multiplica tamanho e entrelinha pelo mesmo fator.
+ */
+export const SCHIBSTED_800_LINE_EM = (2000 + 528) / 2048;
+
+/** Entrelinha que nunca recorta o numeral: a do desenho ou a natural da fonte, a maior. */
+export function safeNumeralLineHeight(spec: NumeralSpec): number {
+  return Math.max(spec.lineHeight, Math.ceil(spec.size * SCHIBSTED_800_LINE_EM));
+}
+
+/**
  * Tamanho base (antes do multiplicador do sistema) para que `word`, a maior
  * palavra que não pode quebrar, caiba em `available` pt com a fonte do sistema
  * em `fontScale` (limitada a 1,2×). Nunca passa do tamanho do desenho.
@@ -56,7 +77,15 @@ export function useDisplayNumeral(word: string, spec: NumeralSpec) {
   };
   return {
     onLayout,
-    style: { fontSize: fitted.size, lineHeight: fitted.lineHeight, letterSpacing: fitted.letterSpacing },
+    style: {
+      fontSize: fitted.size,
+      lineHeight: safeNumeralLineHeight(fitted),
+      letterSpacing: fitted.letterSpacing,
+      // O tracking negativo come o fim do último glifo em algumas plataformas;
+      // devolver essa folga à direita não muda a medida do encaixe (que já é
+      // pela largura de reserva, maior que a real).
+      paddingRight: Math.ceil(Math.abs(fitted.letterSpacing)),
+    },
     maxFontSizeMultiplier: NUMERAL_MAX_SCALE,
   };
 }

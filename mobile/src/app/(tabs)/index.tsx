@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FlatList, type LayoutChangeEvent, Platform, useWindowDimensions, View } from 'react-native';
 
 import { track } from '@/analytics/analytics';
+import { holdMilestones, releaseMilestones } from '@/journey/celebration';
 import { getDay } from '@/journey/datasetSource';
 import { milestoneForDay } from '@/journey/milestones';
 import { daysForMinistry } from '@/journey/ministries';
@@ -25,6 +26,8 @@ import { reflectionCount, useReflections } from '@/reflections/reflectionsStore'
 import { type Settings, updateSettings, useSettings } from '@/settings/settingsStore';
 import { Button, DevContentBanner, OfflineBanner, Screen, ScreenScroll } from '@/ui/components';
 import { BeforeCampaign } from '@/ui/jornada/BeforeCampaign';
+import { dailyNoticeMark, useDailyNotice } from '@/ui/jornada/dailyNotice';
+import { DailyVerseNotice } from '@/ui/jornada/DailyVerseNotice';
 import { CampaignFinished } from '@/ui/jornada/CampaignFinished';
 import { JourneyHeader } from '@/ui/jornada/JourneyHeader';
 import { openingIndex, openingOffset } from '@/ui/jornada/opening';
@@ -131,6 +134,19 @@ function JourneyTrail({
   const [cap, setCap] = useState<{ y: number; height: number } | null>(null);
 
   const { campaign, officialDay, phase, completions } = journey;
+
+  // J4 · aviso do dia: uma vez por dia oficial, só com a campanha em curso (nunca
+  // antes dela) e só com a Jornada em foco — o Modal fica por cima de tudo, e
+  // não pode cobrir o marco ou a tela de conclusão empilhados sobre a casa.
+  const notice = useDailyNotice(dailyNoticeMark(campaign.id, officialDay));
+  const [focused, setFocused] = useState(false);
+  useFocusEffect(
+    useCallback(() => {
+      setFocused(true);
+      return () => setFocused(false);
+    }, []),
+  );
+  const showNotice = phase === 'running' && focused && notice.loaded && !notice.dismissed;
   const total = campaign.total_days;
   const running = phase === 'running';
   const finished = phase === 'finished';
@@ -274,10 +290,14 @@ function JourneyTrail({
   const summary = readingSummary(journey.todayDay);
   const preferOwnBible = (settings.lastUsedReadingMode ?? settings.readingMode) === 'own_bible';
 
-  /** "Concluir leitura" — o único gesto que conclui o dia no painel (invariante P-09). */
+  /**
+   * "Concluir leitura" — o único gesto que conclui o dia no painel (invariante P-09).
+   * J5: gravado, leva à tela "Dia N concluído"; o marco (se houver) espera ela sair.
+   */
   const complete = async () => {
     setBusy(true);
     setSaveFailed(false);
+    holdMilestones();
     try {
       await setDayCompleted(campaign.id, officialDay, true);
       const reached = milestoneForDay(journey.completedCount + 1);
@@ -285,8 +305,10 @@ function JourneyTrail({
       track({ name: 'reading_completed', dayNumber: officialDay, mode: preferOwnBible ? 'own_bible' : 'in_app' });
       if (reached) track({ name: 'milestone_reached', dayNumber: reached.day });
       if (returning && gap) track({ name: 'return_after_gap', gapDays: gap });
+      router.push({ pathname: '/concluido/[day]', params: { day: String(officialDay) } });
     } catch {
       // PER-02: o store não mudou nada; a pessoa vê que não salvou e tenta de novo.
+      releaseMilestones();
       setSaveFailed(true);
     } finally {
       setBusy(false);
@@ -409,15 +431,27 @@ function JourneyTrail({
     const state = journey.dayState(day);
     const kind = state === 'completed' ? 'done' : state === 'pending' ? 'open' : 'future';
     const unlocked = journey.isDayUnlocked(day);
-    // Dia futuro não revela nada do dia: nem o monte (REGRAS 7).
-    const sphere = kind === 'future' ? null : (getDay(day)?.sphere ?? null);
-    const status = kind === 'done' ? 'Concluído' : kind === 'open' ? 'Em aberto' : 'Em breve';
+    // Sem a chave J6 (config/features.ts), o dia futuro não revela nada do dia:
+    // nem o monte (REGRAS 7). Com ela, o dia futuro abre como os outros e a linha
+    // diz a data dele no lugar do "Em breve" (hoje continua o destaque).
+    const hidden = kind === 'future' && !unlocked;
+    const sphere = hidden ? null : (getDay(day)?.sphere ?? null);
+    const futureDate = kind === 'future' ? formatDayDate(day, campaign) : null;
+    const status =
+      kind === 'done'
+        ? 'Concluído'
+        : kind === 'open'
+          ? 'Em aberto'
+          : unlocked && futureDate
+            ? futureDate.slice(0, 5)
+            : 'Em breve';
+    const spokenStatus = kind === 'future' && unlocked && futureDate ? `Dia de ${futureDate}` : status;
     // A escala futura aparece por decisão consciente — ver o PROVISÓRIO de `MinistryNote`.
     const isMinistryDay = ministrySet.has(day);
     const minHeight = declared(item);
     const spoken = [
       sphere ? `Dia ${day}, ${SPHERE_LABEL[sphere]}.` : `Dia ${day}.`,
-      `${status}.`,
+      `${spokenStatus}.`,
       isMinistryDay ? 'Seu ministério conduz o altar.' : null,
     ]
       .filter(Boolean)
@@ -492,6 +526,13 @@ function JourneyTrail({
         ListFooterComponent={
           expanded ? <Button title="Comprimir a linha" variant="underline" onPress={() => setExpanded(false)} /> : null
         }
+      />
+
+      <DailyVerseNotice
+        visible={showNotice}
+        day={officialDay}
+        dayData={journey.todayDay}
+        onClose={notice.dismiss}
       />
 
       {/* A4 · o dia futuro abre a folha do cadeado, sem revelar nada daquele dia.

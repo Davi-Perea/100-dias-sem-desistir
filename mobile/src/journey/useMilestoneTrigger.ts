@@ -3,6 +3,7 @@ import { useEffect } from 'react';
 
 import { updateSettings, useSettings } from '@/settings/settingsStore';
 
+import { useMilestonesHeld } from './celebration';
 import { reachedMilestones } from './milestones';
 import { useJourney } from './useJourney';
 
@@ -41,9 +42,11 @@ export function useMilestoneTrigger() {
   const settings = useSettings();
   const segments = useSegments();
   const inTabs = segments[0] === '(tabs)';
+  // J5: a tela "Dia N concluído" vem primeiro; o marco espera ela sair (celebration.ts).
+  const held = useMilestonesHeld();
 
   const target =
-    journey.ready && settings && inTabs ? milestoneToShow(journey.completedCount, settings.milestonesSeen) : null;
+    journey.ready && settings && inTabs && !held ? milestoneToShow(journey.completedCount, settings.milestonesSeen) : null;
 
   useEffect(() => {
     if (target === null) return;

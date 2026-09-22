@@ -14,6 +14,21 @@ import { finishedCopy, reflectionsLabel } from '@/ui/jornada/CampaignFinished';
 import { extenso, extensoCap } from '@/ui/jornada/extenso';
 import { _resetEntryDismissalForTests } from '@/ui/jornada/entryDismissal';
 
+/**
+ * J6 · chave única FUTURE_DAYS_OPEN (config/features.ts). Os casos deste arquivo
+ * rodam com a chave DESLIGADA (o comportamento de antes: dia futuro trancado);
+ * os casos com ela ligada ligam `mockFutureOpen` no próprio teste.
+ */
+let mockFutureOpen = false;
+// Getter de verdade (defineProperty): num literal com spread, o Babel avalia o
+// getter uma vez só, na criação do mock, e a chave ficaria congelada.
+jest.mock('@/config/features', () => {
+  const mocked = { ...jest.requireActual('@/config/features') };
+  Object.defineProperty(mocked, 'FUTURE_DAYS_OPEN', { get: () => mockFutureOpen, enumerable: true });
+  return mocked;
+});
+
+
 jest.mock('expo-router', () => ({
   router: { push: jest.fn(), replace: jest.fn(), back: jest.fn(), canGoBack: () => true },
   useLocalSearchParams: () => ({}),
@@ -103,6 +118,7 @@ async function scrollListToTop() {
 }
 
 beforeEach(async () => {
+  mockFutureOpen = false;
   await AsyncStorage.clear();
   _resetCompletionsCacheForTests();
   _resetFastingCacheForTests();
