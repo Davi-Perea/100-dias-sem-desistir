@@ -1,58 +1,40 @@
-import { router } from 'expo-router';
+import { router, type Href } from 'expo-router';
 
-import { SUPPORT_EMAIL } from '@/config/contato';
-import { isDemoMode } from '@/config/demo';
-import { COMMUNITY_ENABLED } from '@/config/features';
-import { fastingKeptCount, useFasting } from '@/fasting/fastingStore';
 import { useJourney } from '@/journey/useJourney';
+import { useMarks } from '@/marks/marksStore';
 import { completedDayNumbers } from '@/progress/completionsStore';
-import { reflectionCount, useReflections } from '@/reflections/reflectionsStore';
 import { useSettings } from '@/settings/settingsStore';
-import { AppText, Button, Screen, ScreenScroll, SettingRow, StateView } from '@/ui/components';
-import { ModerationEntry } from '@/ui/comunidade/moderacao/ModerationEntry';
+import { Screen, ScreenScroll, StateView } from '@/ui/components';
 import { spacing } from '@/ui/theme';
+import { CompleteProfile, profileSteps, type ProfileStepId } from '@/ui/voce/CompleteProfile';
+import { ProfileExtras } from '@/ui/voce/ProfileExtras';
+import { ProfileHeader } from '@/ui/voce/ProfileHeader';
 import { ProgressBlock } from '@/ui/voce/ProgressBlock';
-import { StartHereCard, type StartStepId } from '@/ui/voce/StartHereCard';
-import { RowGroup } from '@/ui/voce/SubScreen';
 
-const READING_MODE_LABEL: Record<string, string> = {
-  in_app: 'No app',
-  own_bible: 'Minha Bíblia',
-  both: 'Vou alternar',
-};
+// Rotas novas (F7): os tipos do expo-router só as conhecem depois de o servidor
+// de desenvolvimento regerar .expo/types; até lá, o cast mantém o tsc limpo.
+const SETTINGS = '/ajustes' as Href;
+const EDIT_PROFILE = '/perfil-editar' as Href;
+const EDIT_NAME = '/perfil-editar?secao=nome' as Href;
 
 /**
- * D1 · Você. Só o que tem destaque fica à vista: MEU PROGRESSO e uma lista curta
- * de linhas com chevron. O resto existe e mora dentro de cada linha, como nos
- * Ajustes do iPhone (pedido do fundador, 2026-09-21).
+ * F7 · Você como perfil (decisão do fundador, 2026-09-22; referência só de
+ * ESTRUTURA de um app social de treino — cores, fontes e ícones são os nossos).
  *
- * Todo número desta tela é real e local (dias lidos, reflexões, jejum).
+ * - topo: contador de DIAS LIDOS (nunca zera, nunca "perdeu") e a engrenagem,
+ *   que abre /ajustes com a lista que antes morava aqui;
+ * - nome (ou "Você"), avatar com iniciais e "Editar perfil" (/perfil-editar);
+ * - <ProfileExtras/>: vazio no main; o branch da Comunidade pluga ali foto,
+ *   bio e "Minhas publicações";
+ * - "Complete seu perfil N/6": carrossel que substituiu o "Comece por aqui";
+ * - MEU PROGRESSO, a régua dos dias realmente lidos.
  *
- * PROVISÓRIO (decisão do engenheiro, 2026-09-21: pedido de simplicidade do
- * fundador para a V1 sem nuvem). Saíram daqui, sem apagar as rotas:
- * - a identidade (avatar e nome): sem conta, dizia só "Sem conta conectada";
- * - "Conta e privacidade" (/conta): a nuvem está desligada na V1; a privacidade
- *   ganhou tela própria (/privacidade);
- * - o grupo Liderança (/grupo, /admin): depende de servidor;
- * - "Altar de hoje": abria Comunidade, que fica fora da V1; com ela saiu a faixa C-07
- *   daqui, porque esta tela deixou de mostrar conteúdo da igreja;
- * - o interruptor do aviso do altar das 12h30: foi para Lembretes (/lembrete).
- *
- * V1 (feedback do fundador, 2026-09-22): cartão "Comece por aqui" (nome, metas,
- * lembrete; some com os três feitos) e as linhas "Minhas metas" e "Minhas
- * anotações". Nome e metas saem de settings.profile, só neste aparelho.
+ * Tudo é local (settings.profile, dias lidos, marcas). Nada daqui vai ao servidor.
  */
-const START_ROUTES: Record<StartStepId, () => void> = {
-  name: () => router.push({ pathname: '/metas', params: { secao: 'nome' } }),
-  goals: () => router.push('/metas'),
-  reminder: () => router.push('/lembrete'),
-};
-
 export default function YouScreen() {
   const journey = useJourney();
   const settings = useSettings();
-  const reflections = useReflections(journey.campaign.id);
-  const fasting = useFasting(journey.campaign.id);
+  const marks = useMarks();
 
   if (!settings || !journey.ready) {
     return (
@@ -62,102 +44,44 @@ export default function YouScreen() {
     );
   }
 
-  const reminder = settings.reminder;
-  const reminderLabel =
-    reminder.slot === 'none'
-      ? 'Desligado'
-      : `${String(reminder.hour).padStart(2, '0')}:${String(reminder.minute).padStart(2, '0')}`;
-  const kept = fastingKeptCount(fasting);
-  const goalCount = settings.profile.goals.length;
+  const readDays = completedDayNumbers(journey.completions);
+  const total = journey.campaign.total_days;
+  // Todos os dias estão abertos; "Ler um dia" leva ao de hoje, ou ao 1 fora da campanha.
+  const readingDay = journey.phase === 'running' ? Math.min(Math.max(journey.officialDay, 1), total) : 1;
+
+  const openStep: Record<ProfileStepId, () => void> = {
+    name: () => router.push(EDIT_NAME),
+    goals: () => router.push(EDIT_PROFILE),
+    reminder: () => router.push('/lembrete'),
+    firstReading: () => router.push({ pathname: '/dia/[day]', params: { day: String(readingDay) } }),
+    firstNote: () => router.push('/biblia'),
+    ministry: () => router.push('/ministerio'),
+  };
 
   return (
     <Screen>
       <ScreenScroll gap={spacing.xl}>
-        <AppText variant="screenTitle" accessibilityRole="header" testID="voce-title">
-          Você
-        </AppText>
+        <ProfileHeader
+          name={settings.profile.name ?? 'Você'}
+          ministry={settings.ministry ?? null}
+          readCount={readDays.length}
+          onOpenSettings={() => router.push(SETTINGS)}
+          onEditProfile={() => router.push(EDIT_PROFILE)}
+        />
 
-        {/* ------------------------------------------------- comece por aqui */}
-        <StartHereCard settings={settings} onOpen={(step) => START_ROUTES[step]()} />
+        <ProfileExtras />
 
-        {/* ---------------------------------------------------- meu progresso */}
+        <CompleteProfile
+          steps={profileSteps({ settings, readCount: readDays.length, marks })}
+          onOpen={(step) => openStep[step]()}
+        />
+
         <ProgressBlock
-          completedDays={completedDayNumbers(journey.completions)}
-          totalDays={journey.campaign.total_days}
+          completedDays={readDays}
+          totalDays={total}
           officialDay={journey.officialDay}
           phase={journey.phase}
         />
-
-        {/* ---------------------------------------------------- minha jornada */}
-        <RowGroup title="Minha jornada">
-          <SettingRow
-            label="Minhas reflexões"
-            value={String(reflectionCount(reflections))}
-            onPress={() => router.push('/reflexoes')}
-            first
-            testID="row-reflections"
-          />
-          {/* B2: marca-texto e anotações ficam só no aparelho. */}
-          <SettingRow label="Minhas anotações" onPress={() => router.push('/anotacoes')} testID="row-notes" />
-          <SettingRow
-            label="Minhas metas"
-            value={goalCount === 0 ? 'Escolher' : `${goalCount} ${goalCount === 1 ? 'meta' : 'metas'}`}
-            onPress={() => router.push('/metas')}
-            testID="row-goals"
-          />
-          <SettingRow
-            label="Meu ministério"
-            value={settings.ministry ?? 'Escolher'}
-            onPress={() => router.push('/ministerio')}
-            testID="row-ministry"
-          />
-          {/* REGRAS §5 item 4: o jejum foi desenhado para sair sem refazer a tela. */}
-          <SettingRow
-            label="Meu jejum"
-            value={settings.fastingEnabled ? `${kept} ${kept === 1 ? 'dia' : 'dias'}` : 'Desligado'}
-            onPress={() => router.push('/jejum')}
-            testID="row-fasting"
-          />
-        </RowGroup>
-
-        {/* ----------------------------------------------------- preferências */}
-        <RowGroup title="Preferências">
-          <SettingRow
-            label="Lembretes"
-            value={reminderLabel}
-            onPress={() => router.push('/lembrete')}
-            first
-            testID="row-reminder"
-          />
-          {/* Tamanho da letra e modo de leitura moram na mesma tela. */}
-          <SettingRow
-            label="Leitura"
-            value={settings.readingMode ? READING_MODE_LABEL[settings.readingMode] : undefined}
-            // Abre com "Como eu leio" em primeiro (o valor da linha) e o tamanho logo abaixo.
-            onPress={() => router.push({ pathname: '/aparencia', params: { secao: 'leitura' } })}
-            testID="row-reading"
-          />
-        </RowGroup>
-
-        {/* ------------------------------------------------------------ sobre */}
-        <RowGroup title="Sobre">
-          <SettingRow
-            label="Sobre os 100 dias"
-            onPress={() => router.push('/proposito')}
-            first
-            testID="row-proposito"
-          />
-          <SettingRow label="Privacidade" onPress={() => router.push('/privacidade')} testID="row-privacy" />
-          <SettingRow label={SUPPORT_EMAIL ? 'Ajuda e contato' : 'Ajuda'} onPress={() => router.push('/ajuda')} testID="row-help" />
-        </RowGroup>
-
-        {/* Só com a Comunidade ligada e só para quem o servidor diz que modera. */}
-        {COMMUNITY_ENABLED ? <ModerationEntry /> : null}
-
-        {/* Modo demonstração (config/demo.ts): o app aparece como a pessoa o verá, sem o painel. */}
-        {__DEV__ && !isDemoMode() ? (
-          <Button title="Painel de desenvolvimento" variant="underline" onPress={() => router.push('/dev')} />
-        ) : null}
       </ScreenScroll>
     </Screen>
   );

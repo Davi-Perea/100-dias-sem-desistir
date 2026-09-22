@@ -1,7 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 
-import YouScreen from '@/app/(tabs)/voce';
+// F7: as linhas do antigo Você foram para /ajustes (engrenagem do perfil).
+import SettingsScreen from '@/app/ajustes';
 import MinistryScreen from '@/app/ministerio';
 import { _resetFastingCacheForTests } from '@/fasting/fastingStore';
 import { BUNDLED_CONTENT, getDay, loadDataset, resetToBundledContent } from '@/journey/datasetSource';
@@ -183,7 +184,7 @@ describe('tela Meu ministério', () => {
 describe('Você: comunidade e ministério', () => {
   test('sem servidor não há "Meu grupo"; "Meu ministério" continua', async () => {
     await seedSettings();
-    await render(<YouScreen />);
+    await render(<SettingsScreen />);
     await waitFor(() => expect(screen.getByTestId('row-ministry')).toBeTruthy());
 
     expect(screen.queryByTestId('row-group')).toBeNull();
@@ -204,7 +205,7 @@ describe('Você: comunidade e ministério', () => {
 
   test('a linha mostra o ministério escolhido', async () => {
     await seedSettings({ ministry: 'Kids' });
-    await render(<YouScreen />);
+    await render(<SettingsScreen />);
     await waitFor(() => expect(screen.getByTestId('row-ministry')).toBeTruthy());
     expect(screen.getByTestId('row-ministry').props.accessibilityLabel).toBe('Meu ministério, Kids');
     // A identidade saiu do Você: o ministério aparece só como valor da linha.

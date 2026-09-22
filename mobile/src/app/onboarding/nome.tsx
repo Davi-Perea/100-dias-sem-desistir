@@ -3,6 +3,7 @@ import { useState } from 'react';
 
 import { normalizeProfileName, PROFILE_NAME_MAX, updateSettings, useSettings } from '@/settings/settingsStore';
 import { Button, SAVE_ERROR_COPY, SaveErrorNotice } from '@/ui/components';
+import { useDoveTransition } from '@/ui/entrada/doveContext';
 import { ONBOARDING_STEP, OnboardingStep, StepSupport } from '@/ui/OnboardingStep';
 import { TextField } from '@/ui/TextField';
 
@@ -11,11 +12,14 @@ import { TextField } from '@/ui/TextField';
  * nome e sem apagar um nome já gravado (quem voltou só para passar adiante não
  * perde o que escreveu antes).
  *
+ * Daqui para as metas a troca é com a pomba (E5), gravando ou pulando.
+ *
  * O nome fica SÓ neste aparelho (settings.profile), serve para o app falar com a
  * pessoa e não vai para analytics nem servidor. Não é o nome da comunidade.
  */
 export default function NameStep() {
   const settings = useSettings();
+  const flyDove = useDoveTransition();
   // Rascunho local; enquanto a pessoa não digita, mostra o que já está gravado.
   const [draft, setDraft] = useState<string | null>(null);
   const [error, setError] = useState(false);
@@ -23,7 +27,7 @@ export default function NameStep() {
   const value = draft ?? settings?.profile.name ?? '';
   const name = normalizeProfileName(value);
 
-  const next = () => router.push('/onboarding/metas');
+  const next = () => flyDove(() => router.push('/onboarding/metas'));
 
   const save = async () => {
     if (!name || busy) return;

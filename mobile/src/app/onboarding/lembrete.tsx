@@ -19,6 +19,8 @@ const DENIED_NOTICE = `Permissão de notificações negada. ${LATER}`;
  * Passo 4 de 4 · lembrete, no molde do F2. É o ÚLTIMO passo: o "Continuar"
  * daqui faz o que a antiga tela "Tudo pronto" fazia — grava
  * `onboardingCompleted`, dispara `onboarding_completed` e abre a casa.
+ * SEM a pomba (E5): esta troca sai da entrada, e o layout dela (onde a pomba
+ * voa) desmonta no meio do voo. A troca é a normal do app.
  *
  * É o ÚNICO lugar do onboarding que pede a permissão de notificação, e só no
  * gesto de escolher um horário (REGRAS 13): o iOS mostra o diálogo uma vez na

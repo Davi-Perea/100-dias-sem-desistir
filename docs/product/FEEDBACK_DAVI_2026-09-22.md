@@ -66,3 +66,23 @@ como vai ficar. **[FAZER]** = entra agora. **[DECISÃO]** = conflita com lei, lo
 ## Geral
 - **G1** O app está "meio morto": mais vida, animações leves. → [FAZER] movimento em conclusão, entrada, transições e
   toques, sempre com "Reduzir movimento".
+
+## Comunidade no formato de "diário compartilhado" (2026-09-22, prints de um app de treino como referência)
+O fundador quer a Comunidade no mesmo formato de um app social de treino: cada pessoa compartilha todo dia o seu
+processo — no nosso caso, com a Bíblia. Referência só de ESTRUTURA; cores, marca e ícones são os nossos.
+- **F1 Post do dia**: tipo da atividade ("Leitura do dia", "Oração", "Jejum", "Versículo"), texto, até 4 fotos em
+  carrossel, grupo no topo do cartão ("Toda a igreja" ou o ministério), "Ver leitura" quando há leitura anexada.
+- **F2 Criar post** ("O que Deus falou com você hoje?"): anexos (leitura do dia, versículo marcado, oração, jejum,
+  tempo de leitura, galeria, câmera), seletor de público "Toda a igreja ▾ / Meu ministério", "Publicar".
+  - **[ADIADO] tempo de leitura**: o app não mede tempo; precisa de cronômetro local no leitor do dia antes de virar
+    anexo (nunca um número inventado). Os outros anexos de F2 estão no Criar post.
+- **F3 Amém** = mão de oração (no app de referência é o braço): **número e rostinhos de quem disse Amém** (decisão do
+  fundador; substitui a regra antiga de não mostrar contagem).
+- **F4 Comentários** em folha, como no app de referência.
+- **F5 Fotos aparecem na hora** com filtro automático de imagem (nudez/violência) e denúncia; sem filtro configurado,
+  cai para aprovação humana (padrão seguro).
+- **F6 Sem seguidores**: feed da igreja inteira + grupos (ministérios).
+- **F7 Perfil (Você)**: cabeçalho com nome, foto, ministério, contador tipo "sequência" que **conta os dias lidos e
+  nunca zera** (decisão do fundador: não punir), "Editar perfil", cartões "Complete seu perfil 1/5", engrenagem para
+  os ajustes (a lista atual do Você vai para dentro dela).
+- **F8 Sino**: atividade dentro do app (Amém e comentários nos meus posts), sem notificação push.

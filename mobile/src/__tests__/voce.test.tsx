@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { StyleSheet } from 'react-native';
 
 import YouScreen from '@/app/(tabs)/voce';
+import SettingsScreen from '@/app/ajustes';
 import AppearanceScreen from '@/app/aparencia';
 import HelpScreen from '@/app/ajuda';
 import FastingScreen from '@/app/jejum';
@@ -124,18 +125,22 @@ describe('D1 · Você', () => {
     expect(screen.getByText('Meu progresso')).toBeTruthy();
     expect(screen.getByTestId('progress-count').props.children).toBe(3);
     expect(screen.getByLabelText('3 de 100 dias lidos')).toBeTruthy();
+
+    // F7: a lista mora em Ajustes (engrenagem), com os mesmos números.
+    await render(<SettingsScreen />);
+    await waitFor(() => expect(screen.getByTestId('row-reflections')).toBeTruthy());
     expect(screen.getByTestId('row-reflections').props.accessibilityLabel).toBe('Minhas reflexões, 1');
     expect(screen.getByTestId('row-fasting').props.accessibilityLabel).toBe('Meu jejum, 1 dia');
   });
 
-  test('três grupos com cap marcado como cabeçalho, e sem "Meu grupo"', async () => {
+  test('Ajustes: três grupos com cap marcado como cabeçalho, e sem "Meu grupo"', async () => {
     await seedSettings();
-    await render(<YouScreen />);
+    await render(<SettingsScreen />);
     await waitFor(() => expect(screen.getByTestId('row-reminder')).toBeTruthy());
 
     const headers = screen.getAllByRole('header').map((node) => node.props.children);
-    expect(headers).toEqual(expect.arrayContaining(['Meu progresso', 'Minha jornada', 'Preferências', 'Sobre']));
-    expect(headers.indexOf('Meu progresso')).toBeLessThan(headers.indexOf('Minha jornada'));
+    expect(headers).toEqual(expect.arrayContaining(['Ajustes', 'Minha jornada', 'Preferências', 'Sobre']));
+    expect(headers.indexOf('Ajustes')).toBeLessThan(headers.indexOf('Minha jornada'));
     expect(headers.indexOf('Minha jornada')).toBeLessThan(headers.indexOf('Preferências'));
     expect(headers.indexOf('Preferências')).toBeLessThan(headers.indexOf('Sobre'));
 
@@ -165,7 +170,7 @@ describe('D1 · Você', () => {
 
   test('o lembrete escolhido aparece em HH:MM', async () => {
     await seedSettings({ reminder: { slot: 'custom', hour: 7, minute: 0 } });
-    await render(<YouScreen />);
+    await render(<SettingsScreen />);
     await waitFor(() => expect(screen.getByTestId('row-reminder')).toBeTruthy());
     expect(screen.getByTestId('row-reminder').props.accessibilityLabel).toBe('Lembretes, 07:00');
   });

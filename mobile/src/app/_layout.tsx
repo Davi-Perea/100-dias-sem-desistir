@@ -188,6 +188,8 @@ function AppRoot() {
         <Stack.Screen name="ajuda" options={{ headerShown: false }} />
         {/* Tela nova do Você (casca SubScreen, barra própria), sem cabeçalho nativo. */}
         <Stack.Screen name="privacidade" options={{ headerShown: false }} />
+        <Stack.Screen name="ajustes" options={{ headerShown: false }} />
+        <Stack.Screen name="perfil-editar" options={{ headerShown: false }} />
         <Stack.Screen name="lembrete" options={{ headerShown: false, presentation: 'modal' }} />
         <Stack.Screen name="conta" options={{ headerShown: false, presentation: 'modal' }} />
         <Stack.Screen name="grupo/[id]" options={{ headerShown: false }} />

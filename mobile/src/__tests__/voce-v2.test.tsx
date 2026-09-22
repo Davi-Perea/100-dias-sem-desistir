@@ -13,6 +13,7 @@ import { AccessibilityInfo } from 'react-native';
 import * as Notifications from 'expo-notifications';
 
 import YouScreen from '@/app/(tabs)/voce';
+import SettingsScreen from '@/app/ajustes';
 import FastingScreen from '@/app/jejum';
 import ReminderScreen from '@/app/lembrete';
 import GoalsScreen from '@/app/metas';
@@ -319,42 +320,22 @@ describe('Lembretes: interruptor de ausência e teste de 10 s', () => {
 
 /* ----------------------------------------------------------------- V1 */
 
-describe('V1: Você', () => {
-  test('"Comece por aqui" com os três passos; o que está feito tem ✓', async () => {
+describe('V1: Você (F7: perfil)', () => {
+  test('o carrossel "Complete seu perfil" substituiu o "Comece por aqui"', async () => {
     loadCampaignOnDay(5);
     await seedSettings({ profile: { name: 'Davi', goals: [] } });
     await render(<YouScreen />);
-    await screen.findByTestId('start-here');
-    expect(screen.getByText('Comece por aqui')).toBeTruthy();
-    expect(screen.getByTestId('start-step-name-done')).toBeTruthy();
-    expect(screen.queryByTestId('start-step-goals-done')).toBeNull();
-    expect(screen.queryByTestId('start-step-reminder-done')).toBeNull();
-    expect(screen.getByTestId('start-step-name').props.accessibilityLabel).toBe('Como podemos te chamar?, Davi, feito');
-    expect(screen.getByText('1 de 3 feitos. Tudo fica só neste aparelho.')).toBeTruthy();
-
-    await fireEvent.press(screen.getByTestId('start-step-name'));
-    expect(mockRouter.router.push).toHaveBeenLastCalledWith({ pathname: '/metas', params: { secao: 'nome' } });
-    await fireEvent.press(screen.getByTestId('start-step-goals'));
-    expect(mockRouter.router.push).toHaveBeenLastCalledWith('/metas');
-    await fireEvent.press(screen.getByTestId('start-step-reminder'));
-    expect(mockRouter.router.push).toHaveBeenLastCalledWith('/lembrete');
+    await screen.findByTestId('complete-profile');
+    expect(screen.queryByText('Comece por aqui')).toBeNull();
+    expect(screen.queryByTestId('profile-step-name')).toBeNull();
+    expect(screen.getByTestId('profile-step-goals')).toBeTruthy();
+    expect(screen.getByTestId('profile-step-reminder')).toBeTruthy();
   });
 
-  test('com nome, metas e lembrete, o cartão some', async () => {
-    loadCampaignOnDay(5);
-    await seedSettings({
-      profile: { name: 'Davi', goals: ['jejuar'] },
-      reminder: { slot: 'morning', hour: 7, minute: 0 },
-    });
-    await render(<YouScreen />);
-    await screen.findByTestId('progress-block');
-    expect(screen.queryByTestId('start-here')).toBeNull();
-  });
-
-  test('"Minhas metas" mostra a contagem e abre /metas; "Minhas anotações" abre /anotacoes', async () => {
+  test('Ajustes: "Minhas metas" mostra a contagem e abre /metas; "Minhas anotações" abre /anotacoes', async () => {
     loadCampaignOnDay(5);
     await seedSettings({ profile: { name: null, goals: ['jejuar', 'orar-todo-dia'] } });
-    await render(<YouScreen />);
+    await render(<SettingsScreen />);
     const goals = await screen.findByTestId('row-goals');
     expect(goals.props.accessibilityLabel).toBe('Minhas metas, 2 metas');
     await fireEvent.press(goals);
