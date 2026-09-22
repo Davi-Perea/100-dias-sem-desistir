@@ -9,7 +9,7 @@ import { AmenButton, AmenSummary } from './AmenButton';
 import { PhotoCarousel } from './PhotoCarousel';
 import { relativeTime } from './tempo';
 import type { CardModel } from './useFeed';
-import { activityLine } from './v2';
+import { activityLine, readingTarget, type ReadingTarget } from './v2';
 
 /**
  * Cartão do post do dia (F1, "diário compartilhado"):
@@ -19,6 +19,9 @@ import { activityLine } from './v2';
  *   texto
  *   [fotos em carrossel, 1–4]
  *   Amém (rostinhos) 12   Comentar 3        Ver leitura ›
+ *
+ * "Ver leitura" só existe quando o post ANEXOU leitura — dia ou versículo
+ * (`readingTarget`, pedido do fundador, 2026-09-22). Em post livre, não aparece.
  *
  * SAIU o rótulo do grupo no topo (2026-09-22): todo post vai para a igreja
  * inteira, e uma etiqueta "Toda a igreja" repetida em cada cartão só ocupa linha.
@@ -47,8 +50,8 @@ export function PostCard({
   onAmen: (next: boolean) => void;
   onComments: () => void;
   onMore: () => void;
-  /** "Ver leitura": abre o leitor no dia anexado. */
-  onOpenReading?: (day: number) => void;
+  /** "Ver leitura": o leitor no dia anexado, ou o capítulo do versículo anexado. */
+  onOpenReading?: (target: ReadingTarget) => void;
   now?: number;
 }) {
   const { colors } = useTheme();
@@ -129,13 +132,17 @@ export function PostCard({
     </AppText>
   ) : null;
 
-  const readingDay = card.dayNumber;
+  // Post livre não tem leitura anexada: nada de "Ver leitura" (2026-09-22).
+  const reading = readingTarget(card);
   const seeReading =
-    readingDay && onOpenReading ? (
+    reading && onOpenReading ? (
       <Pressable
-        onPress={() => onOpenReading(readingDay)}
+        onPress={() => onOpenReading(reading)}
         accessibilityRole="link"
-        accessibilityLabel={`Ver leitura do dia ${readingDay}`}
+        accessibilityLabel={
+          // Começa pelo rótulo visível (WCAG 2.5.3) e diz onde vai dar.
+          reading.kind === 'dia' ? `Ver leitura do dia ${reading.day}` : `Ver leitura, ${reading.label} na Bíblia`
+        }
         testID={`post-reading-${card.postId}`}
         style={({ pressed }) => [
           {

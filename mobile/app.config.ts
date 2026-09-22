@@ -185,6 +185,10 @@ export default ({ config, projectRoot }: ConfigContext): ExpoConfig => {
   if (variant === 'production') {
     assertRightsForStore(projectRoot);
     assertContactForStore(projectRoot);
+    // Estava definida e nunca chamada (achado do veredito de lojas, 2026-09-22): sem
+    // isto, um build de loja com o Juntos ligado passaria sem exclusão de conta e sem
+    // os rótulos de privacidade — reprovação certa na Apple e no Google.
+    assertCommunityForStore(projectRoot, COLLECTED_DATA_TYPES);
   }
 
   return {

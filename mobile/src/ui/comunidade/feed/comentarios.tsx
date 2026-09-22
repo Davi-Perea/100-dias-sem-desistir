@@ -11,6 +11,9 @@ import { announceNotice } from '@/ui/voce/announce';
 import { useKeyboardVisible } from '@/ui/comunidade/publicar/partes';
 
 import { LimitNote } from '../LimitNote';
+import { aceiteDocs, aceiteNeeds, availabilityNotice, nameOk, useAceite } from '../publicar/aceite';
+import { AceiteLine } from '../publicar/pecas';
+import { ACEITE_LINE_SPOKEN, ACEITE_NEEDS_NAME } from '../publicar/textos';
 import { AmenButton } from './AmenButton';
 import { relativeTime } from './tempo';
 import { humanError, needsConsent } from './useCommunity';
@@ -29,54 +32,15 @@ import { humanError, needsConsent } from './useCommunity';
 export const COMMENTS_GUTTER = 20;
 /** O aviso de limite aparece 100 caracteres antes dos 1.000 do servidor. */
 const COMMENT_NEAR_FROM = LIMITS.commentBody - 100;
-/** Dito ao voltar das regras e do consentimento: nada foi enviado sozinho. */
-export const AFTER_CONSENT_COMMENT = 'Pronto. Seu comentário ainda não foi enviado: toque em Enviar para mandar.';
 
 export type CommentsListState =
   | { phase: 'loading' }
   | { phase: 'error'; message: string }
   | { phase: 'ready'; items: PostComment[] };
 
-/**
- * Amém em comentário que levou à tela de aceite: marcado sozinho quando a pessoa
- * volta (o toque dela já disse o que queria; a tela de aceite só veio antes). Vale
- * por 10 minutos: quem desistiu do aceite e volta outro dia não ganha um Amém
- * que já esqueceu.
- */
-const PENDING_AMEN_TTL_MS = 10 * 60 * 1000;
-let pendingCommentAmen: { postId: string; commentId: string; at: number } | null = null;
-
-export function rememberPendingCommentAmen(postId: string, commentId: string, now = Date.now()) {
-  pendingCommentAmen = { postId, commentId, at: now };
-}
-
-/** Tira o Amém pendente (deste post, se informado), se houver e ainda valer. */
-export function takePendingCommentAmen(postId?: string, now = Date.now()): { postId: string; commentId: string } | null {
-  const pending = pendingCommentAmen;
-  if (!pending) return null;
-  if (now - pending.at > PENDING_AMEN_TTL_MS) {
-    pendingCommentAmen = null;
-    return null;
-  }
-  if (postId !== undefined && pending.postId !== postId) return null;
-  pendingCommentAmen = null;
-  return { postId: pending.postId, commentId: pending.commentId };
-}
-
-/**
- * Para quem abriu a folha (que fechou para o aceite): grava o Amém pendente sem
- * precisar reabrir a conversa. Silencioso se falhar: a pessoa vê o estado real
- * ao abrir os comentários.
- */
-export async function flushPendingCommentAmen(api: CommunityApi): Promise<boolean> {
-  const pending = takePendingCommentAmen();
-  if (!pending) return false;
-  try {
-    return await api.setCommentAmen(pending.commentId, true);
-  } catch {
-    return false;
-  }
-}
+/* O "Amém guardado para depois" SAIU junto com a tela de aceite (2026-09-22):
+   nenhum Amém fica pendente, porque o aceite é registrado no próprio toque
+   (`ensureAceite`) e a conversa nem fecha. */
 
 /** Meu Amém num comentário: o número acompanha. */
 export function withCommentAmen(comment: PostComment, next: boolean): PostComment {
@@ -90,15 +54,25 @@ export function visibleComments(items: PostComment[]): PostComment[] {
 }
 
 /**
- * Estado da conversa: lista, campo, envio. `openConsent` é quem leva às regras
- * e ao consentimento (a folha fecha antes; a tela empurra a rota) — o que está
- * no campo não é enviado sozinho depois do aceite.
+ * Estado da conversa: lista, campo, envio.
+ *
+ * O ACEITE NÃO É MAIS UMA TELA (decisão do fundador, 2026-09-22): quem ainda não
+ * aceitou vê a linha "Ao publicar, você confirma que tem 16 anos ou mais e aceita
+ * as regras do Juntos." embaixo do campo (`Composer`, com `needsAceite`), e o
+ * PRÓPRIO toque em Enviar registra 16+, as regras e o consentimento destacado
+ * (`useAceite`, as mesmas RPCs) antes de criar o comentário. O mesmo vale para o
+ * Amém num comentário.
+ *
+ * Onde a linha ainda não é mostrada (a folha do feed, enquanto quem a desenha não
+ * a passa), o primeiro toque em Enviar não registra nada: ele DIZ a frase e
+ * espera. Ninguém aceita sem ler, e nada do que foi escrito se perde.
  */
 export function useComments({
   api,
   postId,
   status,
-  openConsent,
+  showsAceiteLine = false,
+  onAccepted,
   initialText = '',
   initialNotice = null,
   onCountChange,
@@ -106,7 +80,10 @@ export function useComments({
   api: CommunityApi;
   postId: string;
   status: CommunityStatus;
-  openConsent: (draft: string) => void;
+  /** true = a tela mostra a linha do aceite; então o toque em Enviar já registra. */
+  showsAceiteLine?: boolean;
+  /** Aceite registrado: quem tem o estado da comunidade pergunta de novo. */
+  onAccepted?: () => void;
   initialText?: string;
   initialNotice?: string | null;
   /** +1 ao publicar, -1 ao apagar/sumir: o número do cartão acompanha. */
@@ -129,24 +106,57 @@ export function useComments({
     }
   }, [api, postId]);
 
-  // Foi aceitar regras/consentimento a partir daqui (a tela continua montada):
-  // ao voltar, diz que o comentário (que continua no campo) ainda não saiu.
-  const askedConsent = useRef(false);
   const gated = needsConsent(status);
+
+  /* ------------------------------------------------------------- o aceite
+     Registrado no toque (sem tela). `told` guarda se a frase do aceite já foi
+     dita nesta conversa: onde a linha não aparece, o primeiro toque diz e o
+     segundo registra. */
+  const [docs] = useState(aceiteDocs);
+  const aceite = useAceite(docs, { kind: 'ready', status, api });
+  const told = useRef(showsAceiteLine);
   useEffect(() => {
-    if (!askedConsent.current || gated) return;
-    askedConsent.current = false;
-    setNotice(AFTER_CONSENT_COMMENT);
-    announceNotice(AFTER_CONSENT_COMMENT);
-  }, [gated]);
+    if (showsAceiteLine) told.current = true;
+  }, [showsAceiteLine]);
+  const aceiteName = status.displayName ?? status.profile.displayName ?? '';
+
+  /** Registra o aceite, se faltar. false = não deu (ou só avisou), e o campo fica como está. */
+  const ensureAceite = useCallback(async (): Promise<boolean> => {
+    if (!gated) return true;
+    // Já está registrando: o segundo toque espera, não vira erro.
+    if (aceite.busy) return false;
+    const say = (message: string) => {
+      setError(null);
+      setNotice(message);
+      announceNotice(message);
+    };
+    if (!told.current) {
+      told.current = true;
+      say(ACEITE_LINE_SPOKEN);
+      return false;
+    }
+    const block = aceite.availability !== null ? availabilityNotice(aceite.availability) : null;
+    if (block) {
+      say(block);
+      return false;
+    }
+    if (aceiteNeeds(status).name && !nameOk(aceiteName)) {
+      say(ACEITE_NEEDS_NAME);
+      return false;
+    }
+    const ok = await aceite.accept({ name: aceiteName });
+    if (!ok) {
+      setError(aceite.error ?? 'Não deu para registrar agora. Tente de novo.');
+      return false;
+    }
+    setNotice(null);
+    onAccepted?.();
+    return true;
+  }, [gated, aceite, status, aceiteName, onAccepted]);
 
   // Amém nos comentários: marca na hora (otimista). Toques seguidos não travam:
   // vale o último; quando a resposta chega, se a pessoa já mudou de ideia, manda
   // de novo. Se o servidor recusar, volta ao que era e diz por quê.
-  const textRef = useRef(text);
-  useEffect(() => {
-    textRef.current = text;
-  }, [text]);
   const amenWant = useRef(new Map<string, boolean>());
   const amenBusy = useRef(new Set<string>());
 
@@ -189,40 +199,24 @@ export function useComments({
 
   const toggleAmen = useCallback(
     (commentId: string, next: boolean) => {
-      if (next && gated) {
-        rememberPendingCommentAmen(postId, commentId);
-        openConsent(textRef.current);
+      const mark = () => {
+        setError(null);
+        amenWant.current.set(commentId, next);
+        patchAmen(commentId, next);
+        void syncAmen(commentId);
+      };
+      // Marcar exige o aceite (criar conteúdo); desmarcar nunca. O aceite, se
+      // faltar, é registrado neste toque — sem tela e sem Amém guardado.
+      if (!next || !gated) {
+        mark();
         return;
       }
-      setError(null);
-      amenWant.current.set(commentId, next);
-      patchAmen(commentId, next);
-      void syncAmen(commentId);
+      void (async () => {
+        if (await ensureAceite()) mark();
+      })();
     },
-    [gated, postId, openConsent, patchAmen, syncAmen],
+    [gated, ensureAceite, patchAmen, syncAmen],
   );
-
-  // Voltou do aceite com um Amém pendente neste post: marca agora.
-  const ready = list.phase === 'ready';
-  useEffect(() => {
-    if (gated || !ready) return;
-    const pending = takePendingCommentAmen(postId);
-    if (!pending) return;
-    // Fora do corpo do efeito (a marcação mexe no estado da lista).
-    let applied = false;
-    void Promise.resolve().then(() => {
-      if (applied) return;
-      applied = true;
-      toggleAmen(pending.commentId, true);
-    });
-    return () => {
-      // Desmontou antes: o pendente volta a esperar.
-      if (!applied) {
-        applied = true;
-        rememberPendingCommentAmen(pending.postId, pending.commentId);
-      }
-    };
-  }, [gated, ready, postId, toggleAmen]);
 
   const cleaned = cleanText(text);
   const length = cleaned === null ? 0 : charLength(cleaned);
@@ -231,11 +225,8 @@ export function useComments({
 
   async function send() {
     if (!cleaned || tooLong) return;
-    if (gated) {
-      askedConsent.current = true;
-      openConsent(text);
-      return;
-    }
+    // O aceite, se faltar, é registrado neste toque; só então o comentário sai.
+    if (!(await ensureAceite())) return;
     setSending(true);
     setError(null);
     setNotice(null);
@@ -413,6 +404,8 @@ export function Composer({
   bottomInset,
   gutter = COMMENTS_GUTTER,
   onSheet = false,
+  needsAceite = false,
+  onOpenRules,
 }: {
   value: string;
   onChange: (text: string) => void;
@@ -427,6 +420,13 @@ export function Composer({
   gutter?: number;
   /** Dentro da folha o fundo é o da folha (surface); na tela, o da página. */
   onSheet?: boolean;
+  /**
+   * O aceite ainda falta: a linha aparece embaixo do campo, e o toque em Enviar
+   * registra (decisão do fundador, 2026-09-22).
+   */
+  needsAceite?: boolean;
+  /** Abre as regras (o link da linha do aceite). */
+  onOpenRules?: () => void;
 }) {
   const { colors } = useTheme();
   const face = useFace();
@@ -516,6 +516,8 @@ export function Composer({
           <Icon name="send" size={22} color={colors.onBlue} />
         </Pressable>
       </View>
+      {/* Embaixo do botão, como na tela de publicar: o que o toque significa. */}
+      {needsAceite && onOpenRules ? <AceiteLine onOpenRules={onOpenRules} testID="comment-aceite-line" /> : null}
     </View>
   );
 }

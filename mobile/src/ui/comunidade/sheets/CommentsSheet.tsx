@@ -1,3 +1,4 @@
+import { router } from 'expo-router';
 import { type ReactNode, useEffect, useState } from 'react';
 import { KeyboardAvoidingView, Modal, Pressable, ScrollView, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -10,6 +11,8 @@ import { floatShadow, glass, MIN_TOUCH, radius, spacing, useReducedMotion, useTh
 
 import { CommentRow, CommentsEmpty, COMMENTS_GUTTER as GUTTER, Composer, useComments } from '../feed/comentarios';
 import { FeedError, FeedSkeleton } from '../feed/FeedStates';
+import { COMMUNITY_ROUTES } from '../feed/rotas';
+import { needsConsent } from '../feed/useCommunity';
 import { ReportSheet, type SheetTarget } from './ReportSheet';
 
 /**
@@ -17,10 +20,13 @@ import { ReportSheet, type SheetTarget } from './ReportSheet';
  * folha não é o único jeito de fechar: tem "Fechar" (48×48), o véu e o voltar do
  * Android.
  *
- * Antes do primeiro comentário a folha FECHA e quem abriu leva às regras e ao
- * consentimento (uma folha aberta ficaria por cima da tela seguinte). O que
- * estava no campo volta junto quando a pessoa reabre, com o aviso de que ainda
- * não foi enviado.
+ * O ACEITE NÃO FECHA MAIS A FOLHA (decisão do fundador, 2026-09-22): a tela de
+ * aceite antes de participar saiu. Enquanto o aceite falta, a linha "Ao publicar,
+ * você confirma que tem 16 anos ou mais e aceita as regras do Juntos." fica à
+ * vista embaixo do campo (com link para as regras), e o PRÓPRIO toque em Enviar —
+ * ou no primeiro Amém de um comentário — registra 16+, as regras e o
+ * consentimento destacado antes de criar o conteúdo, como o Google Play e o Apple
+ * 1.2 pedem. Ninguém navega e o que foi escrito nunca se perde.
  *
  * Denunciar, bloquear e apagar o meu comentário: a mesma folha de C5, aberta de
  * dentro desta.
@@ -32,7 +38,7 @@ export function CommentsSheet({
   status,
   target,
   onClose,
-  onNeedsConsent,
+  onAccepted,
   initialText,
   initialNotice,
   onCountChange,
@@ -43,8 +49,8 @@ export function CommentsSheet({
   /** null = fechada. */
   target: CommentsTarget | null;
   onClose: () => void;
-  /** A folha já fechou; quem abriu leva às regras/consentimento, guardando o rascunho. */
-  onNeedsConsent: (postId: string, draft: string) => void;
+  /** Aceite registrado no toque: quem tem o estado da comunidade pergunta de novo. */
+  onAccepted?: () => void;
   initialText?: string;
   initialNotice?: string | null;
   onCountChange?: (postId: string, delta: number) => void;
@@ -73,7 +79,7 @@ export function CommentsSheet({
           status={status}
           target={target}
           onClose={onClose}
-          onNeedsConsent={onNeedsConsent}
+          onAccepted={onAccepted}
           initialText={initialText}
           initialNotice={initialNotice}
           onCountChange={onCountChange}
@@ -89,7 +95,7 @@ function SheetBody({
   status,
   target,
   onClose,
-  onNeedsConsent,
+  onAccepted,
   initialText,
   initialNotice,
   onCountChange,
@@ -99,7 +105,7 @@ function SheetBody({
   status: CommunityStatus;
   target: CommentsTarget;
   onClose: () => void;
-  onNeedsConsent: (postId: string, draft: string) => void;
+  onAccepted?: () => void;
   initialText?: string;
   initialNotice?: string | null;
   onCountChange?: (postId: string, delta: number) => void;
@@ -109,16 +115,16 @@ function SheetBody({
   const { height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const [report, setReport] = useState<SheetTarget | null>(null);
+  /** O aceite ainda falta: a linha fica à vista, e o toque em Enviar registra. */
+  const aceiteFalta = needsConsent(status);
   const talk = useComments({
     api,
     postId: target.postId,
     status,
+    showsAceiteLine: aceiteFalta,
+    onAccepted,
     initialText,
     initialNotice,
-    openConsent: (draft) => {
-      onClose();
-      onNeedsConsent(target.postId, draft);
-    },
     onCountChange: (delta) => onCountChange?.(target.postId, delta),
   });
   const { load } = talk;
@@ -215,6 +221,8 @@ function SheetBody({
             notice={talk.notice}
             bottomInset={insets.bottom}
             onSheet
+            needsAceite={aceiteFalta}
+            onOpenRules={() => router.push(COMMUNITY_ROUTES.regras)}
           />
         ) : (
           <View style={{ height: insets.bottom }} />

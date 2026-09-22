@@ -84,6 +84,18 @@ export function chipLabel(attachment: Attachment): string {
   }
 }
 
+/**
+ * Resumo discreto do que vai junto com a publicação (item 4 do fundador,
+ * 2026-09-22): uma linha, acima dos chips, que soma as fotos — que são miniaturas,
+ * não chips. Nunca um passo obrigatório: sem nada anexado, não existe.
+ */
+export function attachSummary(attachments: readonly Attachment[], photoCount: number): string | null {
+  const parts = attachments.map(chipLabel);
+  if (photoCount === 1) parts.push('1 foto');
+  else if (photoCount > 1) parts.push(`${photoCount} fotos`);
+  return parts.length === 0 ? null : `Vai junto: ${parts.join(' · ')}`;
+}
+
 /** Nome falado do "x" do chip. */
 export function removeLabel(attachment: Attachment): string {
   return `Tirar ${ACTIVITY_LABEL[attachment.kind].toLocaleLowerCase('pt-BR')}: ${chipLabel(attachment)}`;

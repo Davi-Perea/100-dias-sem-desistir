@@ -14,7 +14,7 @@ import { type AmenFace, amenSpoken, MAX_FACES } from './v2';
  * estado vai em `checked`, então a forma e o leitor de tela dizem a mesma coisa,
  * sem depender de cor.
  *
- * Cor do marcado: `blue`, a cor de marca do Juntos (a mesma do botão "Escrever",
+ * Cor do marcado: `blue`, a cor de marca do Juntos (a mesma do botão "Publicar",
  * da linha de atividade do cartão e do aviso de quem vê).
  * CORREÇÃO TÉCNICA sobre "cheio na cor de marca" (pedido de 2026-09-22): o
  * amarelo da marca mede 1,46:1 sobre o fundo claro do feed — abaixo dos 3:1 que a

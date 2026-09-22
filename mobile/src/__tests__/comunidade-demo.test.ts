@@ -102,12 +102,75 @@ describe('portão da demonstração', () => {
   });
 });
 
+/**
+ * FEED VAZIO DE VERDADE (decisão do fundador de 2026-09-22, prévia do Dia 23):
+ * o caminho do APP começa sem nada. É o que a primeira pessoa vai ver no Dia 1.
+ * O conteúdo de exemplo continua existindo, mas só um teste o liga, de propósito.
+ */
+describe('a prévia começa vazia (o caminho do app)', () => {
+  function vazio() {
+    g.__DEV__ = true;
+    const { demo } = load(DEMO_ENV);
+    // Sem opções: exatamente o que o app faz.
+    demo._resetDemoForTests(Date.parse('2026-09-25T12:00:00Z'));
+    const api = demo.getDemoCommunityApi()!;
+    demo.demoSignIn();
+    return { api, demo };
+  }
+
+  it('sem post, sem comentário, sem Amém e sem rosto de exemplo', async () => {
+    const { api } = vazio();
+    await api.joinCommunity({ displayName: 'Davi' });
+    const page = await api.feedPage();
+    expect(page.posts).toEqual([]);
+    expect(page.ended).toBe(true);
+    expect(page.nextCursor).toBeNull();
+    await expect(api.myPosts()).resolves.toEqual([]);
+    await expect(api.myActivity()).resolves.toEqual([]);
+    await expect(api.getStatus()).resolves.toMatchObject({ hasNewActivity: false });
+  });
+
+  it('o primeiro post é o único do feed, e NINGUÉM diz Amém sozinho (o sino fica apagado)', async () => {
+    const { api } = vazio();
+    await api.joinCommunity({ displayName: 'Davi' });
+    await api.updateProfile({ name: 'Davi', confirms16: true });
+    await api.acceptTerms({ purpose: 'community_rules', version: 'PENDENTE', sha256: SHA, appVersion: 't' });
+    await api.acceptTerms({ purpose: 'community_publish', version: 'PENDENTE', sha256: SHA, appVersion: 't' });
+    const post = await api.createPost({ body: 'Primeiro dia. Começando Gênesis.', day: 1 });
+    expect(post.status).toBe('published');
+    const page = await api.feedPage();
+    expect(page.posts).toHaveLength(1);
+    expect(page.posts[0]).toMatchObject({
+      postId: post.id,
+      isMine: true,
+      authorName: 'Davi',
+      amenCount: 0,
+      amenFaces: [],
+      commentCount: 0,
+    });
+    // Nada de "Marina disse Amém": no Dia 1 real ninguém disse ainda.
+    await expect(api.myActivity()).resolves.toEqual([]);
+    await expect(api.getStatus()).resolves.toMatchObject({ hasNewActivity: false });
+  });
+
+  it('o conteúdo de exemplo só aparece quando um teste o pede (o app nunca pede)', async () => {
+    const { api, demo } = vazio();
+    await api.joinCommunity({ displayName: 'Davi' });
+    await expect(api.feedPage()).resolves.toMatchObject({ posts: [] });
+    demo._resetDemoForTests(Date.parse('2026-09-25T12:00:00Z'), { withExamples: true });
+    demo.demoSignIn();
+    await api.joinCommunity({ displayName: 'Davi' });
+    expect((await api.feedPage()).posts.length).toBeGreaterThan(0);
+  });
+});
+
 describe('comunidade de demonstração em memória', () => {
   let demoAvatarPath = '';
+  /** Com o conteúdo de exemplo LIGADO: estes testes precisam de gente na tela. */
   function setup() {
     g.__DEV__ = true;
     const { demo } = load(DEMO_ENV);
-    demo._resetDemoForTests(Date.parse('2026-09-25T12:00:00Z'));
+    demo._resetDemoForTests(Date.parse('2026-09-25T12:00:00Z'), { withExamples: true });
     const api = demo.getDemoCommunityApi()!;
     demoAvatarPath = demo.DEMO_AVATAR_PATH;
     return { api, demo };
@@ -162,8 +225,11 @@ describe('comunidade de demonstração em memória', () => {
       for (const face of post.amenFaces ?? []) expect(EXAMPLE_NAMES).toContain(face.name);
       expect(post.audience).toBe('igreja');
     }
-    // F1: tipos variados; o versículo é só a referência.
-    expect(page.posts.map((p) => p.kind)).toEqual(['leitura', 'oracao', 'oracao', 'versiculo', 'jejum', null]);
+    // F1: tipos variados; o versículo é só a referência. Todo exemplo COM número de
+    // dia tem TIPO: sem tipo, o cartão diria "Dia N" sem nada anexado — "Ver
+    // leitura" só existe com anexo (`readingTarget`, feed/v2.ts).
+    expect(page.posts.map((p) => p.kind)).toEqual(['leitura', 'oracao', 'oracao', 'versiculo', 'jejum', 'leitura']);
+    for (const post of page.posts) if (post.dayNumber !== null) expect(post.kind).not.toBeNull();
     expect(page.posts[3].verse).toEqual({ book: 'PSA', chapter: 119, verseStart: 105, verseEnd: null });
     // Ordem: mais recente primeiro; dias relativos ao dia simulado (3).
     expect(page.posts[0].dayNumber).toBe(3);
@@ -365,7 +431,9 @@ describe('prévia "um desconhecido instala no dia 23" (EXPO_PUBLIC_DEMO_DAY=1)',
   function dayOne(env: Record<string, string> = {}) {
     g.__DEV__ = true;
     const { demo } = load({ ...DEMO_ENV, EXPO_PUBLIC_DEMO_DAY: '1', ...env });
-    demo._resetDemoForTests(Date.parse('2026-09-23T10:30:00Z'));
+    // Com exemplos: este bloco descreve o conteúdo de exemplo do Dia 1, que o
+    // APP não mostra mais (o feed dele começa vazio — ver o primeiro describe).
+    demo._resetDemoForTests(Date.parse('2026-09-23T10:30:00Z'), { withExamples: true });
     const api = demo.getDemoCommunityApi()!;
     demo.demoSignIn();
     return { api, demo };

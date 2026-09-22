@@ -1,6 +1,6 @@
 import type { Href } from 'expo-router';
 
-import type { CommunityStatus } from '@/community/types';
+import type { VerseAttachment } from '@/community/types';
 
 import { COMMUNITY_ENTRY_ROUTE, COMMUNITY_PROFILE_ROUTE, MY_POSTS_ROUTE, SIGN_IN_ROUTE } from '../perfil/routes';
 import { ROUTES as PUBLISH_ROUTES } from '../publicar/fluxo';
@@ -27,14 +27,10 @@ export const COMMUNITY_ROUTES = {
   jornada: '/' as Href,
 } as const;
 
-/**
- * Antes do primeiro comentário ou Amém: a tela única de aceite (16+, regras,
- * consentimento destacado e o nome, se faltar). O status fica na assinatura
- * para quem já chama assim.
- */
-export function consentHref(_status?: CommunityStatus): Href {
-  return PUBLISH_ROUTES.consentimento as Href;
-}
+/* A rota do ACEITE saiu daqui (decisão do fundador, 2026-09-22): não há tela de
+   aceite antes de participar. O feed e a conversa registram o aceite no próprio
+   toque (Amém, Enviar), e o que abre é `regras` — onde os dois textos do aceite
+   podem ser lidos. */
 
 /** C6 (desta parte). */
 export function commentsHref(postId: string): Href {
@@ -47,4 +43,15 @@ export const ACTIVITY_ROUTE = '/comunidade/atividade' as Href;
 /** "Ver leitura": o leitor no dia anexado ao post. */
 export function readerHref(day: number): Href {
   return { pathname: '/reader/[day]', params: { day: String(day) } } as unknown as Href;
+}
+
+/**
+ * "Ver leitura" de um post que anexou VERSÍCULO e não dia: o capítulo dele na
+ * Bíblia (leitura livre, que não conclui dia nenhum da campanha). Mesma rota que
+ * `chapterHref` de ui/biblia/bibleNav.ts monta; texto montado e afirmado como
+ * `Href` pelo mesmo motivo dito lá (os tipos de rota só se regeneram com o
+ * servidor de desenvolvimento).
+ */
+export function verseHref(verse: VerseAttachment): Href {
+  return `/biblia/${verse.book}/${verse.chapter}` as Href;
 }

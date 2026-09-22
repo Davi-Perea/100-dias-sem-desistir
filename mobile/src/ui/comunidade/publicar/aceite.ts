@@ -1,4 +1,3 @@
-import { router } from 'expo-router';
 import { useRef, useState } from 'react';
 
 import { termsSha256 } from '@/community/api';
@@ -6,12 +5,12 @@ import { isDemoCommunityApi } from '@/community/demoApi';
 import { toCommunityError } from '@/community/errors';
 import type { CommunityStatus } from '@/community/types';
 import { charLength, cleanText, LIMITS } from '@/community/validation';
-import { goBackOrHome } from '@/ui/BackBar';
 
-import { flowParams } from './fluxo';
 import {
+  aceiteDocument,
   MISMATCH_NOTICE,
   PENDING_NOTICE,
+  rulesDocument,
   termsAvailability,
   termsDocumentText,
   type TermsAvailability,
@@ -20,19 +19,28 @@ import {
 import { appVersion, type CommunityStatusState } from './useCommunityStatus';
 
 /**
- * Tela única de aceite (aba "Juntos", 2026-09-22): antes da primeira
- * publicação, comentário ou Amém, a pessoa confirma 16+, aceita as regras e dá
- * o consentimento destacado, com UM botão ("Concordo e continuar"). Se ela
- * ainda não tem nome, dá ali mesmo.
+ * O ACEITE, sem tela (DECISÃO DO FUNDADOR, 2026-09-22): a tela de aceite antes de
+ * participar saiu. A linha embaixo do botão diz o que o toque significa —
+ * "Ao publicar, você confirma que tem 16 anos ou mais e aceita as regras do
+ * Juntos." — e o próprio toque em Publicar (ou em Enviar comentário, ou no
+ * primeiro Amém) registra o aceite ANTES de criar o conteúdo, como o Google Play
+ * e o Apple 1.2 pedem.
  *
  * O servidor recebe o que sempre recebeu, cada coisa no seu registro:
  *   1. `set_community_profile` (nome, se faltava; 16+),
- *   2. `accept_community_terms` das regras (versão + sha256 do texto COMPLETO,
- *      aberto pelo link da tela),
- *   3. `accept_community_terms` do consentimento (versão + sha256 do texto
- *      exato que a tela mostrou).
+ *   2. `accept_community_terms` das regras (versão + sha256 do texto COMPLETO),
+ *   3. `accept_community_terms` do consentimento destacado (versão + sha256).
  * O que já foi registrado não é enviado de novo numa segunda tentativa.
+ *
+ * Os dois textos cujo hash vai ao servidor continuam LEGÍVEIS a um toque: o link
+ * "regras do Juntos" da linha abre a tela de regras, que mostra as regras e o
+ * consentimento destacado (LGPD art. 11, I).
  */
+
+/** Os dois documentos do aceite, montados uma vez por tela. */
+export function aceiteDocs(): { rules: TermsDocument; consent: TermsDocument } {
+  return { rules: rulesDocument(), consent: aceiteDocument() };
+}
 export function serverVersionFor(doc: TermsDocument, status: CommunityStatus): string {
   return doc.purpose === 'community_rules' ? status.rulesVersion : status.publishConsentVersion;
 }
@@ -50,37 +58,12 @@ export function combinedAvailability(a: TermsAvailability, b: TermsAvailability)
   return 'ready';
 }
 
-/* ------------------------------------------------ o que aconteceu no aceite */
+/* ----------------------------------------------------------------- o aceite
 
-/**
- * Como a pessoa saiu da tela de aceite. Quem pediu (o feed com um Amém, a tela
- * de publicar com o post pronto) lê isto ao voltar: "aceitou" = faça a ação que
- * ela queria; "saiu" = esqueça a ação pendente. Lido uma vez só.
- */
-export type AceiteOutcome = 'accepted' | 'declined';
-let lastOutcome: AceiteOutcome | null = null;
-
-export function markAceite(outcome: AceiteOutcome): void {
-  lastOutcome = outcome;
-}
-
-export function takeAceiteOutcome(): AceiteOutcome | null {
-  const outcome = lastOutcome;
-  lastOutcome = null;
-  return outcome;
-}
-
-/** Depois do aceite: para a rota pedida (`next`) ou de volta para quem chamou. */
-export function continueAfterAceite(input: { next: string | null; day: number | null }) {
-  markAceite('accepted');
-  if (input.next) {
-    router.replace({ pathname: input.next, params: flowParams(null, input.day) } as never);
-    return;
-  }
-  goBackOrHome();
-}
-
-/* ----------------------------------------------------------------- o aceite */
+   "Como a pessoa saiu da tela de aceite" (`AceiteOutcome`, `markAceite`,
+   `takeAceiteOutcome`) SAIU em 2026-09-22 junto com a própria tela: publicar,
+   comentar e dizer Amém registram o aceite no toque, e nenhuma tela precisa
+   contar a outra o que aconteceu. */
 
 export type AceiteNeeds = { name: boolean; age: boolean; rules: boolean; consent: boolean };
 
@@ -99,6 +82,13 @@ export function nameOk(name: string): boolean {
   return cleaned !== null && charLength(cleaned) <= LIMITS.displayName;
 }
 
+/**
+ * O aceite de uma tela que publica: `availability` (o portão do texto aprovado),
+ * `accept({ name })` para registrar no toque, e `busy`/`error` para o botão. A
+ * tela de publicar chama `accept` dentro do "Publicar" e segue para o post; quem
+ * comenta ou dá o primeiro Amém faz igual, com o mesmo `state` de
+ * `useCommunityStatus` ou com `{ kind: 'ready', status, api }`.
+ */
 export function useAceite(docs: { rules: TermsDocument; consent: TermsDocument }, state: CommunityStatusState) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);

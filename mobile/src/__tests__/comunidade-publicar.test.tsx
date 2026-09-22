@@ -1,30 +1,24 @@
 /**
- * Publicar (C3), consentimento (C4) e regras, com o cliente da Comunidade
- * SIMULADO (mesmo molde de comunidade-cliente.test.ts). Prova o comportamento das
- * TELAS: o fluxo regras → consentimento → publicar, o portão PENDENTE, o aviso de
- * quem vê, a foto preparada sem metadados, os estados depois de enviar e que a
- * reflexão privada nunca pré-preenche a publicação. Não prova o servidor.
+ * Publicar (C3) e regras, com o cliente da Comunidade SIMULADO (mesmo molde de
+ * comunidade-cliente.test.ts). Prova o comportamento das TELAS: o aceite
+ * registrado no toque em Publicar (a tela de aceite saiu em 2026-09-22), o portão
+ * PENDENTE, o aviso de quem vê, a foto preparada sem metadados, os estados depois
+ * de enviar e que a reflexão privada nunca pré-preenche a publicação. Não prova o
+ * servidor.
  */
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import fs from 'fs';
 import path from 'path';
 import { Keyboard } from 'react-native';
 
-import ConsentScreen from '@/app/comunidade/consentimento';
+import AceiteRouteGone from '@/app/comunidade/consentimento';
 import PublishScreen from '@/app/comunidade/publicar';
 import RulesScreen from '@/app/comunidade/regras';
 import { createCommunityApi, type CommunityApi, type CommunityClient } from '@/community/api';
 import { CommunityError } from '@/community/errors';
 import { LIMITS } from '@/community/validation';
 import { inspectJpeg } from '@/community/photos';
-import {
-  fitsWithoutScroll,
-  parseDay,
-  publishStep,
-  reachedEnd,
-  safeNext,
-  sentCopy,
-} from '@/ui/comunidade/publicar/fluxo';
+import { needsAceite, parseDay, publishStep, safeNext, sentCopy } from '@/ui/comunidade/publicar/fluxo';
 import { base64ToBytes, fitWithin, preparePhoto } from '@/ui/comunidade/publicar/foto';
 import { splitBold } from '@/ui/comunidade/publicar/partes';
 import {
@@ -335,14 +329,15 @@ describe('fluxo', () => {
     isModerator: false,
   };
 
-  test('a tela única de aceite vem antes do formulário; foto de perfil e ministério não contam (2026-09-22)', () => {
+  test('não existe mais passo de aceite: membro ativo vê o formulário (2026-09-22)', () => {
     expect(publishStep({ ...base, isMember: false, memberStatus: null })).toBe('needs_join');
     expect(publishStep({ ...base, isMember: false, memberStatus: 'removed' })).toBe('blocked');
     expect(publishStep({ ...base, memberStatus: 'suspended' })).toBe('blocked');
-    expect(publishStep({ ...base, needsRules: true })).toBe('aceite');
-    expect(publishStep({ ...base, needsPublishConsent: true })).toBe('aceite');
-    expect(publishStep({ ...base, profile: { ...base.profile, ageConfirmed: false } })).toBe('aceite');
-    expect(publishStep({ ...base, displayName: null, profile: { ...base.profile, displayName: null } })).toBe('aceite');
+    // O que antes era o passo 'aceite' hoje é só "falta registrar", e a tela continua no formulário.
+    expect(publishStep({ ...base, needsRules: true })).toBe('form');
+    expect(publishStep({ ...base, needsPublishConsent: true })).toBe('form');
+    expect(publishStep({ ...base, profile: { ...base.profile, ageConfirmed: false } })).toBe('form');
+    expect(publishStep({ ...base, displayName: null, profile: { ...base.profile, displayName: null } })).toBe('form');
     const semFotoNemMinisterio = {
       ...base,
       profileComplete: false,
@@ -351,6 +346,17 @@ describe('fluxo', () => {
     };
     expect(publishStep(semFotoNemMinisterio)).toBe('form');
     expect(publishStep(base)).toBe('form');
+  });
+
+  test('o que falta registrar: regras, consentimento, 16+ ou nome; foto de perfil e ministério não contam', () => {
+    expect(needsAceite(base)).toBe(false);
+    expect(needsAceite({ ...base, needsRules: true })).toBe(true);
+    expect(needsAceite({ ...base, needsPublishConsent: true })).toBe(true);
+    expect(needsAceite({ ...base, profile: { ...base.profile, ageConfirmed: false } })).toBe(true);
+    expect(needsAceite({ ...base, displayName: null, profile: { ...base.profile, displayName: null } })).toBe(true);
+    expect(
+      needsAceite({ ...base, profile: { ...base.profile, avatarPath: null, avatarStatus: 'none', ministryAnswered: false } }),
+    ).toBe(false);
   });
 
   test('o "next" só aceita rota interna da Comunidade', () => {
@@ -367,14 +373,6 @@ describe('fluxo', () => {
     expect(parseDay('0')).toBeNull();
     expect(parseDay('101')).toBeNull();
     expect(parseDay('3.5')).toBeNull();
-  });
-
-  test('fim da rolagem', () => {
-    expect(reachedEnd({ contentOffset: { y: 0 }, contentSize: { height: 2000 }, layoutMeasurement: { height: 800 } })).toBe(false);
-    expect(reachedEnd({ contentOffset: { y: 1190 }, contentSize: { height: 2000 }, layoutMeasurement: { height: 800 } })).toBe(true);
-    expect(fitsWithoutScroll(800, 700)).toBe(true);
-    expect(fitsWithoutScroll(800, 2000)).toBe(false);
-    expect(fitsWithoutScroll(0, 0)).toBe(false);
   });
 
   test('"Em análise" diz que só o autor vê', () => {
@@ -471,17 +469,94 @@ describe('C3 · Publicar', () => {
     expect(mockRouter.replace).not.toHaveBeenCalled();
   });
 
-  test('primeira vez: o formulário abre na hora; "Publicar" abre a tela única de aceite, sem enviar nada', async () => {
+  test('texto PENDENTE e primeira vez: a tela diz que a igreja não liberou, e Publicar não serve', async () => {
     const { rpc } = useFakeApi({
       my_community_status: { data: [statusRow({ needs_rules: true, needs_publish_consent: true })] },
     });
     mockParams = { day: '17' };
     await render(<PublishScreen />);
     await fireEvent.changeText(await screen.findByTestId('publish-input'), 'Hoje eu li Gênesis.');
+    expect(screen.getByTestId('publish-pending')).toBeTruthy();
+    expect(screen.getAllByText(PENDING_NOTICE).length).toBeGreaterThan(0);
+    expect(screen.getByTestId('publish-send').props.accessibilityState.disabled).toBe(true);
     await fireEvent.press(screen.getByTestId('publish-send'));
-    expect(mockRouter.push).toHaveBeenCalledWith('/comunidade/consentimento');
-    expect(mockRouter.replace).not.toHaveBeenCalled();
+    expect(mockRouter.push).not.toHaveBeenCalled();
     expect(rpc.mock.calls.filter(([name]) => name !== 'my_community_status')).toEqual([]);
+  });
+
+  test('primeira vez com texto aprovado: o toque em Publicar registra o aceite e publica, sem tela no meio', async () => {
+    fillCampos('1.0');
+    const { rpc } = useFakeApi({
+      my_community_status: {
+        data: [
+          statusRow({
+            needs_rules: true,
+            needs_publish_consent: true,
+            publish_consent_version: '1.0',
+            rules_version: '1.0',
+            age_confirmed: false,
+          }),
+        ],
+      },
+      create_community_post: { data: [{ post_id: POST, status: 'published' }] },
+    });
+    await render(<PublishScreen />);
+    await fireEvent.changeText(await screen.findByTestId('publish-input'), 'Hoje eu li Gênesis.');
+    // A linha embaixo do botão, palavra por palavra, com o link para as regras.
+    expect(screen.getByTestId('aceite-line').props.accessibilityLabel).toContain(
+      'Ao publicar, você confirma que tem 16 anos ou mais e aceita as regras do Juntos.',
+    );
+    await fireEvent.press(screen.getByTestId('publish-send'));
+    expect(await screen.findByText('Publicado')).toBeTruthy();
+    // Nenhuma navegação para uma tela de aceite: nem push, nem replace.
+    expect(mockRouter.push).not.toHaveBeenCalled();
+    expect(mockRouter.replace).not.toHaveBeenCalled();
+    // 16+ e os DOIS aceites são registrados ANTES do post (Google Play; Apple 1.2).
+    expect(rpcCalls(rpc, 'set_community_profile')[0]).toMatchObject({ confirms_16: true });
+    expect(rpcCalls(rpc, 'accept_community_terms').map((args) => args?.terms_purpose)).toEqual([
+      'community_rules',
+      'community_publish',
+    ]);
+    const order = rpc.mock.calls.map(([name]) => name).filter((name) => name !== 'my_community_status');
+    expect(order).toEqual([
+      'set_community_profile',
+      'accept_community_terms',
+      'accept_community_terms',
+      'create_community_post',
+    ]);
+    expect(rpcCalls(rpc, 'accept_community_terms')[0]).toMatchObject({
+      terms_version: '1.0',
+      terms_sha256: 'ab'.repeat(32),
+    });
+  });
+
+  test('sem nome nenhum: não publica, diz o que falta e oferece o perfil (o servidor recusaria, CM007)', async () => {
+    fillCampos('1.0');
+    const { rpc } = useFakeApi({
+      my_community_status: {
+        data: [
+          statusRow({
+            needs_rules: true,
+            needs_publish_consent: true,
+            publish_consent_version: '1.0',
+            rules_version: '1.0',
+            display_name: null,
+            profile_complete: false,
+          }),
+        ],
+      },
+      create_community_post: { data: [{ post_id: POST, status: 'published' }] },
+    });
+    await render(<PublishScreen />);
+    await fireEvent.changeText(await screen.findByTestId('publish-input'), 'Deus foi fiel.');
+    await fireEvent.press(screen.getByTestId('publish-send'));
+    expect(await screen.findByTestId('publish-error')).toBeTruthy();
+    expect(screen.getByText('Para publicar, escreva o seu nome. É como a igreja vai te ver.')).toBeTruthy();
+    expect(screen.getByTestId('publish-write-name')).toBeTruthy();
+    // Nada foi registrado, e nenhum nome inventado ("Você") foi enviado.
+    expect(rpcCalls(rpc, 'set_community_profile')).toEqual([]);
+    expect(rpcCalls(rpc, 'create_community_post')).toEqual([]);
+    expect(JSON.stringify(rpc.mock.calls)).not.toContain('Você');
   });
 
   test('formulário: aviso de quem vê acima do campo, campo VAZIO e "Publicar" desligado até haver texto', async () => {
@@ -525,6 +600,8 @@ describe('C3 · Publicar', () => {
         post_verse_start: null,
         post_verse_end: null,
         post_audience: 'igreja',
+        // Quem já aceitou publica sem aceite junto (o `accept_terms` da chamada é null).
+        accept_terms: null,
       },
     ]);
   });
@@ -556,7 +633,7 @@ describe('C3 · Publicar', () => {
     expect(screen.getByTestId('publish-counter-sentence').props.accessibilityLiveRegion).toBe('polite');
   });
 
-  test('foto: aviso ANTES da galeria; sobe só ao publicar; "Em análise" só se o filtro segurar', async () => {
+  test('foto: Galeria abre a galeria DIRETO (sem aviso); sobe só ao publicar; "Em análise" do F5', async () => {
     const { rpc, upload } = useFakeApi({
       my_community_status: { data: [statusRow()] },
       create_community_post: { data: [{ post_id: POST, status: 'in_review' }] },
@@ -564,18 +641,10 @@ describe('C3 · Publicar', () => {
     mockLaunch.mockResolvedValue({ canceled: false, assets: [{ uri: 'file:///galeria.jpg', width: 4000, height: 3000 }] });
     await render(<PublishScreen />);
     await fireEvent.press(await screen.findByTestId('attach-galeria'));
-    expect(screen.getByTestId('photo-warning')).toBeTruthy();
-    expect(screen.getByText(/Não exponha outra pessoa/)).toBeTruthy();
-    // REVISÃO FINAL 2026-09-22: o aviso não pode PROMETER que a foto aparece na
-    // hora. Sem MODERATION_PROVIDER o servidor devolve in_review para toda foto,
-    // e a promessa seria desmentida na tela seguinte ("Em análise"). O que ele diz
-    // é verdade nos dois casos, e a localização continua dita em separado.
-    expect(screen.getByText(/passa por uma conferência antes de aparecer para a igreja/)).toBeTruthy();
-    expect(screen.queryByText(/aparece para a igreja assim que você publica/)).toBeNull();
-    expect(screen.getByText(/A localização da foto é apagada no seu celular/)).toBeTruthy();
-    expect(mockLaunch).not.toHaveBeenCalled();
-
-    await fireEvent.press(screen.getByTestId('photo-pick'));
+    // 2026-09-22: o aviso de rosto/criança e o da câmera saíram; só a permissão do sistema aparece.
+    expect(screen.queryByTestId('photo-warning')).toBeNull();
+    expect(screen.queryByTestId('photo-pick')).toBeNull();
+    expect(screen.queryByText(/Não exponha outra pessoa/)).toBeNull();
     await screen.findByTestId('photo-thumb-0');
     // F2: até 4 fotos por post, na ordem da escolha.
     // `quality` PRECISA ser < 1: em 1 o expo-image-picker devolve o arquivo original
@@ -606,7 +675,6 @@ describe('C3 · Publicar', () => {
     mockLaunch.mockResolvedValue({ canceled: false, assets: [{ uri: 'file:///g.jpg', width: 800, height: 600 }] });
     await render(<PublishScreen />);
     await fireEvent.press(await screen.findByTestId('attach-galeria'));
-    await fireEvent.press(screen.getByTestId('photo-pick'));
     expect(await screen.findByTestId('photo-error')).toBeTruthy();
     expect(screen.getByText('Não foi possível preparar esta foto. Tente outra.')).toBeTruthy();
     expect(screen.queryByTestId('photo-thumb-0')).toBeNull();
@@ -620,7 +688,6 @@ describe('C3 · Publicar', () => {
     mockLaunch.mockResolvedValue({ canceled: false, assets: [{ uri: 'file:///g.jpg', width: 800, height: 600 }] });
     await render(<PublishScreen />);
     await fireEvent.press(await screen.findByTestId('attach-galeria'));
-    await fireEvent.press(screen.getByTestId('photo-pick'));
     await screen.findByTestId('photo-thumb-0');
     await fireEvent.press(screen.getByTestId('publish-send'));
     expect(await screen.findByText('Você chegou ao limite por agora. Tente de novo mais tarde.')).toBeTruthy();
@@ -648,43 +715,10 @@ describe('C3 · Publicar', () => {
   });
 });
 
-/* ------------------------------------------------------------------ C4 */
+/* ------------------------------------------------ aceite: erro do servidor */
 
-describe('C4 · Consentimento', () => {
-  test('versão PENDENTE: diz que a igreja ainda não liberou e não oferece o aceite', async () => {
-    const { rpc } = useFakeApi({ my_community_status: { data: [statusRow({ needs_publish_consent: true })] } });
-    await render(<ConsentScreen />);
-    expect(await screen.findByTestId('consent-notice')).toBeTruthy();
-    expect(screen.getAllByText(PENDING_NOTICE).length).toBeGreaterThan(0);
-    expect(screen.queryByTestId('consent-accept')).toBeNull();
-    expect(screen.getByText(audienceSentence())).toBeTruthy();
-    expect(rpcCalls(rpc, 'accept_community_terms')).toEqual([]);
-  });
-
-  test('versão aprovada: registra versão + sha256 e segue para a publicação', async () => {
-    fillCampos('C4-1.0');
-    const { rpc } = useFakeApi({
-      my_community_status: {
-        data: [statusRow({ needs_publish_consent: true, publish_consent_version: 'C4-1.0', rules_version: 'C4-1.0' })],
-      },
-    });
-    mockParams = { next: '/comunidade/publicar', day: '17' };
-    await render(<ConsentScreen />);
-    await fireEvent.press(await screen.findByTestId('consent-accept'));
-    await waitFor(() =>
-      expect(mockRouter.replace).toHaveBeenCalledWith({ pathname: '/comunidade/publicar', params: { day: '17' } }),
-    );
-    expect(rpcCalls(rpc, 'accept_community_terms')).toEqual([
-      {
-        terms_purpose: 'community_publish',
-        terms_version: 'C4-1.0',
-        terms_sha256: 'ab'.repeat(32),
-        client_app_version: expect.any(String),
-      },
-    ]);
-  });
-
-  test('UMA tela: consentimento destacado, regras curtas com link, 16+ e o nome; um botão só', async () => {
+describe('aceite no toque', () => {
+  test('servidor diz que o texto mudou: pede atualização, e nada é publicado', async () => {
     fillCampos('1.0');
     const { rpc } = useFakeApi({
       my_community_status: {
@@ -694,76 +728,72 @@ describe('C4 · Consentimento', () => {
             needs_publish_consent: true,
             publish_consent_version: '1.0',
             rules_version: '1.0',
-            display_name: null,
-            age_confirmed: false,
           }),
         ],
       },
-    });
-    await render(<ConsentScreen />);
-    const accept = await screen.findByTestId('consent-accept');
-    expect(screen.getByText('Concordo e continuar')).toBeTruthy();
-    expect(screen.getByTestId('consent-block')).toBeTruthy();
-    expect(screen.getByText(audienceSentence())).toBeTruthy();
-    expect(screen.getByTestId('consent-read-rules')).toBeTruthy();
-    expect(screen.getByTestId('perfil-idade').props.accessibilityState.checked).toBe(false);
-    expect(screen.queryByText(/foto de perfil|ministério/i)).toBeNull();
-    // Sem 16+ e sem nome, o botão não serve.
-    expect(accept.props.accessibilityState.disabled).toBe(true);
-    await fireEvent.press(screen.getByTestId('perfil-idade'));
-    expect(screen.getByTestId('consent-accept').props.accessibilityState.disabled).toBe(true);
-    await fireEvent.changeText(screen.getByTestId('perfil-nome'), 'Bia');
-    expect(screen.getByTestId('consent-accept').props.accessibilityState.disabled).toBe(false);
-
-    await fireEvent.press(screen.getByTestId('consent-accept'));
-    await waitFor(() => expect(mockRouter.back).toHaveBeenCalled());
-    expect(rpcCalls(rpc, 'set_community_profile')[0]).toMatchObject({ new_name: 'Bia', confirms_16: true });
-    expect(rpcCalls(rpc, 'accept_community_terms').map((args) => args?.terms_purpose)).toEqual([
-      'community_rules',
-      'community_publish',
-    ]);
-  });
-
-  test('"Agora não" volta sem enviar nada', async () => {
-    const { rpc } = useFakeApi({ my_community_status: { data: [statusRow({ needs_publish_consent: true })] } });
-    await render(<ConsentScreen />);
-    await fireEvent.press(await screen.findByTestId('consent-not-now'));
-    expect(mockRouter.back).toHaveBeenCalled();
-    expect(rpcCalls(rpc, 'accept_community_terms')).toEqual([]);
-    expect(rpcCalls(rpc, 'set_community_profile')).toEqual([]);
-  });
-
-  test('servidor diz que o texto mudou: pede atualização, sem aceitar', async () => {
-    fillCampos('C4-1.0');
-    useFakeApi({
-      my_community_status: { data: [statusRow({ needs_publish_consent: true, publish_consent_version: 'C4-1.0' })] },
       accept_community_terms: { error: { code: 'CM005' } },
+      create_community_post: { data: [{ post_id: POST, status: 'published' }] },
     });
-    await render(<ConsentScreen />);
-    await fireEvent.press(await screen.findByTestId('consent-accept'));
-    expect((await screen.findAllByText('O texto foi atualizado. Atualize o app para ler a versão nova e continuar.')).length).toBeGreaterThan(0);
-    expect(mockRouter.replace).not.toHaveBeenCalled();
+    await render(<PublishScreen />);
+    await fireEvent.changeText(await screen.findByTestId('publish-input'), 'Deus foi fiel.');
+    await fireEvent.press(screen.getByTestId('publish-send'));
+    await waitFor(() => expect(screen.getByTestId('publish-pending')).toBeTruthy());
+    expect(
+      screen.getAllByText('O texto foi atualizado. Atualize o app para ler a versão nova e continuar.').length,
+    ).toBeGreaterThan(0);
+    expect(rpcCalls(rpc, 'create_community_post')).toEqual([]);
+  });
+
+  test('o servidor recusa o registro: a recusa aparece e o post não sai', async () => {
+    fillCampos('1.0');
+    const { rpc } = useFakeApi({
+      my_community_status: {
+        data: [
+          statusRow({
+            needs_rules: true,
+            needs_publish_consent: true,
+            publish_consent_version: '1.0',
+            rules_version: '1.0',
+          }),
+        ],
+      },
+      accept_community_terms: { error: { code: 'CM001' } },
+      create_community_post: { data: [{ post_id: POST, status: 'published' }] },
+    });
+    await render(<PublishScreen />);
+    await fireEvent.changeText(await screen.findByTestId('publish-input'), 'Deus foi fiel.');
+    await fireEvent.press(screen.getByTestId('publish-send'));
+    expect(await screen.findByTestId('publish-error')).toBeTruthy();
+    expect(rpcCalls(rpc, 'create_community_post')).toEqual([]);
   });
 });
 
 /* -------------------------------------------------------------- regras */
 
 describe('Regras', () => {
-  test('sem "ler=1" (link antigo do aceite das regras): leva à tela única de aceite, com os parâmetros', async () => {
+  test('a rota antiga do aceite não é mais uma tela: leva às regras', async () => {
     mockParams = { next: '/comunidade/publicar', day: '17' };
-    await render(<RulesScreen />);
+    await render(<AceiteRouteGone />);
     expect(screen.getByTestId('redirect').props.accessibilityLabel).toBe(
-      JSON.stringify({ pathname: '/comunidade/consentimento', params: { next: '/comunidade/publicar', day: '17' } }),
+      JSON.stringify({
+        pathname: '/comunidade/regras',
+        params: { next: '/comunidade/publicar', day: '17', ler: '1' },
+      }),
     );
   });
 
-  test('só leitura (link "Regras da comunidade"): sem aceite, funciona até sem Comunidade ligada', async () => {
-    mockParams = { ler: '1' };
+  test('só leitura: regras E consentimento destacado, sem aceite, até sem Comunidade ligada', async () => {
     await render(<RulesScreen />);
     expect(screen.getByTestId('rules-title').props.children).toBe('Regras do Juntos');
     expect(screen.getByText('O que não pode')).toBeTruthy();
     expect(screen.queryByText('Fotos de crianças e adolescentes')).toBeNull();
+    // Os DOIS textos que o aceite registra podem ser lidos aqui (LGPD art. 11, I).
+    expect(screen.getByTestId('rules-consent-block')).toBeTruthy();
+    expect(screen.getByTestId('rules-consent-title').props.children).toBe('Antes de participar');
+    expect(screen.getByText(audienceSentence())).toBeTruthy();
+    // Nada de aceitar por aqui.
     expect(screen.queryByTestId('rules-accept')).toBeNull();
+    expect(screen.queryByTestId('consent-accept')).toBeNull();
     expect(screen.getByTestId('rules-back')).toBeTruthy();
   });
 });

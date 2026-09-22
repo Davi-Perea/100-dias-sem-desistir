@@ -419,9 +419,9 @@ describe('5 · publicar foto (a que "não carregava")', () => {
 
     const view = await render(<PublishScreen />);
     await waitFor(() => expect(screen.getByTestId('publish-input')).toBeTruthy());
+    // A galeria abre DIRETO (decisão do fundador, 2026-09-22): sem aviso no meio.
     await fireEvent.press(screen.getByTestId('attach-galeria'));
-    expect(screen.getByTestId('photo-warning')).toBeTruthy();
-    await fireEvent.press(screen.getByTestId('photo-pick'));
+    expect(screen.queryByTestId('photo-warning')).toBeNull();
 
     // A prévia aparece: é isso que não acontecia.
     const thumb = await screen.findByTestId('photo-thumb-0');
@@ -454,7 +454,6 @@ describe('5 · publicar foto (a que "não carregava")', () => {
     const view = await render(<PublishScreen />);
     await waitFor(() => expect(screen.getByTestId('publish-input')).toBeTruthy());
     await fireEvent.press(screen.getByTestId('attach-galeria'));
-    await fireEvent.press(screen.getByTestId('photo-pick'));
     expect(await screen.findByTestId('photo-error')).toBeTruthy();
     expect(screen.getByText('Não foi possível preparar esta foto. Tente outra.')).toBeTruthy();
     expect(screen.queryByTestId('photo-thumb-0')).toBeNull();

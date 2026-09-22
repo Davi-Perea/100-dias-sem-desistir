@@ -19,6 +19,7 @@ import type {
   FeedPost,
   FeedScope,
   HoldReason,
+  InlineAccept,
   MyBlock,
   MyPost,
   NewPost,
@@ -38,6 +39,7 @@ import {
   isValidCommentBody,
   isValidDisplayName,
   LIMITS,
+  normalizeInlineAccept,
   normalizeNewPost,
 } from './validation';
 
@@ -72,19 +74,23 @@ import {
  * conta ligada ao aparelho do app real. A foto de perfil fica só na memória
  * (o arquivo preparado no aparelho), em análise, como no real.
  *
- * Diário compartilhado (2026-09-22, F1, F3, F5, F8): as publicações de
- * exemplo têm tipos variados (leitura, oração, jejum, versículo — só a
- * REFERÊNCIA, nunca o texto bíblico — e livre) e números de Amém FICTÍCIOS
- * (DEMO_AMEN_NOTE) com rostinhos só dos nomes de exemplo. Desde 2026-09-22 não
- * há público por ministério: TODA publicação vai para a igreja inteira. Fotos
- * de post aparecem na hora, como com o filtro automático configurado (F5,
- * simulado: nada sai do aparelho). Ao publicar, "Marina" (exemplo) diz Amém e o
- * sino (F8) acende.
+ * Diário compartilhado (2026-09-22, F1, F3, F5, F8): desde 2026-09-22 não há
+ * público por ministério — TODA publicação vai para a igreja inteira. Fotos de
+ * post aparecem na hora, como com o filtro automático configurado (F5,
+ * simulado: nada sai do aparelho).
  *
- * Conteúdo por dia: no Dia 1 (23/09, EXPO_PUBLIC_DEMO_DAY=1) o feed é o da
- * primeira manhã da campanha — poucas publicações, sobre começar Gênesis, orar e
- * a expectativa; nenhuma da própria pessoa. Em outros dias, um feed "em
- * andamento".
+ * FEED VAZIO DE VERDADE (decisão do fundador de 2026-09-22, prévia do Dia 23):
+ * a demonstração COMEÇA SEM NADA — nenhum post, comentário, Amém ou rosto de
+ * exemplo. É assim que o Dia 1 real vai ser: a primeira pessoa que abrir o app
+ * encontra o estado vazio, e o que aparecer no feed é o que ela mesma publicar.
+ * Por isso, também, publicar não faz mais ninguém "de exemplo" dizer Amém: o
+ * sino (F8) só acende quando houver atividade de verdade.
+ *
+ * O conteúdo de exemplo (`dayOneContent` / `runningContent`, tipos variados,
+ * versículo só como REFERÊNCIA, números de Amém fictícios — DEMO_AMEN_NOTE)
+ * continua aqui, mas SÓ os testes o ligam, por
+ * `_resetDemoForTests(now, { withExamples: true })`. Nenhum caminho do app
+ * passa por ele: o app sempre vê o feed vazio.
  */
 
 /** Caminho fictício da foto de perfil na demonstração (o arquivo fica no aparelho). */
@@ -105,7 +111,11 @@ export const DEMO_TERMS_NOTICE =
 /** Só código/testes: os números de Amém dos exemplos são fictícios. */
 export const DEMO_AMEN_NOTE = 'Números de Amém de demonstração';
 
-/** Nome de quem diz Amém na publicação nova da pessoa (F8). Fictício. */
+/**
+ * Nome de quem diz Amém na publicação nova da pessoa (F8). Fictício.
+ * Só com o conteúdo de exemplo ligado (testes): na prévia, publicar não gera
+ * Amém de ninguém.
+ */
 export const DEMO_FIRST_AMEN_NAME = 'Marina';
 
 const DEMO_DAY_DEFAULT = 3;
@@ -214,6 +224,11 @@ type State = {
   blocks: DemoBlock[];
   activity: DemoActivity[];
   reports: number;
+  /**
+   * Conteúdo de exemplo ligado. false em TODO caminho do app (feed vazio, como
+   * no Dia 1 real); true só em teste que precisa de post/comentário alheio.
+   */
+  withExamples: boolean;
   nextId: number;
   /** Relógio da demonstração: o "agora" do seed mais o tempo real passado desde então. */
   seededAt: number;
@@ -346,7 +361,9 @@ function dayOneContent(now: number): SeedContent {
       'Nunca li a Bíblia inteira. Desta vez vou com calma, um dia de cada vez. Se eu atrasar, volto e continuo.',
       1,
       68,
-      { otherAmens: 11, otherFaces: [face('marina'), face('bruna'), face('camila')] },
+      // Com número de dia, o exemplo precisa do TIPO: post livre não anexa leitura,
+      // e sem tipo o cartão diria "Dia 1" sem nada por trás (`readingTarget`, feed/v2.ts).
+      { kind: 'leitura', otherAmens: 11, otherFaces: [face('marina'), face('bruna'), face('camila')] },
     ),
     post(
       105,
@@ -417,7 +434,8 @@ function runningContent(now: number, day: number): SeedContent {
       'Comecei a ler com meu filho à noite. Ele faz perguntas em que eu nunca tinha pensado.',
       d(2),
       60 * 45,
-      { otherAmens: 9, otherFaces: [face('leticia'), face('camila'), face('tiago')] },
+      // Idem: dia sem tipo prometeria uma leitura que este post não anexou.
+      { kind: 'leitura', otherAmens: 9, otherFaces: [face('leticia'), face('camila'), face('tiago')] },
     ),
     // Desde 2026-09-22 não há público por ministério: tudo vai para a igreja inteira.
     post(107, 'camila', 'Vamos orar juntos hoje às 21h, cada um da sua casa.', null, 90, {
@@ -447,9 +465,17 @@ function runningContent(now: number, day: number): SeedContent {
   return { posts, comments };
 }
 
-function seed(now = Date.now()): State {
+/**
+ * Estado inicial. Sem `withExamples`, o feed nasce VAZIO (decisão do fundador de
+ * 2026-09-22): é o que o Dia 1 real vai mostrar.
+ */
+function seed(now = Date.now(), withExamples = false): State {
   const day = demoDay();
-  const { posts, comments } = day === 1 ? dayOneContent(now) : runningContent(now, day);
+  const { posts, comments } = withExamples
+    ? day === 1
+      ? dayOneContent(now)
+      : runningContent(now, day)
+    : { posts: [], comments: [] };
 
   return {
     member: false,
@@ -462,6 +488,7 @@ function seed(now = Date.now()): State {
     blocks: [],
     activity: [],
     reports: 0,
+    withExamples,
     nextId: 1000,
     seededAt: now,
     realAtSeed: Date.now(),
@@ -474,9 +501,14 @@ function current(): State {
   return state;
 }
 
-/** Só para testes: volta ao estado inicial (sem sessão, dados de exemplo de novo). */
-export function _resetDemoForTests(now?: number): void {
-  state = seed(now);
+/**
+ * Só para testes: volta ao estado inicial (sem sessão, sem fotos, sem sessão).
+ * `withExamples: true` liga o conteúdo de exemplo (posts, comentários e Amém de
+ * outras pessoas) para o teste que precisa de algo alheio na tela. O app NUNCA
+ * chama isto: na prévia o feed começa vazio.
+ */
+export function _resetDemoForTests(now?: number, options: { withExamples?: boolean } = {}): void {
+  state = seed(now, options.withExamples === true);
   demoPhotos.clear();
   session = null;
   emit();
@@ -512,6 +544,28 @@ function requireMember(s: State) {
 function requireConsent(s: State) {
   requireMember(s);
   if (!s.rulesAccepted || !s.consentAccepted) throw communityError('needs_consent');
+}
+
+/**
+ * O aceite que veio JUNTO com a ação (decisão do fundador de 2026-09-22: não há
+ * tela de aceite). Espelha private.apply_inline_accept: entra na comunidade se
+ * preciso, guarda nome (só se falta) e 16+, e marca as finalidades aceitas.
+ * Roda ANTES da barreira, como no servidor.
+ */
+function applyInlineAccept(s: State, accept: InlineAccept | null | undefined) {
+  if (!accept) return;
+  if (!session) throw communityError('session_expired');
+  const args = normalizeInlineAccept(accept);
+  if (!args) throw communityError('invalid_input');
+  if (!s.member) {
+    s.member = true;
+    s.profile = { ...EMPTY_PROFILE, displayName: null };
+  }
+  // Nome já escolhido não é trocado pelo toque de publicar (como no servidor).
+  if (s.profile.displayName === null && typeof args.name === 'string') s.profile.displayName = args.name;
+  s.profile.ageConfirmed = true;
+  if (args.rules_version !== undefined) s.rulesAccepted = true;
+  if (args.consent_version !== undefined) s.consentAccepted = true;
 }
 
 function requireId(value: string | undefined): string {
@@ -806,8 +860,9 @@ function createDemoCommunityApi(): CommunityApi {
         }));
     },
 
-    async createPost(input: NewPost): Promise<PublishResult> {
+    async createPost(input: NewPost, accept?: InlineAccept | null): Promise<PublishResult> {
       const s = current();
+      applyInlineAccept(s, accept);
       requireConsent(s);
       requireProfile(s);
       const post = normalizeNewPost(input, (path) => demoPhotos.has(path));
@@ -836,8 +891,9 @@ function createDemoCommunityApi(): CommunityApi {
         otherFaces: [],
       };
       s.posts.push(created);
-      if (!hold) {
-        // Para mostrar o sino (F8): alguém de exemplo diz Amém no que acabou de sair.
+      // Na prévia (sem conteúdo de exemplo) ninguém diz Amém sozinho: o Dia 1 real
+      // é assim. Com os exemplos ligados, o sino (F8) continua tendo o que mostrar.
+      if (!hold && s.withExamples) {
         created.otherAmens = 1;
         created.otherFaces = [{ name: DEMO_FIRST_AMEN_NAME, avatarPath: null, isMine: false }];
         s.activity.unshift({
@@ -876,8 +932,9 @@ function createDemoCommunityApi(): CommunityApi {
       s.activity = s.activity.filter((a) => a.postId !== id);
     },
 
-    async createComment(postId: string, body: string): Promise<PublishResult> {
+    async createComment(postId: string, body: string, accept?: InlineAccept | null): Promise<PublishResult> {
       const s = current();
+      applyInlineAccept(s, accept);
       requireConsent(s);
       requireProfile(s);
       const id = requireId(postId);
@@ -910,8 +967,9 @@ function createDemoCommunityApi(): CommunityApi {
     },
 
     /** Liga/desliga o MEU Amém; o número e o meu rostinho (F3) saem de diaryOf. */
-    async setAmen(postId: string, amen: boolean) {
+    async setAmen(postId: string, amen: boolean, accept?: InlineAccept | null) {
       const s = current();
+      if (amen) applyInlineAccept(s, accept);
       requireConsent(s);
       const post = s.posts.find((p) => p.postId === requireId(postId));
       if (!post || (amen && (post.status !== 'published' || !audienceAllows(s, post)))) {
@@ -923,8 +981,9 @@ function createDemoCommunityApi(): CommunityApi {
     },
 
     /** Amém no comentário: as mesmas regras do servidor (marcar pede consentimento; desmarcar é livre). */
-    async setCommentAmen(commentId: string, amen: boolean) {
+    async setCommentAmen(commentId: string, amen: boolean, accept?: InlineAccept | null) {
       const s = current();
+      if (amen) applyInlineAccept(s, accept);
       requireMember(s);
       const comment = s.comments.find((c) => c.commentId === requireId(commentId));
       if (!amen) {

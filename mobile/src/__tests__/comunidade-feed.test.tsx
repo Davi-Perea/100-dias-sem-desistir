@@ -12,10 +12,9 @@ import { AccessibilityInfo, Keyboard } from 'react-native';
 import CommunityTab from '@/app/(tabs)/juntos';
 import PostCommentsRoute from '@/app/comunidade/post/[id]';
 import { createCommunityApi, type CommunityApi, type CommunityClient } from '@/community/api';
-import { AFTER_CONSENT_COMMENT } from '@/ui/comunidade/feed/CommentsScreen';
-import { AFTER_CONSENT_FEED, FeedScreen } from '@/ui/comunidade/feed/FeedScreen';
+import { FeedScreen } from '@/ui/comunidade/feed/FeedScreen';
 import { postMeta, relativeTime } from '@/ui/comunidade/feed/tempo';
-import { markAceite } from '@/ui/comunidade/publicar/aceite';
+import { ACEITE_LINE, CAMPOS, PENDING_NOTICE, type CampoId } from '@/ui/comunidade/publicar/textos';
 
 /* ------------------------------------------------------------------ mocks */
 
@@ -209,6 +208,18 @@ function allText(): string {
   return out.join(' ');
 }
 
+/**
+ * Texto do aceite APROVADO pela igreja (o app traz o rascunho PENDENTE): mesma
+ * manobra de comunidade-publicar.test.tsx. Sem isto ninguém aceita — e esse
+ * portão também é testado.
+ */
+const ORIGINAL_CAMPOS = { ...CAMPOS };
+function fillCampos(version: string) {
+  for (const key of Object.keys(CAMPOS) as CampoId[]) CAMPOS[key] = `valor-${key}`;
+  CAMPOS.versaoRegras = version;
+  CAMPOS.versaoConsentimento = version;
+}
+
 beforeEach(() => {
   jest.clearAllMocks();
   mockSignedIn = true;
@@ -217,6 +228,7 @@ beforeEach(() => {
   mockFlag = true;
   mockParams = {};
   mockApi = null;
+  Object.assign(CAMPOS, ORIGINAL_CAMPOS);
   jest.spyOn(Date, 'now').mockReturnValue(NOW);
 });
 
@@ -345,13 +357,13 @@ describe('C1: feed', () => {
     await waitFor(() =>
       expect(screen.getByTestId(`post-amen-${POST(0)}`).props.accessibilityState).toMatchObject({ checked: true }),
     );
-    expect(rpc).toHaveBeenCalledWith('set_amen', { target_post: POST(0), amen: true });
+    expect(rpc).toHaveBeenCalledWith('set_amen', { target_post: POST(0), amen: true, accept_terms: null });
 
     await fireEvent.press(screen.getByTestId(`post-amen-${POST(0)}`));
     await waitFor(() =>
       expect(screen.getByTestId(`post-amen-${POST(0)}`).props.accessibilityState).toMatchObject({ checked: false }),
     );
-    expect(rpc).toHaveBeenLastCalledWith('set_amen', { target_post: POST(0), amen: false });
+    expect(rpc).toHaveBeenLastCalledWith('set_amen', { target_post: POST(0), amen: false, accept_terms: null });
   });
 
   test('Amém que falha volta ao estado anterior e diz por quê, sem texto cru', async () => {
@@ -365,59 +377,63 @@ describe('C1: feed', () => {
     expect(screen.queryByText(/raw/)).toBeNull();
   });
 
-  test('antes do primeiro Amém: a tela única de aceite; o Amém não é enviado', async () => {
-    const { rpc } = setup({
+  /* O ACEITE SAIU DA TELA (decisão do fundador, 2026-09-22): a linha fica no topo
+     do feed e o próprio toque no Amém registra. O caminho inteiro (registrar e
+     então mandar o Amém, com o texto já aprovado pela igreja) está em
+     juntos-fluxo.test.tsx; aqui se prova que NINGUÉM é mandado para uma tela. */
+  test('antes do primeiro Amém: a linha do aceite no topo, e nenhuma tela de aceite', async () => {
+    setup({
       my_community_status: { data: [{ ...READY_STATUS, needs_rules: true, needs_publish_consent: true }] },
     });
     await render(<FeedScreen />);
     await waitFor(() => expect(screen.getByTestId(`post-amen-${POST(0)}`)).toBeTruthy());
+    expect(screen.getByTestId('feed-aceite-line')).toBeTruthy();
     await fireEvent.press(screen.getByTestId(`post-amen-${POST(0)}`));
-    expect(mockRouter.push).toHaveBeenCalledWith('/comunidade/consentimento');
-    expect(calls(rpc, 'set_amen')).toHaveLength(0);
+    expect(mockRouter.push).not.toHaveBeenCalled();
   });
 
-  test('regras já aceitas, falta o consentimento: vai direto para o consentimento', async () => {
+  test('falta só o consentimento: a mesma linha, e o Amém também não navega', async () => {
     setup({ my_community_status: { data: [{ ...READY_STATUS, needs_publish_consent: true }] } });
     await render(<FeedScreen />);
     await waitFor(() => expect(screen.getByTestId(`post-amen-${POST(0)}`)).toBeTruthy());
+    expect(screen.getByTestId('feed-aceite-line')).toBeTruthy();
     await fireEvent.press(screen.getByTestId(`post-amen-${POST(0)}`));
-    expect(mockRouter.push).toHaveBeenCalledWith('/comunidade/consentimento');
+    expect(mockRouter.push).not.toHaveBeenCalled();
   });
 
-  test('voltando do aceite com "Concordo e continuar", o Amém que levou até lá é gravado sozinho', async () => {
+  test('aceite já feito: a linha não aparece', async () => {
+    setup();
+    await render(<FeedScreen />);
+    await waitFor(() => expect(screen.getByTestId(`post-amen-${POST(0)}`)).toBeTruthy());
+    expect(screen.queryByTestId('feed-aceite-line')).toBeNull();
+  });
+
+  test('texto do aceite ainda não liberado pela igreja: o Amém diz isso, e nada é enviado nem aceito', async () => {
     const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility').mockImplementation(() => {});
-    const { rpc, handlers } = setup({
-      my_community_status: { data: [{ ...READY_STATUS, needs_publish_consent: true }] },
+    const { rpc } = setup({
+      my_community_status: { data: [{ ...READY_STATUS, needs_rules: true, needs_publish_consent: true }] },
       set_amen: (args) => ({ data: args?.amen === true }),
     });
     await render(<FeedScreen />);
     await waitFor(() => expect(screen.getByTestId(`post-amen-${POST(0)}`)).toBeTruthy());
     await fireEvent.press(screen.getByTestId(`post-amen-${POST(0)}`));
-    expect(calls(rpc, 'set_amen')).toHaveLength(0);
-
-    markAceite('accepted');
-    handlers.my_community_status = { data: [READY_STATUS] };
-    await refocus();
-    await waitFor(() => expect(calls(rpc, 'set_amen')).toHaveLength(1));
-    expect(rpc).toHaveBeenCalledWith('set_amen', { target_post: POST(0), amen: true });
     await waitFor(() => expect(screen.getByTestId('feed-consent-notice')).toBeTruthy());
-    expect(screen.getByTestId('feed-consent-notice').props.children).toBe(AFTER_CONSENT_FEED);
-    expect(announce).toHaveBeenCalledWith(AFTER_CONSENT_FEED);
+    expect(screen.getByTestId('feed-consent-notice').props.children).toBe(PENDING_NOTICE);
+    expect(announce).toHaveBeenCalledWith(PENDING_NOTICE);
+    expect(calls(rpc, 'set_amen')).toHaveLength(0);
+    expect(calls(rpc, 'accept_community_terms')).toHaveLength(0);
   });
 
-  test('saiu do aceite sem concordar: o Amém é esquecido e nada é enviado', async () => {
+  test('o Amém não fica guardado para depois: voltar à tela não envia nada sozinho', async () => {
     const { rpc, handlers } = setup({ my_community_status: { data: [{ ...READY_STATUS, needs_publish_consent: true }] } });
     await render(<FeedScreen />);
     await waitFor(() => expect(screen.getByTestId(`post-amen-${POST(0)}`)).toBeTruthy());
     await fireEvent.press(screen.getByTestId(`post-amen-${POST(0)}`));
-    markAceite('declined');
-    await refocus();
-    // Mesmo que outro caminho libere depois, o Amém esquecido não volta.
+    // Mesmo que outro caminho libere depois, o toque de antes não volta sozinho.
     handlers.my_community_status = { data: [READY_STATUS] };
     await refocus();
-    await waitFor(() => expect(calls(rpc, 'my_community_status').length).toBeGreaterThanOrEqual(3));
+    await waitFor(() => expect(calls(rpc, 'my_community_status').length).toBeGreaterThanOrEqual(2));
     expect(calls(rpc, 'set_amen')).toHaveLength(0);
-    expect(screen.queryByTestId('feed-consent-notice')).toBeNull();
   });
 
   test('toques seguidos no Amém não se perdem: vale o último', async () => {
@@ -628,7 +644,11 @@ describe('C6: comentários', () => {
     await fireEvent.changeText(screen.getByTestId('comment-input'), '  Deus é fiel  ');
     await fireEvent.press(screen.getByTestId('comment-send'));
     await waitFor(() => expect(screen.getByTestId(`comment-${COMMENT(7)}`)).toBeTruthy());
-    expect(rpc).toHaveBeenCalledWith('create_community_comment', { target_post: POST(0), comment_body: 'Deus é fiel' });
+    expect(rpc).toHaveBeenCalledWith('create_community_comment', {
+      target_post: POST(0),
+      comment_body: 'Deus é fiel',
+      accept_terms: null,
+    });
     expect(screen.queryByTestId(`comment-status-${COMMENT(7)}`)).toBeNull();
     expect(screen.getByTestId('comment-input').props.value).toBe('');
 
@@ -639,7 +659,7 @@ describe('C6: comentários', () => {
     expect(screen.getByTestId('comment-notice')).toBeTruthy();
   });
 
-  test('antes do primeiro comentário: regras/consentimento, e nada é enviado', async () => {
+  test('antes do primeiro comentário: a linha do aceite embaixo do campo, e nenhuma tela', async () => {
     mockParams = { id: POST(0) };
     const { rpc } = setup({
       my_community_status: { data: [{ ...READY_STATUS, needs_publish_consent: true }] },
@@ -647,10 +667,65 @@ describe('C6: comentários', () => {
     });
     await render(<PostCommentsRoute />);
     await waitFor(() => expect(screen.getByTestId('comment-input')).toBeTruthy());
+    expect(screen.getByTestId('comment-aceite-line').props.accessibilityLabel).toContain(ACEITE_LINE);
     await fireEvent.changeText(screen.getByTestId('comment-input'), 'Amém!');
     await fireEvent.press(screen.getByTestId('comment-send'));
-    expect(mockRouter.push).toHaveBeenCalledWith('/comunidade/consentimento');
+    expect(mockRouter.push).not.toHaveBeenCalled();
     expect(calls(rpc, 'create_community_comment')).toHaveLength(0);
+  });
+
+  test('texto do aceite ainda não liberado: o Enviar diz isso e o comentário continua no campo', async () => {
+    mockParams = { id: POST(0) };
+    const { rpc } = setup({
+      my_community_status: { data: [{ ...READY_STATUS, needs_rules: true, needs_publish_consent: true }] },
+      community_post_comments: { data: [] },
+    });
+    await render(<PostCommentsRoute />);
+    await waitFor(() => expect(screen.getByTestId('comment-input')).toBeTruthy());
+    await fireEvent.changeText(screen.getByTestId('comment-input'), 'Amém, irmã!');
+    await fireEvent.press(screen.getByTestId('comment-send'));
+    await waitFor(() => expect(screen.getByTestId('comment-notice').props.children).toBe(PENDING_NOTICE));
+    expect(screen.getByTestId('comment-input').props.value).toBe('Amém, irmã!');
+    expect(calls(rpc, 'create_community_comment')).toHaveLength(0);
+    expect(calls(rpc, 'accept_community_terms')).toHaveLength(0);
+  });
+
+  test('com o texto aprovado: um toque em Enviar registra o aceite e manda o comentário', async () => {
+    fillCampos('1.0');
+    mockParams = { id: POST(0) };
+    let accepted = false;
+    const approved = { rules_version: '1.0', publish_consent_version: '1.0' };
+    const { rpc } = setup({
+      my_community_status: () => ({
+        data: [
+          accepted
+            ? { ...READY_STATUS, ...approved }
+            : { ...READY_STATUS, ...approved, needs_rules: true, needs_publish_consent: true, age_confirmed: false },
+        ],
+      }),
+      set_community_profile: { data: true },
+      accept_community_terms: () => {
+        accepted = true;
+        return { data: true };
+      },
+      community_post_comments: { data: [] },
+      create_community_comment: { data: [{ comment_id: COMMENT(9), status: 'published' }] },
+    });
+    await render(<PostCommentsRoute />);
+    await waitFor(() => expect(screen.getByTestId('comment-input')).toBeTruthy());
+    await fireEvent.changeText(screen.getByTestId('comment-input'), 'Amém, irmã!');
+    await fireEvent.press(screen.getByTestId('comment-send'));
+
+    await waitFor(() => expect(screen.getByTestId(`comment-${COMMENT(9)}`)).toBeTruthy());
+    // 16+ e os DOIS aceites ANTES do comentário (Google Play; Apple 1.2).
+    const reads = new Set(['my_community_status', 'community_post_comments', 'community_comment_amens']);
+    expect(rpc.mock.calls.map(([name]) => name as string).filter((name) => !reads.has(name))).toEqual([
+      'set_community_profile',
+      'accept_community_terms',
+      'accept_community_terms',
+      'create_community_comment',
+    ]);
+    expect(mockRouter.push).not.toHaveBeenCalled();
   });
 
   test('comentário longo demais não sai do aparelho', async () => {
@@ -700,26 +775,12 @@ describe('C6: comentários', () => {
     expect(announce).toHaveBeenLastCalledWith('Agora o texto cabe no limite.');
   });
 
-  test('voltando do aceite, o comentário continua no campo e a tela diz que ainda não foi enviado', async () => {
-    const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility').mockImplementation(() => {});
+  test('quem já aceitou não vê a linha do aceite', async () => {
     mockParams = { id: POST(0) };
-    const { rpc, handlers } = setup({
-      my_community_status: { data: [{ ...READY_STATUS, needs_rules: true, needs_publish_consent: true }] },
-      community_post_comments: { data: [] },
-    });
+    setup({ community_post_comments: { data: [] } });
     await render(<PostCommentsRoute />);
     await waitFor(() => expect(screen.getByTestId('comment-input')).toBeTruthy());
-    await fireEvent.changeText(screen.getByTestId('comment-input'), 'Amém, irmã!');
-    await fireEvent.press(screen.getByTestId('comment-send'));
-    expect(mockRouter.push).toHaveBeenCalledWith('/comunidade/consentimento');
-
-    handlers.my_community_status = { data: [READY_STATUS] };
-    await refocus();
-    await waitFor(() => expect(screen.getByTestId('comment-notice')).toBeTruthy());
-    expect(screen.getByTestId('comment-notice').props.children).toBe(AFTER_CONSENT_COMMENT);
-    expect(announce).toHaveBeenCalledWith(AFTER_CONSENT_COMMENT);
-    expect(screen.getByTestId('comment-input').props.value).toBe('Amém, irmã!');
-    expect(calls(rpc, 'create_community_comment')).toHaveLength(0);
+    expect(screen.queryByTestId('comment-aceite-line')).toBeNull();
   });
 
   test('sem comentários: a tela diz onde escrever', async () => {

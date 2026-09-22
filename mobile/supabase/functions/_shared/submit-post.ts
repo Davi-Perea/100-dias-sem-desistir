@@ -4,6 +4,9 @@
  *
  * Ações (corpo JSON):
  *  - { post: {...} }  (com o token da pessoa): cria o post pela RPC
+ *    — inclusive o `accept_terms` da linha embaixo do botão de publicar
+ *    (2026-09-22): ele segue para a RPC e é registrado na MESMA transação que
+ *    cria o post. Sem tela de aceite no meio, e sem post sem aceite.
  *    create_community_post AGINDO COMO A PESSOA (todas as regras do banco valem:
  *    consentimento, perfil, fotos dela, limites). Se o post ficou em análise só
  *    por causa das fotos e há filtro de imagem configurado, manda cada foto ao
@@ -63,6 +66,36 @@ function isNullableInt(value: unknown, min: number, max: number): value is numbe
   return value === null || value === undefined || (Number.isInteger(value) && (value as number) >= min && (value as number) <= max);
 }
 
+const SHA256_RE = /^[0-9a-f]{64}$/i;
+/** Chaves do aceite embutido (private.apply_inline_accept). */
+const ACCEPT_STRINGS = ['name', 'rules_version', 'rules_sha256', 'consent_version', 'consent_sha256', 'app_version'];
+
+/**
+ * O aceite que vem JUNTO com o post (decisão do fundador de 2026-09-22: não há
+ * tela de aceite). Aqui só a forma: `confirms_16` obrigatório, chaves conhecidas,
+ * strings curtas e hash com cara de sha256. Quem confere versão e hash contra o
+ * texto vigente é o banco (private.accept_community_terms, CM005) — e é ele que
+ * grava a prova. `undefined` devolve null: quem já aceitou não manda nada.
+ */
+export function sanitizeAcceptTerms(raw: unknown): Json | null | false {
+  if (raw === null || raw === undefined) return null;
+  if (typeof raw !== 'object' || Array.isArray(raw)) return false;
+  const accept = raw as Record<string, unknown>;
+  if (accept.confirms_16 !== true) return false;
+  const out: Record<string, unknown> = { confirms_16: true };
+  for (const key of ACCEPT_STRINGS) {
+    const value = accept[key];
+    if (value === undefined || value === null) continue;
+    if (typeof value !== 'string' || value.length === 0 || value.length > 200) return false;
+    if (key.endsWith('_sha256') && !SHA256_RE.test(value)) return false;
+    out[key] = value;
+  }
+  for (const key of Object.keys(accept)) {
+    if (key !== 'confirms_16' && !ACCEPT_STRINGS.includes(key)) return false;
+  }
+  return out as Json;
+}
+
 /**
  * Só as chaves conhecidas, com tipo e tamanho grosseiros. A regra fina (e a de
  * verdade) é do banco; isto só impede lixo de chegar à RPC.
@@ -70,6 +103,8 @@ function isNullableInt(value: unknown, min: number, max: number): value is numbe
 export function sanitizePostArgs(raw: unknown): Json | null {
   const post = asObject(raw);
   const photos = post.post_photo_paths;
+  const accept = sanitizeAcceptTerms(post.accept_terms);
+  if (accept === false) return null;
   if (
     !isNullableString(post.post_body, 4000) ||
     !isNullableString(post.post_activity, 20) ||
@@ -97,6 +132,7 @@ export function sanitizePostArgs(raw: unknown): Json | null {
     post_verse_start: post.post_verse_start ?? null,
     post_verse_end: post.post_verse_end ?? null,
     post_audience: post.post_audience ?? 'igreja',
+    accept_terms: accept,
   };
 }
 

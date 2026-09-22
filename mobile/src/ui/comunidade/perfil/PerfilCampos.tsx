@@ -8,7 +8,7 @@ import type { AvatarStatus } from '@/community/types';
 import { charLength, LIMITS } from '@/community/validation';
 import { listMinistries } from '@/journey/ministries';
 import { TextField } from '@/ui/TextField';
-import { AppText, Block, Button, Checkbox, ChoiceRow } from '@/ui/components';
+import { AppText, Button, Checkbox, ChoiceRow } from '@/ui/components';
 import { LimitNote } from '@/ui/comunidade/LimitNote';
 import { pickFromLibrary, preparePhoto } from '@/ui/comunidade/publicar/foto';
 import { MIN_TOUCH, spacing, useTheme } from '@/ui/theme';
@@ -71,6 +71,8 @@ export const AVATAR_NOTE: Record<AvatarStatus, string | null> = {
 
 /** Título do passo da foto. É um convite, nunca uma exigência (2026-09-22). */
 export const AVATAR_STEP_TITLE = 'Coloque uma foto';
+/** Com foto: o mesmo caminho, dito pelo que ele faz agora. */
+export const AVATAR_CHANGE_TITLE = 'Trocar a foto';
 export const AVATAR_OPTIONAL_NOTE =
   'Opcional. Sem foto, aparecem as iniciais do seu nome. Publicar nunca depende dela.';
 
@@ -90,6 +92,12 @@ export const AVATAR_RULES = [
  * Escolher na galeria, preparar no aparelho (1600 px, JPEG, sem EXIF/XMP/IPTC;
  * `preparePhoto` recusa se sobrar metadado) e enviar. O estado que o servidor
  * devolve é dito como veio (`AVATAR_NOTE`); a tela não promete nada no lugar dele.
+ *
+ * CAMINHO CURTO (pedido do fundador, 2026-09-22): UM toque abre a galeria. Antes
+ * eram dois — um botão abria uma caixa com as regras e só ela abria a galeria.
+ * As regras não se perderam: ficam escritas acima do botão, à vista ANTES do
+ * toque, que é o que importa. A própria foto (ou as iniciais) também é botão,
+ * porque é onde a mão vai primeiro.
  */
 export function AvatarField({
   api,
@@ -106,7 +114,7 @@ export function AvatarField({
   onSaved: (localUri: string, status: AvatarStatus) => void;
 }) {
   const { colors } = useTheme();
-  const [stage, setStage] = useState<'idle' | 'rules' | 'working'>('idle');
+  const [stage, setStage] = useState<'idle' | 'working'>('idle');
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -114,6 +122,7 @@ export function AvatarField({
   }, [error]);
 
   const choose = async () => {
+    if (stage === 'working') return;
     setError(null);
     setStage('working');
     try {
@@ -132,11 +141,22 @@ export function AvatarField({
 
   const note = AVATAR_NOTE[status];
   const hasPhoto = status === 'in_review' || status === 'approved';
+  /** O mesmo rótulo do botão, para a foto e o botão serem a mesma porta. */
+  const action = hasPhoto ? AVATAR_CHANGE_TITLE : AVATAR_STEP_TITLE;
 
   return (
     <View style={{ gap: spacing.lg }} testID="perfil-foto">
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.lg }}>
-        <ProfileAvatar name={name || 'Você'} uri={hasPhoto ? photoUrl : null} size={96} testID="perfil-foto-previa" />
+        <Pressable
+          onPress={choose}
+          accessibilityRole="button"
+          accessibilityLabel={action}
+          accessibilityState={{ busy: stage === 'working' }}
+          testID="perfil-foto-toque"
+          style={({ pressed }) => [{ borderRadius: 48 }, pressed && { opacity: 0.72 }]}
+        >
+          <ProfileAvatar name={name || 'Você'} uri={hasPhoto ? photoUrl : null} size={96} testID="perfil-foto-previa" />
+        </Pressable>
         <View style={{ flex: 1, gap: spacing.xs }}>
           {note ? (
             <AppText variant="bodySm" testID="perfil-foto-estado">
@@ -149,36 +169,27 @@ export function AvatarField({
           )}
         </View>
       </View>
-      {stage === 'rules' ? (
-        <Block tone="warm" testID="perfil-foto-regras">
-          <View style={{ gap: spacing.md }}>
-            <AppText variant="rowLabel" accessibilityRole="header">
-              {AVATAR_STEP_TITLE}
+      {/* As regras da foto, à vista antes do toque (e não numa caixa a mais). */}
+      <View style={{ gap: spacing.sm }} testID="perfil-foto-regras">
+        {AVATAR_RULES.map((line) => (
+          <View key={line} style={{ flexDirection: 'row', gap: spacing.md, alignItems: 'flex-start' }}>
+            <View
+              aria-hidden
+              style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: colors.textSecondary, marginTop: 8 }}
+            />
+            <AppText variant="bodySm" style={{ flex: 1, color: colors.textSecondary }}>
+              {line}
             </AppText>
-            {AVATAR_RULES.map((line) => (
-              <View key={line} style={{ flexDirection: 'row', gap: spacing.md, alignItems: 'flex-start' }}>
-                <View
-                  aria-hidden
-                  style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: colors.text, marginTop: 9 }}
-                />
-                <AppText variant="bodySm" style={{ flex: 1, color: colors.textSecondary }}>
-                  {line}
-                </AppText>
-              </View>
-            ))}
-            <Button title="Escolher do celular" onPress={choose} testID="perfil-foto-escolher" />
-            <Button title="Agora não" variant="underline" onPress={() => setStage('idle')} />
           </View>
-        </Block>
-      ) : (
-        <Button
-          title={hasPhoto ? 'Trocar a foto' : AVATAR_STEP_TITLE}
-          variant="outline"
-          onPress={() => setStage('rules')}
-          loading={stage === 'working'}
-          testID="perfil-foto-abrir"
-        />
-      )}
+        ))}
+      </View>
+      <Button
+        title={action}
+        variant="outline"
+        onPress={choose}
+        loading={stage === 'working'}
+        testID="perfil-foto-abrir"
+      />
       {error ? (
         <AppText
           variant="bodySm"

@@ -1,7 +1,8 @@
 /**
- * Textos da Comunidade que a pessoa ACEITA ou LÊ antes de publicar: regras (a
- * tela de regras), consentimento destacado (C4) e a frase única sobre quem vê
- * (C3, C4 e B4).
+ * Textos da Comunidade que a pessoa ACEITA ou LÊ antes de publicar: regras e
+ * consentimento destacado (os dois na tela de regras, desde que a tela de aceite
+ * saiu), a linha de aceite embaixo do botão de publicar e a frase única sobre quem
+ * vê (C3 e B4).
  *
  * Fonte: `docs/legal/COMUNIDADE_REGRAS_E_CONSENTIMENTO_rascunho.md` (2026-09-21),
  * RASCUNHO PARA REVISÃO DE ADVOGADO. O texto foi copiado como está, com três
@@ -287,12 +288,14 @@ export function consentDocument(campos: Record<CampoId, string | null> = CAMPOS)
 }
 
 /**
- * TELA ÚNICA DE ACEITE (pedido do fundador, 2026-09-22, aba “Juntos”): antes da
- * primeira publicação, comentário ou Amém, UMA tela curta com 16+, regras,
- * consentimento destacado e o nome. Este é o consentimento destacado dela
- * (LGPD art. 11, I): o mesmo propósito e as mesmas frases do rascunho §2
- * (`consentDocument`), só que curto, e com uma correção de fato: o Amém agora
- * APARECE com o nome (os rostinhos do F3), então isso tem de estar escrito.
+ * O CONSENTIMENTO DESTACADO que o aceite registra (LGPD art. 11, I): o mesmo
+ * propósito e as mesmas frases do rascunho §2 (`consentDocument`), só que curto, e
+ * com uma correção de fato: o Amém agora APARECE com o nome (os rostinhos do F3),
+ * então isso tem de estar escrito.
+ *
+ * Desde 2026-09-22 ele não tem tela própria (a de aceite saiu): o toque em
+ * Publicar registra o aceite deste texto, e a pessoa o lê na tela de regras, a um
+ * toque do link da linha de aceite. O hash continua sendo deste texto exato.
  *
  * O advogado revisa este texto junto com o rascunho (pedido registrado). Até lá
  * a versão é null e, no app de verdade, ninguém aceita (`termsAvailability`).
@@ -339,10 +342,36 @@ export function aceiteDocument(campos: Record<CampoId, string | null> = CAMPOS):
   };
 }
 
+/* ------------------------------------------------ a linha do aceite (2026-09-22) */
+
 /**
- * As regras, em quatro linhas, na tela única de aceite. Frases do rascunho §1
- * (`rulesDocument`); o aceite vale para as regras COMPLETAS, que abrem pelo link
- * logo abaixo, e é o hash delas que vai ao servidor.
+ * DECISÃO DO FUNDADOR (2026-09-22): a TELA de aceite antes de participar SAIU. No
+ * lugar, esta linha fica embaixo do botão de publicar (e do enviar comentário), e
+ * o toque no botão é que registra o aceite — antes de criar qualquer conteúdo
+ * (Google Play, conteúdo gerado por usuários; Apple 1.2).
+ *
+ * Texto dele, palavra por palavra. "regras do Juntos" é o link: abre a tela de
+ * regras, que agora mostra as regras E o consentimento destacado — os dois textos
+ * cujo hash o aceite registra (ver `aceiteDocument`, LGPD art. 11, I).
+ */
+export const ACEITE_LINE = 'Ao publicar, você confirma que tem 16 anos ou mais e aceita as regras do Juntos.';
+
+/** O trecho da linha que é link. Precisa estar DENTRO de `ACEITE_LINE`. */
+export const ACEITE_LINE_LINK = 'regras do Juntos';
+
+/** Nome falado da linha inteira: a frase mais o que o toque faz. */
+export const ACEITE_LINE_SPOKEN = `${ACEITE_LINE} Abre as regras do Juntos.`;
+
+/**
+ * Sem nome no Juntos e sem nome na entrada do app, o servidor não deixa
+ * participar (CM007): dito na hora, com o caminho.
+ */
+export const ACEITE_NEEDS_NAME = 'Para publicar, escreva o seu nome. É como a igreja vai te ver.';
+
+/**
+ * As regras, em quatro linhas. Frases do rascunho §1 (`rulesDocument`); o aceite
+ * vale para as regras COMPLETAS, que abrem pelo link da linha de aceite, e é o
+ * hash delas que vai ao servidor.
  */
 export const RULES_SUMMARY = [
   'Aqui você conta o que Deus falou na leitura, pede oração e agradece.',
@@ -391,31 +420,14 @@ export const PENDING_NOTICE =
 
 export const MISMATCH_NOTICE = 'O texto foi atualizado. Atualize o app para ler a versão nova e continuar.';
 
-/**
- * Aviso no momento de escolher a foto (C3). Frases das regras curtas ("O que
- * pode" e "O que não pode"), sem texto novo.
+/*
+ * A FOTO NÃO TEM MAIS AVISO ANTES (decisão do fundador, 2026-09-22): tocar em
+ * Galeria abre a galeria, tocar em Câmera abre a câmera, e a única pergunta que
+ * aparece é a permissão do sistema. O `PHOTO_WARNING` que ficava aqui saiu.
  *
- * A FOTO PUBLICA DIRETO é o desenho do fundador (2026-09-22) — mas o F5 dele
- * mesmo guarda o caminho seguro: "sem filtro configurado, cai para aprovação
- * humana". REVISÃO FINAL 2026-09-22: a frase "a foto aparece para a igreja assim
- * que você publica" era uma promessa que o app NÃO cumpre hoje. Sem
- * `MODERATION_PROVIDER`, `submit-post` devolve `in_review` para toda foto: quem
- * publicasse na prévia do Dia 23 leria aqui uma promessa e, na tela seguinte,
- * "Em análise". A frase abaixo é verdadeira nos dois casos e continua verdadeira
- * quando o filtro for ligado — aí a foto limpa passa em segundos.
- *
- * O que não depende de nada disso, e por isso é dito em separado: a localização,
- * que o app apaga de fato (`preparePhoto` reencoda e `assertPhotoSafeToUpload`
- * confere os bytes).
+ * O que o app FAZ com a foto não mudou e não depende de aviso: `preparePhoto`
+ * reencoda (1600 px, JPEG 0,8) e `assertPhotoSafeToUpload` confere os bytes, então
+ * a localização é apagada no aparelho antes de enviar. O que a pessoa pode e não
+ * pode publicar continua escrito nas regras do Juntos, que a linha do aceite
+ * linka embaixo do botão de publicar.
  */
-export const PHOTO_WARNING = {
-  title: 'Antes de escolher a foto',
-  bullets: [
-    'Escolha uma foto da sua Bíblia, das suas anotações, do seu caderno.',
-    '**Não exponha outra pessoa**: não publique foto de alguém que não quer aparecer.',
-    'Na dúvida, escolha uma foto sem rostos.',
-    'A foto passa por uma conferência antes de aparecer para a igreja. Se ela ficar "em análise", só você a vê ' +
-      'até lá.',
-    'A localização da foto é apagada no seu celular, antes de enviar.',
-  ],
-} as const;

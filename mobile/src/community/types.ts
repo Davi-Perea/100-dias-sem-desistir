@@ -206,6 +206,33 @@ export type ActivityItem = {
   unread: boolean;
 };
 
+/**
+ * O ACEITE QUE VAI JUNTO COM A AÇÃO (decisão do fundador de 2026-09-22): não
+ * existe mais tela de aceite antes de participar. Embaixo do botão de publicar /
+ * comentar / Amém há uma linha —
+ *   "Ao publicar, você confirma que tem 16 anos ou mais e aceita as regras do
+ *    Juntos."  (com link para as regras)
+ * — e o toque no botão registra o aceite na MESMA chamada que cria o conteúdo.
+ *
+ * Cada par versão + sha256 é do texto EXATO que a tela mostrou (o servidor
+ * confere os dois e recusa tela desatualizada). O registro fica em
+ * consent_records com finalidade, versão, hash, versão do app e data/hora: a
+ * prova continua sendo a mesma de antes (LGPD art. 8º, §6º), só o lugar do toque
+ * mudou. Google Play exige o aceite ANTES de criar conteúdo e Apple 1.2 idem:
+ * aqui nada é criado sem ele — as duas coisas acontecem na mesma transação.
+ */
+export type InlineAccept = {
+  /** A linha embaixo do botão. Sempre true: é o que a pessoa confirma ao tocar. */
+  confirms16: true;
+  /** Nome, só para quem ainda não escolheu um (não troca nome já escolhido). */
+  name?: string | null;
+  /** Regras do Juntos: versão vigente do servidor + sha256 do texto mostrado. */
+  rules?: { version: string; sha256: string } | null;
+  /** Consentimento de publicar (LGPD art. 11): idem. */
+  consent?: { version: string; sha256: string } | null;
+  appVersion: string;
+};
+
 /** Entrada de createPost (F1, F5). */
 export type NewPost = {
   body?: string | null;

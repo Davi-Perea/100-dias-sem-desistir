@@ -1,5 +1,5 @@
-import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { router, useLocalSearchParams } from 'expo-router';
+import { useEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, Alert, KeyboardAvoidingView, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -12,12 +12,12 @@ import { useJourney } from '@/journey/useJourney';
 import { useSettings } from '@/settings/settingsStore';
 import { BackBar, goBackOrHome } from '@/ui/BackBar';
 import { TextField } from '@/ui/TextField';
-import { AppText, Block, Button, Screen, StateView } from '@/ui/components';
+import { AppText, Button, Screen, StateView } from '@/ui/components';
 import { LimitNote } from '@/ui/comunidade/LimitNote';
 import { MY_POSTS_ROUTE } from '@/ui/comunidade/perfil/routes';
 import { ProfileAvatar } from '@/ui/comunidade/perfil/ProfileAvatar';
-import { takeAceiteOutcome } from '@/ui/comunidade/publicar/aceite';
-import { parseDay, publishStep, ROUTES, sentCopy, type Sent } from '@/ui/comunidade/publicar/fluxo';
+import { aceiteDocs, availabilityNotice, aceiteNeeds, nameOk, useAceite } from '@/ui/comunidade/publicar/aceite';
+import { needsAceite, parseDay, publishStep, ROUTES, sentCopy, type Sent } from '@/ui/comunidade/publicar/fluxo';
 import {
   cameraConfigured,
   pickManyFromLibrary,
@@ -26,9 +26,10 @@ import {
   type PickedAsset,
   type PreparedPhoto,
 } from '@/ui/comunidade/publicar/foto';
-import { AudienceNotice, CommunityGateView, RichText } from '@/ui/comunidade/publicar/partes';
-import { AttachBar, AttachChips, PhotoStrip, type AttachButton } from '@/ui/comunidade/publicar/pecas';
+import { AudienceNotice, CommunityGateView, NoticeBand } from '@/ui/comunidade/publicar/partes';
+import { AceiteLine, AttachBar, AttachChips, PhotoStrip, type AttachButton } from '@/ui/comunidade/publicar/pecas';
 import {
+  attachSummary,
   buildNewPost,
   hasAttachment,
   hasContent,
@@ -39,7 +40,7 @@ import {
   type Attachment,
   type VerseChip,
 } from '@/ui/comunidade/publicar/rascunho';
-import { PHOTO_WARNING } from '@/ui/comunidade/publicar/textos';
+import { ACEITE_NEEDS_NAME } from '@/ui/comunidade/publicar/textos';
 import { useCommunityStatus } from '@/ui/comunidade/publicar/useCommunityStatus';
 import { VersiculoSheet } from '@/ui/comunidade/publicar/VersiculoSheet';
 import { MAX_CONTENT_WIDTH, MIN_TOUCH, radius, spacing, useGutter, useTheme } from '@/ui/theme';
@@ -52,8 +53,20 @@ const COUNTER_FROM = LIMITS.postBody - 200;
 /** Depois de "Publicado", volta sozinho ao feed (o feed recarrega no foco e o post novo fica no topo). */
 const BACK_TO_FEED_MS = 1500;
 
+/**
+ * "Ver no feed" tem de CHEGAR no feed. Voltar não serve: quem publicou depois de
+ * concluir o dia veio por `/comunidade/depois/<dia>`, que se substituiu no
+ * caminho, e embaixo desta tela está a Jornada — voltar levaria para lá, com o
+ * botão prometendo o feed. Então esta tela sai de cena (`replace`) e a aba Juntos
+ * entra; ela recarrega no foco e o post novo fica no topo.
+ */
+function goToFeed() {
+  router.replace(ROUTES.juntos as never);
+}
+
 type PhotoItem = { key: string; photo: PreparedPhoto };
-type PhotoStage = 'idle' | 'warning-galeria' | 'warning-camera' | 'preparing';
+/** Não há mais aviso antes da galeria nem da câmera (2026-09-22): escolher ou preparar. */
+type PhotoStage = 'idle' | 'preparing';
 
 /** Referência formatada da leitura do dia (só o que o guia diz; o app não reescreve). */
 function readingReference(day: number): string | null {
@@ -68,19 +81,22 @@ function readingReference(day: number): string | null {
  * - "O que Deus falou com você hoje?" começa VAZIO. A reflexão privada nunca
  *   pré-preenche (REGRAS 14): esta tela não lê a reflexão.
  * - Anexos (cada um é escolha da pessoa, e só o que ela anexou sai do aparelho):
- *   Leitura do dia ("Dia N · referência"), Versículo (um dos que ela marcou; só a
- *   referência; o texto da Bíblia Livre é só prévia, no aparelho), Oração ou
- *   Jejum (só o tipo), Galeria (até 4 fotos) e Câmera. Viram chips removíveis.
- * - Foto: aviso de rosto de outras pessoas e de crianças ANTES da galeria ou da
- *   câmera; preparada no aparelho (1600 px, JPEG 0,8, sem EXIF/XMP/IPTC) e só
- *   enviada ao publicar.
- * - Embaixo: só "Publicar". A escolha de público SAIU (2026-09-22): todo post vai
- *   para a igreja inteira.
- * - O formulário abre na hora (a entrada no Juntos é automática). Na PRIMEIRA
- *   publicação, o toque em "Publicar" abre a tela única de aceite (16+, regras,
- *   consentimento e o nome, se faltar); ao concordar, a pessoa volta para cá e o
- *   post sai sozinho, do jeito que ela deixou. Foto de perfil e ministério não
- *   são exigidos.
+ *   Leitura do dia ("Dia N · referência"), Versículo (QUALQUER um da Bíblia, pelo
+ *   caminho livro → capítulo → versículo, com os marcados em destaque no topo; só
+ *   a referência sai, o texto da Bíblia Livre é prévia no aparelho), Oração ou
+ *   Jejum (só o tipo), Galeria (até 4 fotos) e Câmera. Viram chips removíveis, com
+ *   um resumo discreto do que vai junto.
+ * - Foto: sem aviso antes (2026-09-22). Galeria abre a galeria, Câmera abre a
+ *   câmera, e a única pergunta é a permissão do sistema. A foto é preparada no
+ *   aparelho (1600 px, JPEG 0,8, sem EXIF/XMP/IPTC) e só enviada ao publicar.
+ * - Embaixo: "Publicar" e, embaixo dele, a linha do aceite. A escolha de público
+ *   SAIU (2026-09-22): todo post vai para a igreja inteira.
+ * - O formulário abre na hora (a entrada no Juntos é automática) e NÃO existe mais
+ *   tela de aceite no meio do caminho (decisão do fundador, 2026-09-22): a linha
+ *   embaixo do botão diz "Ao publicar, você confirma que tem 16 anos ou mais e
+ *   aceita as regras do Juntos.", com link para as regras, e o toque em "Publicar"
+ *   registra o aceite (16+, regras e consentimento destacado, pelas mesmas RPCs) e
+ *   publica em seguida. Foto de perfil e ministério não são exigidos.
  * - Depois: "Publicado" (volta ao feed) ou "Em análise" (F5: foto que o filtro
  *   segurou ou que espera uma pessoa; só o autor vê).
  * - Sem localização, sem marcar pessoas, sem mensagem privada.
@@ -124,26 +140,36 @@ export default function PublishScreen() {
   const [avatarUri, setAvatarUri] = useState<string | null>(null);
   const photoSeq = useRef(0);
 
+  const [docs] = useState(aceiteDocs);
+  const aceite = useAceite(docs, state);
+
   const ready = state.kind === 'ready' ? state : null;
   const step = ready ? publishStep(ready.status) : null;
   const api = ready?.api ?? null;
   const profile = ready?.status.profile ?? null;
   const ministry = profile?.ministry ?? null;
   // Antes do aceite a pessoa pode ainda não ter nome no Juntos: vale o da entrada do app.
-  const displayName = ready?.status.displayName ?? profile?.displayName ?? settings?.profile.name ?? 'Você';
+  // "Você" é só para MOSTRAR (a linha do autor) — nunca é nome para registrar.
+  const ownName = cleanText(ready?.status.displayName ?? profile?.displayName ?? settings?.profile.name ?? null);
+  const displayName = ownName ?? 'Você';
   const avatarPath = profile?.avatarPath ?? null;
 
   /** Dia que "Leitura do dia" anexa: o que veio da conclusão, ou o de hoje na campanha. */
   const readingDay = paramDay ?? (journey.phase === 'before_start' ? null : journey.officialDay);
 
-  // "Publicar" antes do primeiro aceite: guarda a intenção, abre o aceite e,
-  // se a pessoa concordar, envia ao voltar. Se ela sair sem concordar, esquece.
-  const pendingSend = useRef(false);
-  useFocusEffect(
-    useCallback(() => {
-      if (takeAceiteOutcome() !== 'accepted') pendingSend.current = false;
-    }, []),
-  );
+  /* --------------------------------------------------------------- o aceite
+     Não há tela de aceite (2026-09-22): o toque em "Publicar" registra e publica.
+     Só três coisas podem impedir, e cada uma é dita na hora:
+       - o texto das regras/consentimento ainda não foi aprovado pela igreja
+         (Launch Gate; `availability`), e aí ninguém publica;
+       - a pessoa nunca deu um nome, nem na entrada do app (o servidor recusa,
+         CM007), e aí a tela manda para o perfil;
+       - o servidor recusou o registro (a mensagem dele aparece no lugar do envio). */
+  const mustAccept = ready !== null && needsAceite(ready.status);
+  /** Nome que vai junto do aceite: o do Juntos, senão o da entrada do app. Nunca "Você". */
+  const aceiteName = ownName ?? '';
+  const missingName = mustAccept && ready !== null && aceiteNeeds(ready.status).name && !nameOk(aceiteName);
+  const aceiteBlock = mustAccept && aceite.availability !== null ? availabilityNotice(aceite.availability) : null;
 
   // Foto de perfil (URL assinada; a própria aparece mesmo em análise).
   useEffect(() => {
@@ -170,7 +196,7 @@ export default function PublishScreen() {
     let alive = true;
     AccessibilityInfo.isScreenReaderEnabled().then(
       (on) => {
-        if (alive && !on) timer = setTimeout(goBackOrHome, BACK_TO_FEED_MS);
+        if (alive && !on) timer = setTimeout(goToFeed, BACK_TO_FEED_MS);
       },
       () => {},
     );
@@ -185,8 +211,12 @@ export default function PublishScreen() {
   const overLimit = length > LIMITS.postBody;
   const draft = { body: cleaned, photoCount: photos.length, attachments };
   const dirty = isDirty(draft, paramDay);
-  const canSend = hasContent(draft) && !overLimit && !sending && photoStage !== 'preparing';
+  const canSend =
+    hasContent(draft) && !overLimit && !sending && !aceite.busy && photoStage !== 'preparing' && aceiteBlock === null;
   const photosLeft = MAX_POST_PHOTOS - photos.length;
+  const summary = attachSummary(attachments, photos.length);
+  /** Um lugar só para a recusa: a do envio ou a do registro do aceite. */
+  const errorLine = sendError ?? aceite.error;
 
   const cancel = () => {
     if (!dirty || sent) {
@@ -217,7 +247,16 @@ export default function PublishScreen() {
     if (failure) setPhotoError(failure);
   };
 
-  const openPhotoWarning = (source: 'galeria' | 'camera') => {
+  /**
+   * Galeria e Câmera abrem DIRETO (decisão do fundador, 2026-09-22): o aviso de
+   * rosto de outras pessoas, de crianças e o da câmera saíram. A única pergunta
+   * que aparece é a permissão do sistema, pedida pelo próprio seletor.
+   *
+   * Continuam aqui as duas recusas que não são aviso e sim fato: o post já está
+   * cheio, e a build sem o texto de finalidade da câmera (pedir a permissão sem
+   * ele encerra o app no iOS).
+   */
+  const openPhotos = async (source: 'galeria' | 'camera') => {
     setPhotoError(null);
     if (photosLeft <= 0) {
       setPhotoError(`Cabem até ${MAX_POST_PHOTOS} fotos por publicação. Tire uma para escolher outra.`);
@@ -227,12 +266,7 @@ export default function PublishScreen() {
       setPhotoError('A câmera ainda não está liberada nesta versão do app. Escolha uma foto da galeria.');
       return;
     }
-    setPhotoStage(source === 'galeria' ? 'warning-galeria' : 'warning-camera');
-  };
-
-  const pickPhotos = async () => {
-    const fromCamera = photoStage === 'warning-camera';
-    setPhotoError(null);
+    const fromCamera = source === 'camera';
     setPhotoStage('preparing');
     try {
       if (fromCamera) {
@@ -287,7 +321,7 @@ export default function PublishScreen() {
     {
       id: 'versiculo',
       label: 'Versículo',
-      accessibilityLabel: 'Versículo que você marcou',
+      accessibilityLabel: 'Versículo da Bíblia',
       selected: verseAttached !== null,
       onPress: () => setSheet('verse'),
     },
@@ -310,13 +344,13 @@ export default function PublishScreen() {
       label: 'Galeria',
       accessibilityLabel: `Galeria, até ${MAX_POST_PHOTOS} fotos`,
       selected: photos.length > 0,
-      onPress: () => openPhotoWarning('galeria'),
+      onPress: () => void openPhotos('galeria'),
     },
     {
       id: 'camera',
       label: 'Câmera',
       accessibilityLabel: 'Câmera',
-      onPress: () => openPhotoWarning('camera'),
+      onPress: () => void openPhotos('camera'),
     },
   ];
 
@@ -324,15 +358,19 @@ export default function PublishScreen() {
 
   const send = async () => {
     if (!ready || !canSend) return;
-    if (step === 'aceite') {
-      pendingSend.current = true;
-      router.push(ROUTES.consentimento as never);
-      return;
+    setSendError(null);
+    // Primeira publicação: o aceite é registrado AGORA, antes de existir conteúdo
+    // (Google Play; Apple 1.2). Se o registro não passar, nada é publicado.
+    if (mustAccept) {
+      if (missingName) {
+        setSendError(ACEITE_NEEDS_NAME);
+        return;
+      }
+      const accepted = await aceite.accept({ name: aceiteName });
+      if (!accepted) return;
     }
-    pendingSend.current = false;
     const client = ready.api;
     setSending(true);
-    setSendError(null);
     const uploaded: string[] = [];
     try {
       for (const item of photos.slice(0, MAX_POST_PHOTOS)) uploaded.push(await client.uploadPhoto(item.photo.bytes));
@@ -350,7 +388,8 @@ export default function PublishScreen() {
       for (const path of uploaded) client.discardPhoto(path).catch(() => {});
       const known = toCommunityError(failure);
       if (known.code === 'needs_consent' || known.code === 'terms_outdated' || known.code === 'needs_profile') {
-        // O texto mudou ou o aceite caiu: o status novo faz o próximo "Publicar" abrir o aceite de novo.
+        // O aceite caiu ou o texto mudou: com o status novo, o próximo "Publicar"
+        // registra o aceite de novo antes de tentar publicar.
         state.reload();
       }
       setSendError(known.message);
@@ -359,18 +398,9 @@ export default function PublishScreen() {
     }
   };
 
-  // De volta do aceite com o status novo: o post que ela pediu sai agora.
-  const sendRef = useRef(send);
-  useEffect(() => {
-    sendRef.current = send;
-  });
-  useEffect(() => {
-    if (step === 'form' && pendingSend.current) void sendRef.current();
-  }, [step]);
-
   /* ------------------------------------------------------ fora do formulário */
 
-  if (!ready || (step !== 'form' && step !== 'aceite')) {
+  if (!ready || step !== 'form') {
     const gateStep = step === 'needs_join' || step === 'blocked' ? step : undefined;
     return (
       <Screen>
@@ -393,7 +423,7 @@ export default function PublishScreen() {
           message={copy.message}
           action={
             sent.status === 'published' ? (
-              <Button title="Ver no feed" onPress={goBackOrHome} testID="publish-done" />
+              <Button title="Ver no feed" onPress={goToFeed} testID="publish-done" />
             ) : (
               <View style={{ gap: spacing.sm, alignSelf: 'stretch' }}>
                 <Button
@@ -401,7 +431,7 @@ export default function PublishScreen() {
                   onPress={() => router.replace(MY_POSTS_ROUTE)}
                   testID="publish-my-posts"
                 />
-                <Button title="Voltar ao feed" variant="underline" onPress={goBackOrHome} testID="publish-done" />
+                <Button title="Voltar ao feed" variant="underline" onPress={goToFeed} testID="publish-done" />
               </View>
             )
           }
@@ -409,54 +439,6 @@ export default function PublishScreen() {
       </Screen>
     );
   }
-
-  /* ------------------------------------------------------------- partes */
-
-  const photoWarning =
-    photoStage === 'warning-galeria' || photoStage === 'warning-camera' ? (
-      <Block tone="warm" testID="photo-warning">
-        <View style={{ gap: spacing.md }}>
-          <AppText variant="rowLabel" accessibilityRole="header">
-            {PHOTO_WARNING.title}
-          </AppText>
-          {PHOTO_WARNING.bullets.map((line, index) => (
-            <View
-              key={index}
-              style={{
-                flexDirection: 'row',
-                gap: spacing.md,
-                alignItems: 'flex-start',
-              }}
-            >
-              <View
-                aria-hidden
-                style={{
-                  width: 8,
-                  height: 8,
-                  borderRadius: 4,
-                  backgroundColor: colors.text,
-                  marginTop: 9,
-                }}
-              />
-              <View style={{ flex: 1 }}>
-                <RichText text={line} variant="bodySm" color={colors.textSecondary} />
-              </View>
-            </View>
-          ))}
-          <Button
-            title={photoStage === 'warning-camera' ? 'Abrir a câmera' : 'Escolher do celular'}
-            onPress={pickPhotos}
-            testID="photo-pick"
-          />
-          <Button
-            title="Agora não"
-            variant="underline"
-            onPress={() => setPhotoStage('idle')}
-            testID="photo-warning-close"
-          />
-        </View>
-      </Block>
-    ) : null;
 
   return (
     <Screen>
@@ -513,10 +495,18 @@ export default function PublishScreen() {
             <LimitNote length={length} max={LIMITS.postBody} nearFrom={COUNTER_FROM} testID="publish-counter" />
           </View>
 
-          <AttachChips
-            attachments={attachments}
-            onRemove={(attachment) => setAttachments((current) => removeAttachment(current, attachment.kind))}
-          />
+          {/* Resumo discreto do que vai junto (item 4 do fundador): uma linha, nunca um passo. */}
+          {summary ? (
+            <View style={{ gap: spacing.sm }}>
+              <AppText variant="caption" testID="attach-summary">
+                {summary}
+              </AppText>
+              <AttachChips
+                attachments={attachments}
+                onRemove={(attachment) => setAttachments((current) => removeAttachment(current, attachment.kind))}
+              />
+            </View>
+          ) : null}
           {verseAttached?.text ? (
             <View testID="verse-preview" style={{ gap: spacing.xs }}>
               <AppText variant="quote">{verseAttached.text}</AppText>
@@ -538,7 +528,6 @@ export default function PublishScreen() {
               Preparando a foto…
             </AppText>
           ) : null}
-          {photoWarning}
           {photoError ? (
             <AppText
               variant="bodySm"
@@ -553,28 +542,36 @@ export default function PublishScreen() {
 
           <AttachBar buttons={buttons} />
 
-          {sendError ? (
-            <AppText
-              variant="bodySm"
-              accessibilityRole="alert"
-              accessibilityLiveRegion="polite"
-              style={{ color: colors.danger }}
-              testID="publish-error"
-            >
-              {sendError}
-            </AppText>
+          {/* O texto das regras ou do consentimento ainda não foi aprovado pela
+              igreja: ninguém aceita e ninguém publica, e a tela diz isso. */}
+          {aceiteBlock ? <NoticeBand text={aceiteBlock} colors={colors} testID="publish-pending" /> : null}
+          {errorLine !== null ? (
+            <View style={{ gap: spacing.sm }}>
+              <AppText
+                variant="bodySm"
+                accessibilityRole="alert"
+                accessibilityLiveRegion="polite"
+                style={{ color: colors.danger }}
+                testID="publish-error"
+              >
+                {errorLine}
+              </AppText>
+              {missingName ? (
+                <Button
+                  title="Escrever o meu nome"
+                  variant="outline"
+                  onPress={() => router.push(ROUTES.perfil as never)}
+                  style={{ alignSelf: 'flex-start' }}
+                  testID="publish-write-name"
+                />
+              ) : null}
+            </View>
           ) : null}
-          <Button
-            title="Regras do Juntos"
-            variant="underline"
-            onPress={() => router.push({ pathname: ROUTES.regras, params: { ler: '1' } })}
-            style={{ alignSelf: 'flex-start' }}
-            testID="publish-rules"
-          />
         </ScrollView>
 
-        {/* Rodapé: só Publicar. A escolha de público saiu (2026-09-22): todo post
-            vai para a igreja inteira. */}
+        {/* Rodapé: "Publicar" e, embaixo dele, a linha do aceite (decisão do
+            fundador, 2026-09-22 — a tela de aceite saiu). A escolha de público
+            também saiu: todo post vai para a igreja inteira. */}
         <View
           testID="publish-footer"
           style={{
@@ -583,28 +580,26 @@ export default function PublishScreen() {
             paddingHorizontal: inset,
             paddingTop: spacing.sm,
             paddingBottom: insets.bottom + spacing.sm,
-            flexDirection: 'row',
-            flexWrap: 'wrap',
-            alignItems: 'center',
-            justifyContent: 'flex-end',
-            columnGap: spacing.lg,
-            rowGap: spacing.xs,
+            gap: spacing.xs,
           }}
         >
-          <Button
-            title="Publicar"
-            variant="blue"
-            onPress={send}
-            disabled={!canSend}
-            loading={sending}
-            style={{
-              minHeight: MIN_TOUCH,
-              borderRadius: radius.pill,
-              paddingVertical: spacing.sm,
-              paddingHorizontal: spacing.xl,
-            }}
-            testID="publish-send"
-          />
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-end', rowGap: spacing.xs }}>
+            <Button
+              title="Publicar"
+              variant="blue"
+              onPress={send}
+              disabled={!canSend}
+              loading={sending || aceite.busy}
+              style={{
+                minHeight: MIN_TOUCH,
+                borderRadius: radius.pill,
+                paddingVertical: spacing.sm,
+                paddingHorizontal: spacing.xl,
+              }}
+              testID="publish-send"
+            />
+          </View>
+          <AceiteLine onOpenRules={() => router.push({ pathname: ROUTES.regras, params: { ler: '1' } })} />
         </View>
       </KeyboardAvoidingView>
 

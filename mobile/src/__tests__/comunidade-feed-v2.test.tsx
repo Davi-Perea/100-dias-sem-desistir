@@ -11,7 +11,7 @@ import { AccessibilityInfo } from 'react-native';
 import ActivityRoute from '@/app/comunidade/atividade';
 import type { CommunityApi } from '@/community/api';
 import type { CommunityStatus, FeedPage, FeedPost, PostComment } from '@/community/types';
-import { AFTER_CONSENT_COMMENT } from '@/ui/comunidade/feed/comentarios';
+import { ACEITE_LINE_SPOKEN, PENDING_NOTICE } from '@/ui/comunidade/publicar/textos';
 import { FeedScreen } from '@/ui/comunidade/feed/FeedScreen';
 import { activityLine, amenSpoken, feedExtras, type ActivityItem, type FeedPostExtras } from '@/ui/comunidade/feed/v2';
 
@@ -164,6 +164,9 @@ function fakeApi({
     setAmen: jest.fn(async (_id: string, amen: boolean) => amen),
     postComments: jest.fn(async () => comments),
     createComment: jest.fn(async () => ({ id: COMMENT(99), status: 'published' as const })),
+    // O aceite no toque (2026-09-22) passa por estas duas; nenhuma tela o faz.
+    updateProfile: jest.fn(async () => {}),
+    acceptTerms: jest.fn(async () => {}),
     signPhotoUrls: jest.fn(async (paths: (string | null)[]) => {
       const urls = new Map<string, string>();
       paths.forEach((p) => p && urls.set(p, `https://assinada/${p}`));
@@ -406,24 +409,37 @@ describe('F4: comentários em folha', () => {
     expect(screen.queryByTestId('comments-sheet')).toBeNull();
   });
 
-  test('antes do primeiro comentário: a folha fecha, vai ao consentimento, e ao reabrir o rascunho volta com o aviso', async () => {
-    const { api, box } = fakeApi({ current: status({ needsPublishConsent: true }) });
+  /**
+   * O ACEITE SAIU DA TELA (decisão do fundador, 2026-09-22). Na folha, a linha
+   * "Ao publicar…" fica à vista embaixo do campo enquanto o aceite falta, e o
+   * próprio toque em Enviar registraria — aqui, com o texto da igreja ainda em
+   * rascunho (Launch Gate), ele diz isso em vez de aceitar. A folha não fecha,
+   * ninguém é mandado para tela nenhuma e o que foi escrito continua lá.
+   */
+  test('antes do primeiro comentário: nenhuma tela de aceite, a linha à vista e o texto intacto', async () => {
+    const { api } = fakeApi({ current: status({ needsPublishConsent: true }) });
     await renderFeed();
     await fireEvent.press(screen.getByTestId(`post-comment-${POST(0)}`));
     await waitFor(() => expect(screen.getByTestId('comment-input')).toBeTruthy());
+
+    // A linha está à vista ANTES do toque: ninguém aceita sem ler.
+    expect(screen.getByTestId('comment-aceite-line').props.accessibilityLabel).toBe(ACEITE_LINE_SPOKEN);
+
     await fireEvent.changeText(screen.getByTestId('comment-input'), 'Que palavra');
     await fireEvent.press(screen.getByTestId('comment-send'));
-    expect(api.createComment).not.toHaveBeenCalled();
-    expect(screen.queryByTestId('comments-sheet')).toBeNull();
-    expect(mockRouter.push).toHaveBeenCalledWith('/comunidade/consentimento');
 
-    box.status = status();
-    await refocus();
-    await waitFor(() => expect(api.getStatus).toHaveBeenCalledTimes(2));
-    await fireEvent.press(screen.getByTestId(`post-comment-${POST(0)}`));
-    await waitFor(() => expect(screen.getByTestId('comment-input').props.value).toBe('Que palavra'));
-    expect(screen.getByText(AFTER_CONSENT_COMMENT)).toBeTruthy();
+    // O texto do aceite ainda não foi liberado pela igreja: nada é aceito nem enviado.
+    await waitFor(() => expect(screen.getByTestId('comment-notice').props.children).toBe(PENDING_NOTICE));
     expect(api.createComment).not.toHaveBeenCalled();
+    expect(api.acceptTerms).not.toHaveBeenCalled();
+    expect(screen.getByTestId('comments-sheet')).toBeTruthy();
+    expect(mockRouter.push).not.toHaveBeenCalled();
+    expect(screen.getByTestId('comment-input').props.value).toBe('Que palavra');
+
+    // Voltar à tela não envia nada sozinho, e o que foi escrito continua lá.
+    await refocus();
+    expect(api.createComment).not.toHaveBeenCalled();
+    expect(screen.getByTestId('comment-input').props.value).toBe('Que palavra');
   });
 });
 

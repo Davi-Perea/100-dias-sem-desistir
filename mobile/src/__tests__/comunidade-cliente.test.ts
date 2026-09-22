@@ -7,6 +7,7 @@
  * testes pgTAP em supabase/tests/07–10 (NÃO EXECUTADOS, sem banco nesta máquina).
  */
 import {
+  buildInlineAccept,
   createCommunityApi,
   getCommunityApi,
   requestServerAccountDeletion,
@@ -16,6 +17,7 @@ import {
   type CommunityClient,
 } from '@/community/api';
 import { CommunityError } from '@/community/errors';
+import type { CommunityStatus } from '@/community/types';
 import { normalizeNewPost } from '@/community/validation';
 import { COMMUNITY_ENABLED } from '@/config/features';
 
@@ -164,6 +166,7 @@ describe('publicar e comentar', () => {
       post_verse_start: null,
       post_verse_end: null,
       post_audience: 'igreja',
+      accept_terms: null,
     });
   });
 
@@ -184,7 +187,11 @@ describe('publicar e comentar', () => {
   test('comentário ("chegar na pessoa") vai pelo id do post', async () => {
     const { community, rpc } = api({ create_community_comment: { data: [{ comment_id: COMMENT, status: 'in_review' }] } });
     await expect(community.createComment(POST, ' Orando por você ')).resolves.toEqual({ id: COMMENT, status: 'in_review' });
-    expect(rpc).toHaveBeenCalledWith('create_community_comment', { target_post: POST, comment_body: 'Orando por você' });
+    expect(rpc).toHaveBeenCalledWith('create_community_comment', {
+      target_post: POST,
+      comment_body: 'Orando por você',
+      accept_terms: null,
+    });
   });
 
   test('id que não é uuid (deep link adulterado) não vai para a rede', async () => {
@@ -199,7 +206,152 @@ describe('Amém (desde 2026-09-22 o número e os rostinhos vêm no feed; set_ame
   test('liga e desliga só o MEU Amém; a resposta é o meu estado', async () => {
     const { community, rpc } = api({ set_amen: { data: true } });
     await expect(community.setAmen(POST, true)).resolves.toBe(true);
-    expect(rpc).toHaveBeenCalledWith('set_amen', { target_post: POST, amen: true });
+    expect(rpc).toHaveBeenCalledWith('set_amen', { target_post: POST, amen: true, accept_terms: null });
+  });
+});
+
+/**
+ * Aceite NO ATO (decisão do fundador de 2026-09-22): a tela de aceite SAI. A
+ * linha embaixo do botão ("Ao publicar, você confirma que tem 16 anos ou mais e
+ * aceita as regras do Juntos.") é registrada no MESMO toque que publica.
+ */
+describe('aceite junto com a ação (sem tela no meio)', () => {
+  const SHA_REGRAS = 'ab'.repeat(32);
+  const SHA_CONSENT = 'cd'.repeat(32);
+  const aceite = {
+    confirms16: true as const,
+    name: '  Ana  ',
+    rules: { version: 'regras-1', sha256: SHA_REGRAS.toUpperCase() },
+    consent: { version: 'consent-1', sha256: SHA_CONSENT },
+    appVersion: '1.0.0 (7)',
+  };
+
+  const statusBase: CommunityStatus = {
+    isMember: true,
+    memberStatus: 'active',
+    displayName: null,
+    profile: {
+      displayName: null,
+      ministry: null,
+      ministryAnswered: false,
+      bio: null,
+      avatarPath: null,
+      avatarStatus: 'none',
+      ageConfirmed: false,
+      contactEmail: null,
+      newsOptIn: false,
+    },
+    profileComplete: false,
+    canPublish: false,
+    needsPublishConsent: true,
+    needsRules: true,
+    publishConsentVersion: 'consent-1',
+    rulesVersion: 'regras-1',
+    isModerator: false,
+  };
+
+  test('publicar leva o aceite na MESMA chamada: nome aparado, hash em minúsculas, 16+ marcado', async () => {
+    const { community, rpc } = api({ create_community_post: { data: [{ post_id: POST, status: 'published' }] } });
+    await community.createPost({ body: 'Primeiro dia' }, aceite);
+    expect(rpc).toHaveBeenCalledTimes(1);
+    expect(rpc).toHaveBeenCalledWith(
+      'create_community_post',
+      expect.objectContaining({
+        post_body: 'Primeiro dia',
+        accept_terms: {
+          confirms_16: true,
+          name: 'Ana',
+          rules_version: 'regras-1',
+          rules_sha256: SHA_REGRAS,
+          consent_version: 'consent-1',
+          consent_sha256: SHA_CONSENT,
+          app_version: '1.0.0 (7)',
+        },
+      }),
+    );
+  });
+
+  test('comentar e o primeiro Amém também levam o aceite; DESMARCAR nunca leva', async () => {
+    const comentar = api({ create_community_comment: { data: [{ comment_id: COMMENT, status: 'published' }] } });
+    await comentar.community.createComment(POST, 'Amém!', aceite);
+    expect(comentar.rpc).toHaveBeenCalledWith(
+      'create_community_comment',
+      expect.objectContaining({ accept_terms: expect.objectContaining({ confirms_16: true }) }),
+    );
+
+    const amen = api({ set_amen: { data: true }, set_comment_amen: { data: true } });
+    await amen.community.setAmen(POST, true, aceite);
+    expect(amen.rpc).toHaveBeenCalledWith(
+      'set_amen',
+      expect.objectContaining({ accept_terms: expect.objectContaining({ confirms_16: true }) }),
+    );
+    await amen.community.setCommentAmen(COMMENT, true, aceite);
+    expect(amen.rpc).toHaveBeenCalledWith(
+      'set_comment_amen',
+      expect.objectContaining({ accept_terms: expect.objectContaining({ confirms_16: true }) }),
+    );
+    // Retirar o Amém é sempre livre: mandar aceite aí não faria sentido.
+    await amen.community.setAmen(POST, false, aceite);
+    expect(amen.rpc).toHaveBeenLastCalledWith('set_amen', { target_post: POST, amen: false, accept_terms: null });
+  });
+
+  test('aceite quebrado não gasta rede: hash estranho, versão vazia, nome longo ou confirms16 fora', async () => {
+    const { community, rpc } = api();
+    const quebrados = [
+      { ...aceite, rules: { version: 'regras-1', sha256: 'não é hash' } },
+      { ...aceite, consent: { version: '   ', sha256: SHA_CONSENT } },
+      { ...aceite, name: 'a'.repeat(41) },
+      { ...aceite, confirms16: false as unknown as true },
+    ];
+    for (const ruim of quebrados) {
+      await expectCode(community.createPost({ body: 'oi' }, ruim), 'invalid_input');
+    }
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  test('quem já aceitou publica sem aceite nenhum (accept_terms null)', async () => {
+    const { community, rpc } = api({ create_community_post: { data: [{ post_id: POST, status: 'published' }] } });
+    await community.createPost({ body: 'oi' });
+    expect(rpc).toHaveBeenCalledWith('create_community_post', expect.objectContaining({ accept_terms: null }));
+  });
+
+  test('buildInlineAccept manda só o que falta, e null quando não falta nada', () => {
+    const textos = { rulesSha256: SHA_REGRAS, consentSha256: SHA_CONSENT, appVersion: '1.0.0 (7)', name: 'Ana' };
+    // Pessoa nova: falta tudo.
+    expect(buildInlineAccept(statusBase, textos)).toEqual({
+      confirms16: true,
+      name: 'Ana',
+      rules: { version: 'regras-1', sha256: SHA_REGRAS },
+      consent: { version: 'consent-1', sha256: SHA_CONSENT },
+      appVersion: '1.0.0 (7)',
+    });
+    // Já tem nome e já aceitou as regras: só falta o consentimento.
+    const parcial = buildInlineAccept(
+      {
+        ...statusBase,
+        displayName: 'Ana',
+        profile: { ...statusBase.profile, displayName: 'Ana', ageConfirmed: true },
+        needsRules: false,
+      },
+      textos,
+    );
+    expect(parcial).toMatchObject({ confirms16: true, name: null, rules: null });
+    expect(parcial?.consent).toEqual({ version: 'consent-1', sha256: SHA_CONSENT });
+    // Nada falta: a chamada vai sem aceite.
+    expect(
+      buildInlineAccept(
+        {
+          ...statusBase,
+          displayName: 'Ana',
+          profile: { ...statusBase.profile, displayName: 'Ana', ageConfirmed: true },
+          needsRules: false,
+          needsPublishConsent: false,
+          canPublish: true,
+          profileComplete: true,
+        },
+        textos,
+      ),
+    ).toBeNull();
   });
 });
 
@@ -513,6 +665,7 @@ describe('diário compartilhado (F1, F3, F5, F6, F8 — 2026-09-22)', () => {
       post_verse_start: 16,
       post_verse_end: 17,
       post_audience: 'igreja',
+      accept_terms: null,
     });
   });
 

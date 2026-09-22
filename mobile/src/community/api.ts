@@ -20,6 +20,7 @@ import type {
   FeedPost,
   FeedScope,
   HoldReason,
+  InlineAccept,
   MemberStatus,
   MyBlock,
   MyPost,
@@ -40,6 +41,7 @@ import {
   isValidDisplayName,
   LIMITS,
   charLength,
+  normalizeInlineAccept,
   normalizeNewPost,
 } from './validation';
 
@@ -297,6 +299,44 @@ export function postArgs(input: NewPost): Record<string, unknown> {
   };
 }
 
+/**
+ * O corpo `accept_terms` das RPCs que criam conteúdo. null = nada a registrar
+ * (quem já aceitou). Aceite malformado nunca chega ao servidor.
+ */
+export function acceptArgs(accept: InlineAccept | null | undefined): Record<string, unknown> | null {
+  if (!accept) return null;
+  const args = normalizeInlineAccept(accept);
+  if (!args) throw communityError('invalid_input');
+  return args;
+}
+
+/**
+ * Monta o aceite a mandar junto com a ação, a partir do que o servidor disse que
+ * falta (`status`) e dos hashes dos textos que a TELA mostrou (`termsSha256`).
+ * Devolve null quando não falta nada: aí a chamada vai sem `accept_terms`.
+ *
+ * Quem usa: a tela que tem a linha "Ao publicar, você confirma que tem 16 anos
+ * ou mais e aceita as regras do Juntos." embaixo do botão. `name` só é lido
+ * quando a pessoa ainda não escolheu um.
+ */
+export function buildInlineAccept(
+  status: CommunityStatus,
+  texts: { rulesSha256: string; consentSha256: string; appVersion: string; name?: string | null },
+): InlineAccept | null {
+  const needsName = !cleanText(status.displayName ?? status.profile.displayName);
+  const needsAge = !status.profile.ageConfirmed;
+  if (!status.needsRules && !status.needsPublishConsent && !needsName && !needsAge) return null;
+  return {
+    confirms16: true,
+    name: needsName ? cleanText(texts.name) : null,
+    rules: status.needsRules ? { version: status.rulesVersion, sha256: texts.rulesSha256 } : null,
+    consent: status.needsPublishConsent
+      ? { version: status.publishConsentVersion, sha256: texts.consentSha256 }
+      : null,
+    appVersion: texts.appVersion,
+  };
+}
+
 /** Códigos do banco que submit-post devolve em `code` (o resto vira erro genérico). */
 const PASSTHROUGH_CODES = new Set(['CM001', 'CM002', 'CM003', 'CM004', 'CM005', 'CM006', 'CM007', '22023', 'P0002', '42501']);
 
@@ -460,9 +500,13 @@ export function createCommunityApi(client: CommunityClient, deps: { randomUUID: 
       });
     },
 
-    /** Liga/desliga o MEU Amém num comentário. Devolve só o meu novo estado. */
-    async setCommentAmen(commentId: string, amen: boolean): Promise<boolean> {
-      const data = await call('set_comment_amen', { target_comment: requireUuid(commentId), amen });
+    /** Liga/desliga o MEU Amém num comentário. Mesmas regras (e mesmo `accept`) do Amém do post. */
+    async setCommentAmen(commentId: string, amen: boolean, accept?: InlineAccept | null): Promise<boolean> {
+      const data = await call('set_comment_amen', {
+        target_comment: requireUuid(commentId),
+        amen,
+        accept_terms: amen ? acceptArgs(accept) : null,
+      });
       return data === true;
     },
 
@@ -479,9 +523,13 @@ export function createCommunityApi(client: CommunityClient, deps: { randomUUID: 
      * que passa as fotos pelo filtro automático (F5) e devolve 'published' se tudo
      * estiver limpo, ou 'in_review' (suspeita, filtro não configurado, fora do ar).
      * Texto segurado pelo filtro de texto volta sempre 'in_review'.
+     *
+     * `accept` (2026-09-22) é o aceite da linha embaixo do botão, registrado na
+     * MESMA chamada: não há tela de aceite no meio. Se o post for recusado, o
+     * aceite rola junto (uma transação só no servidor).
      */
-    async createPost(input: NewPost): Promise<PublishResult> {
-      const args = postArgs(input);
+    async createPost(input: NewPost, accept?: InlineAccept | null): Promise<PublishResult> {
+      const args: Record<string, unknown> = { ...postArgs(input), accept_terms: acceptArgs(accept) };
       if (args.post_photo_paths && client.functions) {
         const viaFunction = await submitPost(client.functions, args);
         if (viaFunction) return viaFunction;
@@ -493,13 +541,17 @@ export function createCommunityApi(client: CommunityClient, deps: { randomUUID: 
       await call('delete_my_community_post', { target_post: requireUuid(postId) });
     },
 
-    /** "Chegar na pessoa": comentar no post dela. Não existe mensagem privada. */
-    async createComment(postId: string, body: string): Promise<PublishResult> {
+    /**
+     * "Chegar na pessoa": comentar no post dela. Não existe mensagem privada.
+     * `accept`: o aceite da linha embaixo do botão, na mesma chamada.
+     */
+    async createComment(postId: string, body: string, accept?: InlineAccept | null): Promise<PublishResult> {
       const cleaned = cleanText(body);
       if (!isValidCommentBody(cleaned)) throw communityError('invalid_input');
       const data = await call('create_community_comment', {
         target_post: requireUuid(postId),
         comment_body: cleaned,
+        accept_terms: acceptArgs(accept),
       });
       return toPublishResult(data, 'comment_id');
     },
@@ -508,9 +560,19 @@ export function createCommunityApi(client: CommunityClient, deps: { randomUUID: 
       await call('delete_my_community_comment', { target_comment: requireUuid(commentId) });
     },
 
-    /** Liga/desliga o MEU Amém. Devolve só o meu novo estado; o número e os rostinhos (F3) vêm no feed. */
-    async setAmen(postId: string, amen: boolean): Promise<boolean> {
-      const data = await call('set_amen', { target_post: requireUuid(postId), amen });
+    /**
+     * Liga/desliga o MEU Amém. Devolve só o meu novo estado; o número e os
+     * rostinhos (F3) vêm no feed. O rostinho mostra o nome, então MARCAR exige o
+     * mesmo que publicar — e por isso `accept` também vale aqui, no primeiro
+     * Amém de quem nunca participou. DESMARCAR é sempre livre: mandar aceite ao
+     * retirar não faria sentido, e o servidor o ignora nesse caminho.
+     */
+    async setAmen(postId: string, amen: boolean, accept?: InlineAccept | null): Promise<boolean> {
+      const data = await call('set_amen', {
+        target_post: requireUuid(postId),
+        amen,
+        accept_terms: amen ? acceptArgs(accept) : null,
+      });
       return data === true;
     },
 

@@ -12,10 +12,8 @@ import { MAX_CONTENT_WIDTH, spacing } from '@/ui/theme';
 import { ReportSheet, type SheetTarget } from '../sheets/ReportSheet';
 import { CommentRow, CommentsEmpty, COMMENTS_GUTTER as GUTTER, Composer, useComments } from './comentarios';
 import { FeedError, FeedSkeleton, GateView } from './FeedStates';
-import { consentHref } from './rotas';
-import { useCommunity } from './useCommunity';
-
-export { AFTER_CONSENT_COMMENT } from './comentarios';
+import { COMMUNITY_ROUTES } from './rotas';
+import { needsConsent, useCommunity } from './useCommunity';
 
 /**
  * C6 · Comentários de uma publicação em tela cheia (`/comunidade/post/<id>`),
@@ -28,7 +26,7 @@ export function CommentsScreen({ postId }: { postId: string }) {
 
   let content: ReactNode;
   if (gate.kind === 'ready') {
-    return <ReadyComments postId={postId} api={gate.api} status={gate.status} />;
+    return <ReadyComments postId={postId} api={gate.api} status={gate.status} reload={reload} />;
   } else if (gate.kind === 'loading') {
     content = <FeedSkeleton gutter={GUTTER} />;
   } else {
@@ -61,10 +59,23 @@ function CommentsHeader() {
   );
 }
 
-function ReadyComments({ postId, api, status }: { postId: string; api: CommunityApi; status: CommunityStatus }) {
+function ReadyComments({
+  postId,
+  api,
+  status,
+  reload,
+}: {
+  postId: string;
+  api: CommunityApi;
+  status: CommunityStatus;
+  reload: () => void;
+}) {
   const insets = useSafeAreaInsets();
   const [sheet, setSheet] = useState<SheetTarget | null>(null);
-  const talk = useComments({ api, postId, status, openConsent: () => router.push(consentHref(status)) });
+  // Sem tela de aceite (2026-09-22): a linha fica embaixo do campo e o toque em
+  // Enviar registra. Depois de registrado, o estado da comunidade é perguntado de novo.
+  const needsAceite = needsConsent(status);
+  const talk = useComments({ api, postId, status, showsAceiteLine: needsAceite, onAccepted: reload });
   const { load } = talk;
 
   // Ao abrir e a cada volta (do consentimento, por exemplo): a lista fica em dia.
@@ -124,6 +135,8 @@ function ReadyComments({ postId, api, status }: { postId: string; api: Community
               error={talk.error}
               notice={talk.notice}
               bottomInset={insets.bottom}
+              needsAceite={needsAceite}
+              onOpenRules={() => router.push(COMMUNITY_ROUTES.regras)}
             />
           ) : null}
         </View>

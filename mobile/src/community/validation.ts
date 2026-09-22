@@ -1,6 +1,6 @@
 import { getBook } from '@/bible/books';
 
-import type { FeedScope, NewPost, PostKind, VerseAttachment } from './types';
+import type { FeedScope, InlineAccept, NewPost, PostKind, VerseAttachment } from './types';
 import { POST_KINDS } from './types';
 
 /**
@@ -115,4 +115,44 @@ export function normalizeNewPost(input: NewPost, isPhoto: (path: string) => bool
   if (kind === 'versiculo' && !verse) return null;
   if (!body && photoPaths.length === 0 && day === null && !verse && kind === null) return null;
   return { body, photoPaths, day, kind, verse, audience: 'igreja' };
+}
+
+/* -------------------------------------------- o aceite que vai junto com a ação */
+
+const SHA256 = /^[0-9a-f]{64}$/i;
+
+/**
+ * O corpo `accept_terms` de create_community_post / create_community_comment /
+ * set_amen / set_comment_amen (migration 20260923070000_comunidade_aceite_no_ato).
+ * Espelha private.apply_inline_accept:
+ *   - `confirms_16` é OBRIGATÓRIO (é o que a linha embaixo do botão diz);
+ *   - cada finalidade vai como par versão + sha256 do texto EXATO mostrado;
+ *   - `name` só viaja quando a pessoa ainda não tem nome (o servidor não troca
+ *     nome já escolhido).
+ * Devolve null SÓ quando o aceite não pode sair do aparelho (hash malformado,
+ * versão vazia, confirms16 diferente de true): aí quem chama levanta
+ * 'invalid_input' em vez de mandar prova quebrada ao servidor. Quem já aceitou
+ * não passa por aqui — manda `accept_terms: null`.
+ */
+export function normalizeInlineAccept(accept: InlineAccept): Record<string, unknown> | null {
+  if (accept.confirms16 !== true) return null;
+  const args: Record<string, unknown> = { confirms_16: true, app_version: accept.appVersion };
+  const name = cleanText(accept.name);
+  if (name !== null) {
+    if (!isValidDisplayName(name)) return null;
+    args.name = name;
+  }
+  for (const [key, doc] of [
+    ['rules', accept.rules],
+    ['consent', accept.consent],
+  ] as const) {
+    if (!doc) continue;
+    const version = cleanText(doc.version);
+    if (version === null || !SHA256.test(doc.sha256)) return null;
+    args[`${key}_version`] = version;
+    args[`${key}_sha256`] = doc.sha256.toLowerCase();
+  }
+  // Sem nenhuma finalidade, o corpo só confirmaria 16+ — o que é um aceite legítimo
+  // para quem já aceitou os textos e ainda não declarou a idade.
+  return args;
 }

@@ -47,7 +47,7 @@ function fn(name: string): FnDef {
 const policies = [...sql.matchAll(/create policy[\s\S]*?;/g)].map((m) => m[0]);
 
 describe('arquivos', () => {
-  test('migrations da comunidade depois da fundação (5ª perfil v2, 6ª diário compartilhado, 7ª Amém em comentário, 8ª perfil leve do Juntos, 9ª igreja inteira) e os pgTAP', () => {
+  test('migrations da comunidade depois da fundação (5ª perfil v2, 6ª diário compartilhado, 7ª Amém em comentário, 8ª perfil leve do Juntos, 9ª igreja inteira, 10ª aceite no ato) e os pgTAP', () => {
     expect(communityFiles).toEqual([
       '20260921130000_comunidade_tabelas.sql',
       '20260921130100_comunidade_funcoes.sql',
@@ -58,6 +58,7 @@ describe('arquivos', () => {
       '20260923040000_comunidade_amem_comentario.sql',
       '20260923050000_comunidade_juntos_perfil_leve.sql',
       '20260923060000_comunidade_igreja_inteira.sql',
+      '20260923070000_comunidade_aceite_no_ato.sql',
     ]);
     const foundation = allFiles.filter((f) => !f.includes('comunidade'));
     expect(foundation.every((f) => f < communityFiles[0])).toBe(true);
@@ -225,11 +226,15 @@ describe('regras de conteúdo', () => {
     const body = fn('private.set_amen').body;
     const [unmark, mark] = body.split(/return false;\s*end if;/);
     expect(unmark).toMatch(/private\.assert_member\(\)/);
-    expect(unmark).not.toMatch(/perform private\.assert_(can_publish|consents)/);
+    expect(unmark).not.toMatch(/private\.assert_(can_publish|consents)/);
+    // Desmarcar NUNCA registra aceite: o aceite embutido só existe no caminho de marcar.
+    expect(unmark).not.toMatch(/apply_inline_accept/);
     // O rostinho do Amém mostra o NOME de quem deu (private.amen_faces_for): marcar exige
-    // o mesmo que publicar (consentimento + regras + nome + 16+), como a tela única pede.
-    expect(mark).toMatch(/perform private\.assert_can_publish\(\);/);
-    expect(mark.indexOf('perform private.assert_can_publish')).toBeLessThan(mark.indexOf('insert into public.community_amens'));
+    // o mesmo que publicar (consentimento + regras + nome + 16+), que a linha embaixo do
+    // botão registra no mesmo toque (apply_inline_accept, antes da barreira).
+    expect(mark).toMatch(/private\.assert_can_publish\(\);/);
+    expect(mark.indexOf('private.apply_inline_accept')).toBeLessThan(mark.indexOf('private.assert_can_publish'));
+    expect(mark.indexOf('private.assert_can_publish')).toBeLessThan(mark.indexOf('insert into public.community_amens'));
     expect(fn('private.assert_consents').body).toMatch(/private\.has_current_consents\(v_uid\)/);
     // Publicar = consentimentos + perfil completo (C4).
     expect(fn('private.assert_can_publish').body).toMatch(/private\.assert_consents\(\)/);
@@ -298,9 +303,10 @@ describe('Amém em comentário (2026-09-23)', () => {
     const body = fn('private.set_comment_amen').body;
     const [unmark, mark] = body.split(/return false;\s*end if;/);
     expect(unmark).toMatch(/private\.assert_member\(\)/);
-    expect(unmark).not.toMatch(/perform private\.assert_(can_publish|consents)/);
-    expect(mark.indexOf('perform private.assert_can_publish')).toBeGreaterThanOrEqual(0);
-    expect(mark.indexOf('perform private.assert_can_publish')).toBeLessThan(mark.indexOf('insert into public.community_comment_amens'));
+    expect(unmark).not.toMatch(/private\.assert_(can_publish|consents)/);
+    expect(unmark).not.toMatch(/apply_inline_accept/);
+    expect(mark.indexOf('private.assert_can_publish')).toBeGreaterThanOrEqual(0);
+    expect(mark.indexOf('private.assert_can_publish')).toBeLessThan(mark.indexOf('insert into public.community_comment_amens'));
     expect(mark).toContain('private.can_amen_comment(target_comment, v_uid)');
     const can = fn('private.can_amen_comment').body;
     expect(can).toContain("c.status = 'published'");
@@ -316,6 +322,69 @@ describe('Amém em comentário (2026-09-23)', () => {
   test('sair, revogar e apagar a conta levam os Amém em comentário', () => {
     const [beforeDrop] = fn('private.purge_community_member').body.split(/if drop_profile then/);
     expect(beforeDrop).toContain('delete from public.community_comment_amens ca where ca.user_id = target');
+  });
+});
+
+/**
+ * Aceite NO ATO (decisão do fundador de 2026-09-22): a tela de aceite antes de
+ * participar SAI; a linha embaixo do botão registra o aceite no mesmo toque.
+ * O que não pode se perder nessa mudança é a PROVA (LGPD art. 8º, §6º) e a ordem
+ * "aceite antes de existir conteúdo" (Google Play UGC, Apple 1.2).
+ */
+describe('aceite no ato de publicar (2026-09-22)', () => {
+  const CRIAM_CONTEUDO = [
+    'private.create_community_post',
+    'private.create_community_comment',
+    'private.set_amen',
+    'private.set_comment_amen',
+  ];
+
+  test('as quatro funções que criam conteúdo aceitam o corpo do aceite e o aplicam ANTES da barreira', () => {
+    for (const name of CRIAM_CONTEUDO) {
+      const f = fn(name);
+      expect(f.header).toMatch(/accept_terms jsonb/);
+      expect(f.body).toMatch(/private\.apply_inline_accept\(accept_terms\)/);
+      expect(f.body.indexOf('private.apply_inline_accept')).toBeLessThan(f.body.indexOf('private.assert_can_publish'));
+    }
+    // O invólucro público tem default null: quem já aceitou não manda nada.
+    for (const name of CRIAM_CONTEUDO.map((n) => n.replace('private.', 'public.'))) {
+      expect(fn(name).header).toMatch(/accept_terms jsonb default null/);
+      expect(fn(name).body).toMatch(/accept_terms/);
+    }
+  });
+
+  test('nada de aceite implícito: sem confirms_16 no corpo, o toque não vale', () => {
+    const body = fn('private.apply_inline_accept').body;
+    expect(body).toMatch(/accept_terms -> 'confirms_16' is distinct from 'true'::jsonb/);
+    expect(body).toMatch(/errcode = '22023'/);
+    // Corpo ausente = nada a registrar (quem já aceitou), não um aceite vazio.
+    expect(body).toMatch(/jsonb_typeof\(accept_terms\) = 'null'[\s\S]*?return;/);
+    expect(body).toMatch(/jsonb_typeof\(accept_terms\) <> 'object'/);
+  });
+
+  test('a prova continua a mesma: cada finalidade passa por accept_community_terms (versão + hash + data)', () => {
+    const body = fn('private.apply_inline_accept').body;
+    expect(body).toMatch(/private\.accept_community_terms\(\s*'community_rules'/);
+    expect(body).toMatch(/private\.accept_community_terms\(\s*'community_publish'/);
+    // E accept_community_terms continua conferindo versão e hash do texto vigente.
+    const terms = fn('private.accept_community_terms').body;
+    expect(terms).toMatch(/v_version = 'PENDENTE' or v_sha = 'PENDENTE'/);
+    expect(terms).toMatch(/terms_version is distinct from v_version or lower\(terms_sha256\) is distinct from v_sha/);
+    expect(terms).toMatch(/insert into public\.consent_records/);
+  });
+
+  test('o toque de publicar entra na comunidade, guarda 16+, mas NUNCA troca nome já escolhido', () => {
+    const body = fn('private.apply_inline_accept').body;
+    expect(body).toMatch(/perform private\.join_community\(v_name\)/);
+    expect(body).toMatch(/perform private\.assert_member\(\)/);
+    expect(body).toMatch(/display_name\s*=\s*coalesce\(cp\.display_name, v_name\)/);
+    expect(body).toMatch(/adult_attested_at\s*=\s*coalesce\(cp\.adult_attested_at, now\(\)\)/);
+  });
+
+  test('a função do aceite não é alcançável pelo app: só as RPCs a chamam', () => {
+    expect(sql).toMatch(/revoke all on function private\.apply_inline_accept\(jsonb\) from public, anon, authenticated;/);
+    expect(sql).not.toMatch(/grant execute on function private\.apply_inline_accept/);
+    expect(functions.some((f) => f.name === 'public.apply_inline_accept')).toBe(false);
   });
 });
 

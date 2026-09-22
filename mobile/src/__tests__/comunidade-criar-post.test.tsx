@@ -1,9 +1,12 @@
 /**
  * F2 · "Criar post" no formato de diário compartilhado (feedback do fundador de
  * 2026-09-22), com o cliente da Comunidade SIMULADO. Prova o comportamento da
- * TELA e do rascunho: anexos (leitura do dia, versículo marcado, oração, jejum,
- * galeria até 4, câmera), chips removíveis, público, o que vai (e o que NUNCA
- * vai) para a rede, e o "Publicado" / "Em análise" do F5. Não prova o servidor.
+ * TELA e do rascunho: anexos (leitura do dia, versículo, oração, jejum, galeria
+ * até 4, câmera), chips removíveis, público, o que vai (e o que NUNCA vai) para a
+ * rede, e o "Publicado" / "Em análise" do F5. Não prova o servidor.
+ *
+ * O caminho novo do versículo (a Bíblia inteira: livro → capítulo → versículo) e a
+ * linha do aceite embaixo do botão estão em publicar-review.test.tsx.
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
@@ -348,7 +351,7 @@ describe('F2 · Criar post', () => {
     await screen.findByTestId('attach-bar');
     const expected: Record<string, string> = {
       leitura: 'Leitura do dia 5',
-      versiculo: 'Versículo que você marcou',
+      versiculo: 'Versículo da Bíblia',
       oracao: 'Oração',
       jejum: 'Jejum',
       galeria: 'Galeria, até 4 fotos',
@@ -418,7 +421,7 @@ describe('F2 · Criar post', () => {
     });
   });
 
-  test('Versículo: escolhe entre os MARCADOS; vai só a referência; a anotação nunca sai do aparelho', async () => {
+  test('Versículo: o atalho dos MARCADOS; vai só a referência; a anotação nunca sai do aparelho', async () => {
     await seedMarks();
     const { createPost } = useFakeApi();
     await render(<PublishScreen />);
@@ -461,28 +464,27 @@ describe('F2 · Criar post', () => {
     expect(JSON.stringify(sentInput)).not.toMatch(/Texto do versículo|Bíblia Livre/);
   });
 
-  test('Versículo sem nenhuma marca: diz como marcar, sem lista', async () => {
+  test('Versículo sem nenhuma marca: a folha abre direto na Bíblia (sem beco sem saída)', async () => {
     useFakeApi();
     await render(<PublishScreen />);
     await fireEvent.press(await screen.findByTestId('attach-versiculo'));
-    expect(await screen.findByTestId('verse-empty')).toBeTruthy();
-    expect(screen.queryByTestId('verse-attach')).toBeNull();
+    expect(await screen.findByTestId('verse-books')).toBeTruthy();
+    expect(screen.queryByTestId('verse-marked')).toBeNull();
+    expect(screen.getByText('Antigo Testamento')).toBeTruthy();
+    expect(screen.getByText('Novo Testamento')).toBeTruthy();
+    expect(screen.getByTestId('verse-book-GEN')).toBeTruthy();
+    expect(screen.getByTestId('verse-book-REV')).toBeTruthy();
   });
 
-  test('Galeria: aviso de rosto e criança ANTES; até 4 fotos; sobem só ao publicar; F5 "Em análise"', async () => {
+  test('Galeria: abre DIRETO (sem aviso); até 4 fotos; sobem só ao publicar; F5 "Em análise"', async () => {
     const { createPost, upload } = useFakeApi({ result: 'in_review' });
     mockLaunch.mockResolvedValue(picked(5));
     await render(<PublishScreen />);
     await fireEvent.press(await screen.findByTestId('attach-galeria'));
-    expect(screen.getByTestId('photo-warning')).toBeTruthy();
-    expect(screen.getByText(/Não exponha outra pessoa/)).toBeTruthy();
-    // REVISÃO FINAL 2026-09-22: o aviso diz a verdade nos dois casos — com filtro
-    // automático ligado a foto limpa passa em segundos; sem ele, ela fica "em
-    // análise" até uma pessoa olhar (F5, caminho seguro, que é o do servidor hoje).
-    expect(screen.getByText(/passa por uma conferência antes de aparecer para a igreja/)).toBeTruthy();
-    expect(screen.getByText(/A localização da foto é apagada no seu celular/)).toBeTruthy();
-    expect(mockLaunch).not.toHaveBeenCalled();
-    await fireEvent.press(screen.getByTestId('photo-pick'));
+    // 2026-09-22: nenhum aviso antes da galeria; a única pergunta é a do sistema.
+    expect(screen.queryByTestId('photo-warning')).toBeNull();
+    expect(screen.queryByTestId('photo-pick')).toBeNull();
+    expect(screen.queryByText(/Não exponha outra pessoa/)).toBeNull();
     await screen.findByTestId('photo-thumb-3');
     expect(screen.queryByTestId('photo-thumb-4')).toBeNull();
     expect(mockLaunch).toHaveBeenCalledWith(
@@ -495,11 +497,14 @@ describe('F2 · Criar post', () => {
     expect(screen.getByTestId('photo-error').props.children).toBe(
       'Cabem até 4 fotos por publicação. Tire uma para escolher outra.',
     );
-    expect(screen.queryByTestId('photo-warning')).toBeNull();
+    expect(mockLaunch).toHaveBeenCalledTimes(1);
 
     // Tirar uma.
     await fireEvent.press(screen.getByTestId('photo-remove-0'));
     expect(screen.queryByTestId('photo-thumb-3')).toBeNull();
+
+    // O resumo discreto do que vai junto conta as fotos (item 4 do fundador).
+    expect(screen.getByTestId('attach-summary').props.children).toBe('Vai junto: 3 fotos');
 
     await fireEvent.press(screen.getByTestId('publish-send'));
     expect(await screen.findByText('Em análise')).toBeTruthy();
@@ -517,7 +522,6 @@ describe('F2 · Criar post', () => {
     mockLaunch.mockResolvedValue(picked(2));
     await render(<PublishScreen />);
     await fireEvent.press(await screen.findByTestId('attach-galeria'));
-    await fireEvent.press(screen.getByTestId('photo-pick'));
     await screen.findByTestId('photo-thumb-1');
     await fireEvent.press(screen.getByTestId('publish-send'));
     await screen.findByTestId('publish-error');
@@ -532,22 +536,21 @@ describe('F2 · Criar post', () => {
     expect(mockCameraPermission).not.toHaveBeenCalled();
   });
 
-  test('Câmera: aviso antes; permissão só no toque; recusada diz o caminho; aceita vira foto preparada', async () => {
+  test('Câmera: abre direto, só com a permissão do sistema; recusada diz o caminho; aceita vira foto', async () => {
     mockExpoConfig.plugins = [['expo-image-picker', { cameraPermission: 'Para tirar a foto do post.' }]];
     useFakeApi();
     mockCameraPermission.mockResolvedValueOnce({ granted: false });
     await render(<PublishScreen />);
     await fireEvent.press(await screen.findByTestId('attach-camera'));
-    expect(screen.getByTestId('photo-warning')).toBeTruthy();
-    expect(mockCameraPermission).not.toHaveBeenCalled();
-    await fireEvent.press(screen.getByTestId('photo-pick'));
+    // Sem aviso do app no meio: a permissão do sistema é pedida no próprio toque.
+    expect(screen.queryByTestId('photo-warning')).toBeNull();
     expect(await screen.findByTestId('photo-error')).toBeTruthy();
+    expect(mockCameraPermission).toHaveBeenCalledTimes(1);
     expect(mockCamera).not.toHaveBeenCalled();
 
     mockCameraPermission.mockResolvedValueOnce({ granted: true });
     mockCamera.mockResolvedValueOnce({ canceled: false, assets: [{ uri: 'file:///camera.jpg', width: 3000, height: 4000 }] });
     await fireEvent.press(screen.getByTestId('attach-camera'));
-    await fireEvent.press(screen.getByTestId('photo-pick'));
     expect(await screen.findByTestId('photo-thumb-0')).toBeTruthy();
     expect(mockCamera).toHaveBeenCalledWith(expect.objectContaining({ exif: false }));
   });
@@ -578,16 +581,25 @@ describe('F2 · Criar post', () => {
     expect(screen.queryByTestId('audience-button')).toBeNull();
   });
 
-  test('"Publicado" volta sozinho ao feed; com leitor de tela, espera o toque', async () => {
+  /**
+   * "Ver no feed" CHEGA no feed (2026-09-22): voltar não servia, porque quem
+   * publica depois de concluir o dia veio por `/comunidade/depois/<dia>`, que se
+   * substituiu no caminho — embaixo da tela de publicar está a Jornada, e voltar
+   * levaria para lá com o botão prometendo o feed. A aba Juntos entra no lugar
+   * desta tela.
+   */
+  test('"Publicado" vai sozinho para a aba Juntos; com leitor de tela, espera o toque', async () => {
     useFakeApi();
     let view = await render(<PublishScreen />);
     await fireEvent.changeText(await screen.findByTestId('publish-input'), 'Deus foi fiel.');
     await fireEvent.press(screen.getByTestId('publish-send'));
     await screen.findByText('Publicado');
-    await waitFor(() => expect(mockRouter.back).toHaveBeenCalled(), { timeout: 3000 });
+    await waitFor(() => expect(mockRouter.replace).toHaveBeenCalledWith('/juntos'), { timeout: 3000 });
+    expect(mockRouter.back).not.toHaveBeenCalled();
     await view.unmount();
 
     mockRouter.back.mockClear();
+    mockRouter.replace.mockClear();
     screenReader = true;
     useFakeApi();
     view = await render(<PublishScreen />);
@@ -597,9 +609,9 @@ describe('F2 · Criar post', () => {
     await act(async () => {
       await new Promise((resolve) => setTimeout(resolve, 1800));
     });
-    expect(mockRouter.back).not.toHaveBeenCalled();
+    expect(mockRouter.replace).not.toHaveBeenCalled();
     await fireEvent.press(screen.getByTestId('publish-done'));
-    expect(mockRouter.back).toHaveBeenCalled();
+    expect(mockRouter.replace).toHaveBeenCalledWith('/juntos');
   }, 10000);
 });
 

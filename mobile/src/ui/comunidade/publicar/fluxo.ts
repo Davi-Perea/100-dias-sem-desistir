@@ -2,11 +2,14 @@ import type { CommunityStatus, ContentStatus } from '@/community/types';
 import { cleanText } from '@/community/validation';
 
 /**
- * Antes da primeira publicação, comentário ou Amém (pedido do fundador de
- * 2026-09-22, aba “Juntos”): UMA tela só, com a confirmação de 16+ (ECA
- * Digital), o aceite das regras (Google Play), o consentimento destacado (LGPD
- * art. 11) e o nome, se a pessoa ainda não deu um. Foto de perfil e ministério
- * NÃO são mais exigidos. Ler não passa por aqui.
+ * Falta registrar o aceite (16+ do ECA Digital, regras do Google Play,
+ * consentimento destacado da LGPD art. 11, e o nome, se a pessoa ainda não deu
+ * um)? Ler nunca passa por aqui.
+ *
+ * DECISÃO DO FUNDADOR (2026-09-22): isto NÃO é mais uma tela no meio do caminho.
+ * A linha embaixo do botão diz o que o toque significa, e o toque em Publicar
+ * (ou em Enviar comentário, ou no primeiro Amém) registra o aceite e faz a ação
+ * em seguida. Esta função é só "o aceite já está registrado?".
  */
 export function needsAceite(status: CommunityStatus): boolean {
   return (
@@ -17,25 +20,30 @@ export function needsAceite(status: CommunityStatus): boolean {
   );
 }
 
-/** Onde a tela de publicar está. Puro, para testar sem tela. */
+/**
+ * Onde a tela de publicar está. Puro, para testar sem tela. Não existe mais o
+ * passo 'aceite' (2026-09-22): quem é membro ativo vê o formulário, e o aceite
+ * acontece no toque em Publicar.
+ */
 export type PublishStep =
   /** Ainda não entrou (a entrada é automática; a tela espera). */
   | 'needs_join'
   /** Participação suspensa ou removida. */
   | 'blocked'
-  /** Falta a tela única de aceite (16+, regras, consentimento, nome). */
-  | 'aceite'
   | 'form';
 
 export function publishStep(status: CommunityStatus): PublishStep {
   if (!status.isMember) return status.memberStatus ? 'blocked' : 'needs_join';
   if (status.memberStatus !== 'active') return 'blocked';
-  if (needsAceite(status)) return 'aceite';
   return 'form';
 }
 
 export const ROUTES = {
   publicar: '/comunidade/publicar',
+  /**
+   * Rota ANTIGA da tela de aceite. Ela não tem mais tela: quem chega por um link
+   * velho é levado às regras (`app/comunidade/consentimento.tsx`).
+   */
   consentimento: '/comunidade/consentimento',
   regras: '/comunidade/regras',
   /** Perfil da comunidade (nome, bio, foto e ministério opcionais, e-mail opcional). */
@@ -69,24 +77,11 @@ export function flowParams(next: string | null, day: number | null): Record<stri
   return params;
 }
 
-/** Folga, em pontos, para contar como "chegou ao fim" (o salto elástico do iOS não chega a zero). */
-export const END_SLACK = 24;
-
-type ScrollMetrics = {
-  contentOffset: { y: number };
-  contentSize: { height: number };
-  layoutMeasurement: { height: number };
-};
-
-/** Chegou ao fim da rolagem das regras? */
-export function reachedEnd({ contentOffset, contentSize, layoutMeasurement }: ScrollMetrics): boolean {
-  return layoutMeasurement.height + contentOffset.y >= contentSize.height - END_SLACK;
-}
-
-/** Conteúdo que cabe inteiro na tela conta como lido até o fim: não há rolagem para fazer. */
-export function fitsWithoutScroll(viewport: number, contentHeight: number): boolean {
-  return viewport > 0 && contentHeight > 0 && contentHeight <= viewport + END_SLACK;
-}
+/*
+ * `reachedEnd` e `fitsWithoutScroll` saíram (2026-09-22): eles existiam para
+ * liberar o botão de aceitar depois de rolar as regras até o fim, e não há mais
+ * botão de aceitar em tela nenhuma.
+ */
 
 export type Sent = { status: ContentStatus; hadPhoto: boolean };
 

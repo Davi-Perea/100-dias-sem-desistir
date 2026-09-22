@@ -17,10 +17,9 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 
 import JuntosTab from '@/app/(tabs)/juntos';
-import PublishScreen from '@/app/comunidade/publicar';
 import { createCommunityApi, type CommunityApi, type CommunityClient } from '@/community/api';
 import { AFTER_CONSENT_FEED } from '@/ui/comunidade/feed/FeedScreen';
-import { markAceite } from '@/ui/comunidade/publicar/aceite';
+import { ACEITE_LINE, CAMPOS, PENDING_NOTICE, type CampoId } from '@/ui/comunidade/publicar/textos';
 
 /* ------------------------------------------------------------------ mocks */
 
@@ -176,6 +175,18 @@ function calls(rpc: jest.Mock, fn: string) {
   return rpc.mock.calls.filter(([name]) => name === fn).map(([, args]) => args);
 }
 
+/**
+ * Texto do aceite APROVADO pela igreja (o contrário do rascunho PENDENTE que o
+ * app traz hoje): mesma manobra de comunidade-publicar.test.tsx. Sem isto,
+ * ninguém aceita — e é justamente esse portão que um dos testes prova.
+ */
+const ORIGINAL_CAMPOS = { ...CAMPOS };
+function fillCampos(version: string) {
+  for (const key of Object.keys(CAMPOS) as CampoId[]) CAMPOS[key] = `valor-${key}`;
+  CAMPOS.versaoRegras = version;
+  CAMPOS.versaoConsentimento = version;
+}
+
 beforeEach(() => {
   jest.clearAllMocks();
   mockSignedIn = true;
@@ -183,6 +194,7 @@ beforeEach(() => {
   mockParams = {};
   mockApi = null;
   mockFocused.clear();
+  Object.assign(CAMPOS, ORIGINAL_CAMPOS);
   jest.spyOn(Date, 'now').mockReturnValue(NOW);
 });
 
@@ -199,7 +211,7 @@ describe('tocar em Juntos cai direto no feed', () => {
     await waitFor(() => expect(screen.getByTestId(`post-body-${POST}`)).toBeTruthy());
     expect(screen.getByText('Juntos')).toBeTruthy();
     expect(screen.queryByText('Comunidade')).toBeNull();
-    expect(screen.getByLabelText('Escrever no Juntos')).toBeTruthy();
+    expect(screen.getByLabelText('Publicar no Juntos')).toBeTruthy();
     expect(screen.queryByText(/Entrar na comunidade|Criar meu perfil|crie o seu perfil|código/i)).toBeNull();
   });
 
@@ -281,59 +293,72 @@ describe('tocar em Juntos cai direto no feed', () => {
 
 /* ----------------------------------------------------------------- aceite */
 
-describe('primeiro Amém: tela única de aceite e volta para a ação', () => {
-  test('o Amém abre o aceite sem enviar nada; ao concordar, o Amém é registrado sozinho', async () => {
+/**
+ * O ACEITE NÃO É MAIS UMA TELA (decisão do fundador, 2026-09-22): a linha fica no
+ * topo do feed enquanto o aceite falta, e o toque no Amém registra 16+, as regras
+ * e o consentimento destacado antes de o Amém ir. Aqui se prova o FEED; a tela de
+ * publicar tem a própria suíte (comunidade-publicar.test.tsx).
+ */
+describe('primeiro Amém: aceite no próprio toque, sem tela', () => {
+  test('a linha do aceite está à vista, e o Amém não leva a tela nenhuma', async () => {
+    setup({ set_amen: (args) => ({ data: args?.amen === true }) });
+    await render(<JuntosTab />);
+    await waitFor(() => expect(screen.getByTestId(`post-amen-${POST}`)).toBeTruthy());
+    // A frase do fundador, palavra por palavra, com o link para as regras.
+    expect(screen.getByTestId('feed-aceite-line').props.accessibilityLabel).toContain(ACEITE_LINE);
+    await fireEvent.press(screen.getByTestId(`post-amen-${POST}`));
+    expect(mockRouter.push).not.toHaveBeenCalled();
+  });
+
+  test('texto ainda não liberado pela igreja: o Amém diz isso e NADA é enviado nem aceito', async () => {
+    const { rpc } = setup({ set_amen: (args) => ({ data: args?.amen === true }) });
+    await render(<JuntosTab />);
+    await waitFor(() => expect(screen.getByTestId(`post-amen-${POST}`)).toBeTruthy());
+    await fireEvent.press(screen.getByTestId(`post-amen-${POST}`));
+    await waitFor(() => expect(screen.getByTestId('feed-consent-notice').props.children).toBe(PENDING_NOTICE));
+    expect(calls(rpc, 'set_amen')).toEqual([]);
+    expect(calls(rpc, 'accept_community_terms')).toEqual([]);
+    expect(calls(rpc, 'set_community_profile')).toEqual([]);
+  });
+
+  test('com o texto aprovado: um toque registra 16+, regras e consentimento, e AÍ manda o Amém', async () => {
+    fillCampos('1.0');
+    const approved = { rules_version: '1.0', publish_consent_version: '1.0' };
     let accepted = false;
     const { rpc } = setup({
-      my_community_status: () => ({ data: [accepted ? status(ACCEPTED) : status()] }),
+      my_community_status: () => ({ data: [accepted ? status({ ...ACCEPTED, ...approved }) : status(approved)] }),
+      set_community_profile: { data: true },
+      accept_community_terms: () => {
+        accepted = true;
+        return { data: true };
+      },
       set_amen: (args) => ({ data: args?.amen === true }),
     });
     await render(<JuntosTab />);
     await waitFor(() => expect(screen.getByTestId(`post-amen-${POST}`)).toBeTruthy());
     await fireEvent.press(screen.getByTestId(`post-amen-${POST}`));
-    expect(mockRouter.push).toHaveBeenCalledWith('/comunidade/consentimento');
-    expect(calls(rpc, 'set_amen')).toEqual([]);
 
-    // A pessoa tocou em "Concordo e continuar" e voltou.
-    accepted = true;
-    markAceite('accepted');
-    await refocus();
-    await waitFor(() => expect(calls(rpc, 'set_amen')).toEqual([{ target_post: POST, amen: true }]));
+    // Ordem: 16+ e os DOIS aceites ANTES do Amém (Google Play; Apple 1.2).
+    await waitFor(() =>
+      expect(calls(rpc, 'set_amen')).toEqual([{ target_post: POST, amen: true, accept_terms: null }]),
+    );
+    const reads = new Set(['my_community_status', 'community_feed', 'my_community_posts']);
+    expect(rpc.mock.calls.map(([name]) => name as string).filter((name) => !reads.has(name))).toEqual([
+      'set_community_profile',
+      'accept_community_terms',
+      'accept_community_terms',
+      'set_amen',
+    ]);
+    expect(mockRouter.push).not.toHaveBeenCalled();
     expect(screen.getByTestId('feed-consent-notice').props.children).toBe(AFTER_CONSENT_FEED);
   });
 
-  test('saiu do aceite sem concordar: o Amém é esquecido, nada é enviado', async () => {
+  test('o Amém não fica guardado para depois: voltar à aba não envia nada sozinho', async () => {
     const { rpc } = setup({ set_amen: (args) => ({ data: args?.amen === true }) });
     await render(<JuntosTab />);
     await waitFor(() => expect(screen.getByTestId(`post-amen-${POST}`)).toBeTruthy());
     await fireEvent.press(screen.getByTestId(`post-amen-${POST}`));
-    markAceite('declined');
     await refocus();
     expect(calls(rpc, 'set_amen')).toEqual([]);
-  });
-});
-
-describe('primeiro post: aceite e o post sai sozinho', () => {
-  test('"Publicar" abre o aceite; ao voltar concordado, o post pronto é enviado sem outro toque', async () => {
-    let accepted = false;
-    const { rpc } = setup({
-      my_community_status: () => ({ data: [accepted ? status(ACCEPTED) : status()] }),
-      create_community_post: { data: [{ post_id: POST, status: 'published' }] },
-    });
-    await render(<PublishScreen />);
-    await fireEvent.changeText(await screen.findByTestId('publish-input'), 'Hoje comecei Gênesis.');
-    await fireEvent.press(screen.getByTestId('publish-send'));
-    expect(mockRouter.push).toHaveBeenCalledWith('/comunidade/consentimento');
-    const sentBefore = rpc.mock.calls.filter(([name]) => name !== 'my_community_status');
-    expect(sentBefore).toEqual([]);
-
-    accepted = true;
-    markAceite('accepted');
-    await refocus();
-    await waitFor(() =>
-      expect(rpc.mock.calls.some(([, args]) => (args as { post_body?: string } | undefined)?.post_body === 'Hoje comecei Gênesis.')).toBe(
-        true,
-      ),
-    );
   });
 });

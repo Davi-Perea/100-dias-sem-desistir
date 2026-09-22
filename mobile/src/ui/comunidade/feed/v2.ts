@@ -60,6 +60,35 @@ export function activityLine(
   return parts.length ? parts.join(' · ') : null;
 }
 
+/**
+ * O que "Ver leitura" abre — ou null quando NÃO há leitura anexada (pedido do
+ * fundador, 2026-09-22: "em post livre, não aparece").
+ *
+ * Post LIVRE é o que não tem tipo de atividade (`kind` null, 'livre' no
+ * servidor). Ele nunca ganha o atalho, mesmo vindo com número de dia: no fluxo
+ * de publicar o dia só existe junto do anexo "Leitura" (`buildNewPost`, em
+ * publicar/rascunho.ts), então dia solto é linha antiga ou exemplo da
+ * demonstração — não é motivo para prometer uma leitura que ninguém anexou.
+ *
+ * Com tipo, o dia manda (abre o leitor daquele dia) e, sem dia, o versículo
+ * anexado abre o capítulo dele na Bíblia. Só a REFERÊNCIA viaja, nunca o texto.
+ */
+export type ReadingTarget =
+  | { kind: 'dia'; day: number }
+  | { kind: 'versiculo'; verse: VerseAttachment; label: string };
+
+export function readingTarget(post: {
+  kind: PostKind | null;
+  dayNumber: number | null;
+  verse: VerseAttachment | null;
+}): ReadingTarget | null {
+  if (!post.kind) return null;
+  const day = post.dayNumber;
+  if (typeof day === 'number' && Number.isFinite(day) && day > 0) return { kind: 'dia', day: Math.floor(day) };
+  const label = verseLabel(post.verse);
+  return post.verse && label ? { kind: 'versiculo', verse: post.verse, label } : null;
+}
+
 function count(value: unknown): number {
   return typeof value === 'number' && Number.isFinite(value) && value > 0 ? Math.floor(value) : 0;
 }

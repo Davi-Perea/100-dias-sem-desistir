@@ -1,18 +1,57 @@
-import { Image, Pressable, useWindowDimensions, View } from 'react-native';
+import { Image, Pressable, Text, useWindowDimensions, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, useReducedMotion as useReanimatedReducedMotion } from 'react-native-reanimated';
 
-import { AppText } from '@/ui/components';
+import { AppText, useFace } from '@/ui/components';
 import { Icon } from '@/ui/icons';
-import { MIN_TOUCH, radius, spacing, useReducedMotion, useTheme } from '@/ui/theme';
+import { faces, MIN_TOUCH, radius, spacing, useReducedMotion, useTheme } from '@/ui/theme';
 
 import { AttachIcon, type AttachIconName } from './icones';
 import { chipLabel, removeLabel, type Attachment } from './rascunho';
+import { ACEITE_LINE, ACEITE_LINE_LINK, ACEITE_LINE_SPOKEN } from './textos';
 
 /**
- * Peças do "Criar post" (F2): a linha de anexos, os chips do que foi anexado e
- * as fotos escolhidas. Só tokens do tema (src/ui/theme.ts); o peso vem da face
- * das variantes de `AppText` (nunca `fontWeight`).
+ * Peças do "Criar post" (F2): a linha de anexos, os chips do que foi anexado, as
+ * fotos escolhidas e a linha de aceite embaixo do botão. Só tokens do tema
+ * (src/ui/theme.ts); o peso vem da face das variantes de `AppText` (nunca
+ * `fontWeight`).
  */
+
+/* ------------------------------------------------------- linha do aceite */
+
+/**
+ * A linha embaixo do botão de publicar (e do enviar comentário), no lugar da tela
+ * de aceite: a frase do fundador, com "regras do Juntos" sublinhado.
+ *
+ * A linha INTEIRA é o alvo (piso de 48 com `minHeight` + `paddingVertical`): um
+ * link de 13pt dentro de uma frase seria um alvo de 18 pontos de altura. Um
+ * elemento só para o leitor de tela, com papel de link e a frase completa mais o
+ * que o toque faz. `caption` = `textMuted`: 7,00:1 no claro e 8,34:1 no escuro.
+ */
+export function AceiteLine({ onOpenRules, testID = 'aceite-line' }: { onOpenRules: () => void; testID?: string }) {
+  const { colors } = useTheme();
+  const face = useFace();
+  const [before, after] = ACEITE_LINE.split(ACEITE_LINE_LINK);
+  return (
+    <Pressable
+      onPress={onOpenRules}
+      accessibilityRole="link"
+      accessibilityLabel={ACEITE_LINE_SPOKEN}
+      testID={testID}
+      style={({ pressed }) => [
+        { minHeight: MIN_TOUCH, paddingVertical: spacing.sm, justifyContent: 'center' },
+        pressed && { opacity: 0.72 },
+      ]}
+    >
+      <AppText variant="caption" aria-hidden>
+        {before}
+        <Text style={{ fontFamily: face(faces.sg700), textDecorationLine: 'underline', color: colors.text }}>
+          {ACEITE_LINE_LINK}
+        </Text>
+        {after}
+      </AppText>
+    </Pressable>
+  );
+}
 
 /** Movimento leve de entrada/saída, desligado com "Reduzir movimento" (os dois sinais). */
 function useSoftMotion() {

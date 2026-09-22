@@ -1,5 +1,5 @@
 import { router, useFocusEffect } from 'expo-router';
-import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
+import { type ReactNode, useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, View } from 'react-native';
 
 import type { CommunityApi } from '@/community/api';
@@ -8,31 +8,28 @@ import type { CommunityStatus } from '@/community/types';
 import { useJourney } from '@/journey/useJourney';
 import { useOnline } from '@/net/useOnline';
 import { AppText, Button, DevContentBanner, OfflineBanner, Rule, SaveErrorNotice, Screen } from '@/ui/components';
-import { Icon } from '@/ui/icons';
+import { Icon, type IconName } from '@/ui/icons';
 import { MAX_CONTENT_WIDTH, MIN_TOUCH, spacing, useTheme } from '@/ui/theme';
 import { announceNotice } from '@/ui/voce/announce';
 
 import { CommentsSheet, type CommentsTarget } from '../sheets/CommentsSheet';
 import { ReportSheet, type SheetTarget } from '../sheets/ReportSheet';
-import { AFTER_CONSENT_COMMENT, flushPendingCommentAmen, takePendingCommentAmen } from './comentarios';
 import { useJuntosIntro } from './conheca';
 import { ConhecaOJuntos } from './ConhecaOJuntos';
 import { FeedEmpty, FeedEnd, FeedError, FeedSkeleton, GateView } from './FeedStates';
 import { PostCard } from './PostCard';
-import { takeAceiteOutcome } from '../publicar/aceite';
-import { ROUTES as PUBLISH_ROUTES } from '../publicar/fluxo';
-import { ACTIVITY_ROUTE, COMMUNITY_ROUTES, readerHref } from './rotas';
+import { aceiteDocs, aceiteNeeds, availabilityNotice, nameOk, useAceite } from '../publicar/aceite';
+import { AceiteLine } from '../publicar/pecas';
+import { ACEITE_NEEDS_NAME } from '../publicar/textos';
+import { ACTIVITY_ROUTE, COMMUNITY_ROUTES, readerHref, verseHref } from './rotas';
 import { needsConsent, useCommunity } from './useCommunity';
 import { useFeed } from './useFeed';
 import { hasNewActivity } from './v2';
 
 /** Calha das telas de lista e feed (TELAS, convenções): 20. */
 const FEED_GUTTER = 20;
-/** Dito ao voltar do aceite: o Amém que levou até lá foi registrado. */
+/** Dito no primeiro Amém, que é o toque que registra o aceite (2026-09-22). */
 export const AFTER_CONSENT_FEED = 'Pronto. Seu Amém foi registrado.';
-
-/** A tela única de aceite (16+, regras, consentimento e nome, se faltar). */
-const ACEITE_ROUTE = PUBLISH_ROUTES.consentimento as never;
 
 const COLUMN = { flex: 1, width: '100%', maxWidth: MAX_CONTENT_WIDTH + FEED_GUTTER * 2, alignSelf: 'center' } as const;
 
@@ -41,12 +38,18 @@ const COLUMN = { flex: 1, width: '100%', maxWidth: MAX_CONTENT_WIDTH + FEED_GUTT
  * cada pessoa conta o seu dia com a Bíblia, e a igreja acompanha.
  *
  * Quem abre a aba já está dentro (2026-09-22): a entrada é automática
- * (useCommunity), sem tela de entrar, sem código, sem perfil. A primeira
- * interação que expõe (post, comentário, Amém) abre a tela única de aceite e,
- * ao concordar, a ação que a pessoa queria acontece.
+ * (useCommunity), sem tela de entrar, sem código, sem perfil.
+ *
+ * O ACEITE NÃO É MAIS UMA TELA (decisão do fundador, 2026-09-22): enquanto ele
+ * falta, a linha "Ao publicar, você confirma que tem 16 anos ou mais e aceita as
+ * regras do Juntos." fica no topo do feed, com link para as regras, e o próprio
+ * toque no Amém registra o aceite antes de o Amém ir ao servidor.
  *
  * Topo: "Juntos", o sino da Atividade (F8, com ponto quando há novidade) e
- * "Escrever". Depois os posts do dia e o fim explícito.
+ * "Publicar" (o rótulo é este desde 2026-09-22: é o que o botão faz, e é a mesma
+ * palavra da tela que ele abre). Embaixo, dois atalhos que antes só existiam
+ * fora da aba — "Seu perfil" (onde se coloca ou troca a foto) e "Minhas
+ * publicações". Depois os posts do dia e o fim explícito.
  *
  * SÓ A IGREJA TODA (pedido do fundador, 2026-09-22): saíram o filtro "Meu
  * ministério" do topo e a escolha de público ao publicar. Um feed só, para todo
@@ -70,7 +73,7 @@ export function FeedScreen() {
     <FeedHeader
       ready={ready}
       unread={ready ? hasNewActivity(gate.status) : false}
-      onWrite={() => ready && router.push(COMMUNITY_ROUTES.publicar)}
+      onPublish={() => ready && router.push(COMMUNITY_ROUTES.publicar)}
     />
   );
   // Espera a leitura da dispensa: piscar o aviso e sumir seria pior que esperar.
@@ -89,6 +92,7 @@ export function FeedScreen() {
             status={gate.status}
             online={online}
             day={Math.max(1, journey.officialDay)}
+            reload={reload}
           />
         </View>
         {introOverlay}
@@ -124,7 +128,7 @@ export function FeedScreen() {
   );
 }
 
-function FeedHeader({ ready, unread, onWrite }: { ready: boolean; unread: boolean; onWrite: () => void }) {
+function FeedHeader({ ready, unread, onPublish }: { ready: boolean; unread: boolean; onPublish: () => void }) {
   const { colors } = useTheme();
   return (
     <View>
@@ -177,9 +181,9 @@ function FeedHeader({ ready, unread, onWrite }: { ready: boolean; unread: boolea
               </View>
             </Pressable>
             <Pressable
-              onPress={onWrite}
+              onPress={onPublish}
               accessibilityRole="button"
-              accessibilityLabel="Escrever no Juntos"
+              accessibilityLabel="Publicar no Juntos"
               testID="feed-write"
               style={({ pressed }) => [
                 {
@@ -195,15 +199,94 @@ function FeedHeader({ ready, unread, onWrite }: { ready: boolean; unread: boolea
               ]}
             >
               <AppText variant="action" style={{ color: colors.onBlue }}>
-                Escrever
+                Publicar
               </AppText>
             </Pressable>
           </View>
         ) : null}
       </View>
+      {ready ? <HeaderShortcuts /> : null}
       {DEMO_LABELS_ON_SCREEN && isCommunityDemo() ? <DemoBadge /> : null}
       <Rule />
     </View>
+  );
+}
+
+/**
+ * Os dois atalhos do topo (pedido do fundador, 2026-09-22). Até aqui só se
+ * chegava ao perfil da comunidade e a "Minhas publicações" por "Conta e
+ * privacidade", fora da aba: quem quisesse colocar a foto ou ver o que publicou
+ * não tinha caminho de dentro do Juntos.
+ *
+ * Linha própria, embaixo do título, para caber com a fonte grande (a linha
+ * quebra, não corta) e para não disputar espaço com o sino nem com "Publicar".
+ * Cada um tem ícone E texto; o ícone nunca carrega o significado sozinho.
+ */
+function HeaderShortcuts() {
+  return (
+    <View
+      style={{
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        alignItems: 'center',
+        columnGap: spacing.xl,
+        paddingHorizontal: FEED_GUTTER,
+        paddingBottom: spacing.xs,
+      }}
+    >
+      <HeaderShortcut
+        icon="person"
+        label="Seu perfil"
+        accessibilityLabel="Seu perfil no Juntos: foto, nome e ministério"
+        onPress={() => router.push(COMMUNITY_ROUTES.perfil)}
+        testID="feed-profile"
+      />
+      <HeaderShortcut
+        icon="note"
+        label="Minhas publicações"
+        onPress={() => router.push(COMMUNITY_ROUTES.minhas)}
+        testID="feed-my-posts"
+      />
+    </View>
+  );
+}
+
+function HeaderShortcut({
+  icon,
+  label,
+  accessibilityLabel,
+  onPress,
+  testID,
+}: {
+  icon: IconName;
+  label: string;
+  accessibilityLabel?: string;
+  onPress: () => void;
+  testID: string;
+}) {
+  const { colors } = useTheme();
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="link"
+      accessibilityLabel={accessibilityLabel ?? label}
+      testID={testID}
+      style={({ pressed }) => [
+        {
+          minHeight: MIN_TOUCH,
+          paddingVertical: spacing.sm,
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: spacing.sm,
+        },
+        pressed && { opacity: 0.72 },
+      ]}
+    >
+      <Icon name={icon} size={20} color={colors.blue} />
+      <AppText variant="rowLabel" style={{ color: colors.blue }}>
+        {label}
+      </AppText>
+    </Pressable>
   );
 }
 
@@ -249,12 +332,15 @@ function ReadyFeed({
   status,
   online,
   day,
+  reload,
 }: {
   header: ReactNode;
   api: CommunityApi;
   status: CommunityStatus;
   online: boolean;
   day: number;
+  /** Perguntar o estado de novo (depois do aceite registrado no toque). */
+  reload: () => void;
 }) {
   const journey = useJourney();
   // Um feed só: toda a igreja. O ministério ainda vem no perfil (o cartão mostra
@@ -262,57 +348,61 @@ function ReadyFeed({
   const feed = useFeed(api, status.displayName ?? 'Você', status.profile.ministry, status.profile.avatarPath);
   const [sheet, setSheet] = useState<SheetTarget | null>(null);
   const [comments, setComments] = useState<CommentsOpen | null>(null);
-  // Rascunho de comentário guardado quando a folha fechou para o aceite.
-  const draft = useRef<{ postId: string; text: string } | null>(null);
 
   // Carrega ao aparecer e se atualiza ao voltar de Publicar, da Atividade ou do consentimento.
   useFocusEffect(feed.onFocus);
 
   const gated = needsConsent(status);
-  // O Amém que abriu o aceite fica guardado. Se a pessoa concordou ("Concordo e
-  // continuar" é o toque dela), ele é registrado assim que o status novo chega;
-  // se ela saiu sem concordar, é esquecido.
-  const pendingAmen = useRef<{ postId: string; next: boolean } | null>(null);
   const [consentNotice, setConsentNotice] = useState<string | null>(null);
-  useFocusEffect(
-    useCallback(() => {
-      const outcome = takeAceiteOutcome();
-      if (outcome !== 'accepted') pendingAmen.current = null;
-      // Saiu do aceite sem concordar: o Amém de comentário dado pela folha também é esquecido.
-      if (outcome === 'declined') takePendingCommentAmen();
-    }, []),
-  );
-  const toggleAmen = useRef(feed.toggleAmen);
-  useEffect(() => {
-    toggleAmen.current = feed.toggleAmen;
-  });
-  // Amém de comentário dado pela folha (que fechou para o aceite): gravado ao
-  // voltar liberado, sem precisar reabrir a conversa.
-  useEffect(() => {
-    if (!gated) void flushPendingCommentAmen(api);
-  }, [gated, api]);
-  useEffect(() => {
-    const pending = pendingAmen.current;
-    if (gated || !pending) return;
-    pendingAmen.current = null;
-    toggleAmen.current(pending.postId, pending.next);
+
+  /* ------------------------------------------------------------- o aceite
+     SEM TELA (decisão do fundador, 2026-09-22): a linha `AceiteLine` fica à
+     vista embaixo do topo enquanto o aceite falta, e o PRÓPRIO toque no Amém
+     registra 16+, as regras e o consentimento destacado (`useAceite`, as mesmas
+     RPCs) antes de o Amém ir ao servidor — como o Google Play e o Apple 1.2
+     pedem. Nada de rota no meio, nada de Amém guardado para depois.
+
+     Três coisas podem impedir, e cada uma é dita na hora: texto ainda não
+     aprovado pela igreja (Launch Gate), pessoa sem nome nenhum (o servidor
+     recusa, CM007; daqui ela vai ao perfil pelo atalho do topo) e recusa do
+     servidor. */
+  const [docs] = useState(aceiteDocs);
+  const aceite = useAceite(docs, { kind: 'ready', status, api });
+  const aceiteName = status.displayName ?? status.profile.displayName ?? '';
+
+  /** Registra o aceite, se faltar. false = não deu, e a tela já disse por quê. */
+  const ensureAceite = async (): Promise<boolean> => {
+    if (!gated) return true;
+    // Já está registrando: o segundo toque espera, não vira erro.
+    if (aceite.busy) return false;
+    const block = aceite.availability !== null ? availabilityNotice(aceite.availability) : null;
+    if (block) {
+      setConsentNotice(block);
+      announceNotice(block);
+      return false;
+    }
+    if (aceiteNeeds(status).name && !nameOk(aceiteName)) {
+      setConsentNotice(ACEITE_NEEDS_NAME);
+      announceNotice(ACEITE_NEEDS_NAME);
+      return false;
+    }
+    const ok = await aceite.accept({ name: aceiteName });
+    if (!ok) {
+      const message = aceite.error ?? 'Não deu para registrar agora. Tente de novo.';
+      setConsentNotice(message);
+      announceNotice(message);
+      return false;
+    }
     setConsentNotice(AFTER_CONSENT_FEED);
     announceNotice(AFTER_CONSENT_FEED);
-  }, [gated]);
-  const openConsent = (amen?: { postId: string; next: boolean }) => {
-    pendingAmen.current = amen ?? null;
-    router.push(ACEITE_ROUTE);
+    // O estado novo (já liberado) chega pelo recarregar; o Amém não espera por ele.
+    reload();
+    return true;
   };
 
-  const openComments = (target: CommentsTarget) => {
-    const saved = draft.current?.postId === target.postId ? draft.current : null;
-    draft.current = null;
-    setComments({
-      target,
-      text: saved?.text ?? '',
-      notice: saved && !gated ? AFTER_CONSENT_COMMENT : null,
-    });
-  };
+  // A conversa abre vazia e fica aberta: não há mais rascunho guardado enquanto a
+  // pessoa aceita numa outra tela, porque essa tela não existe (2026-09-22).
+  const openComments = (target: CommentsTarget) => setComments({ target, text: '', notice: null });
 
   const state = feed.state;
   let list: ReactNode;
@@ -341,15 +431,17 @@ function ReadyFeed({
             gutter={FEED_GUTTER}
             photos={feed.photos}
             onAmen={(next) => {
-              if (gated) {
-                openConsent({ postId: card.postId, next });
-                return;
-              }
               setConsentNotice(null);
-              feed.toggleAmen(card.postId, next);
+              void (async () => {
+                // O aceite, se faltar, é registrado neste toque — e só então o Amém vai.
+                if (!(await ensureAceite())) return;
+                feed.toggleAmen(card.postId, next);
+              })();
             }}
             onComments={() => openComments({ postId: card.postId, authorName: card.authorName })}
-            onOpenReading={(readingDay) => router.push(readerHref(readingDay))}
+            onOpenReading={(target) =>
+              router.push(target.kind === 'dia' ? readerHref(target.day) : verseHref(target.verse))
+            }
             onMore={() =>
               setSheet({
                 kind: 'post',
@@ -394,6 +486,12 @@ function ReadyFeed({
         <View style={{ paddingHorizontal: FEED_GUTTER, gap: spacing.sm }}>
           <DevContentBanner state={journey.contentState} compact />
           {!online ? <OfflineNotice /> : null}
+          {/* A linha do aceite, enquanto ele falta: diz o que o próximo toque
+              (dizer Amém, comentar, publicar) significa, ANTES do toque, e o link
+              abre as regras e o consentimento destacado. Depois do aceite ela sai. */}
+          {gated ? (
+            <AceiteLine onOpenRules={() => router.push(COMMUNITY_ROUTES.regras)} testID="feed-aceite-line" />
+          ) : null}
           {feed.notice ? <SaveErrorNotice message={feed.notice} testID="feed-notice" /> : null}
           {consentNotice ? (
             <AppText variant="rowLabel" accessibilityLiveRegion="polite" testID="feed-consent-notice">
@@ -403,13 +501,10 @@ function ReadyFeed({
         </View>
         {list}
         {state.phase === 'ready' ? (
+          // "Minhas publicações" saiu do fim da rolagem: virou atalho do TOPO
+          // (2026-09-22), e repetir o mesmo destino duas vezes na mesma tela só
+          // daria dois botões com o mesmo nome para o leitor de tela.
           <View style={{ paddingHorizontal: FEED_GUTTER, gap: spacing.xs }}>
-            <Button
-              title="Minhas publicações"
-              variant="underline"
-              onPress={() => router.push(COMMUNITY_ROUTES.minhas)}
-              testID="feed-my-posts"
-            />
             <Button
               title="Regras do Juntos"
               variant="underline"
@@ -434,10 +529,10 @@ function ReadyFeed({
         initialText={comments?.text}
         initialNotice={comments?.notice}
         onClose={() => setComments(null)}
-        onNeedsConsent={(postId, text) => {
-          draft.current = { postId, text };
-          openConsent();
-        }}
+        // A folha registra o aceite no próprio toque (Enviar, ou o Amém de um
+        // comentário): ela não fecha e ninguém navega. Só o estado da comunidade
+        // precisa ser perguntado de novo depois.
+        onAccepted={reload}
         onCountChange={feed.bumpComments}
         onPostGone={() => feed.afterBlock(null)}
       />

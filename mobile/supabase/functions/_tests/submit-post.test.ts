@@ -20,7 +20,7 @@ import {
   toBase64,
 } from '../_shared/image-moderation.ts';
 import type { CryptoDeps, FetchLike, ImageModerator, ModeratorDeps } from '../_shared/image-moderation.ts';
-import { DbError, handleSubmitPost, sanitizePostArgs } from '../_shared/submit-post.ts';
+import { DbError, handleSubmitPost, sanitizeAcceptTerms, sanitizePostArgs } from '../_shared/submit-post.ts';
 import type { CheckResult, SubmitPostDeps } from '../_shared/submit-post.ts';
 
 const nodeCrypto: CryptoDeps = {
@@ -215,7 +215,49 @@ describe('submit-post', () => {
       post_verse_start: null,
       post_verse_end: null,
       post_audience: 'igreja',
+      // Quem já aceitou não manda nada: null, e a RPC segue como sempre.
+      accept_terms: null,
     });
+  });
+
+  /**
+   * Aceite NO ATO (decisão do fundador de 2026-09-22): post COM FOTO passa por
+   * aqui, então o aceite da linha embaixo do botão tem de atravessar esta função
+   * intacto até a RPC — senão a primeira publicação com foto falharia por falta
+   * de consentimento e o aceite se perderia no caminho.
+   */
+  test('o aceite da linha embaixo do botão atravessa até a RPC', async () => {
+    const { deps: d } = deps();
+    const accept = {
+      confirms_16: true,
+      name: 'Ana',
+      rules_version: 'regras-1',
+      rules_sha256: 'ab'.repeat(32),
+      consent_version: 'consent-1',
+      consent_sha256: 'cd'.repeat(32),
+      app_version: '1.0.0 (7)',
+    };
+    await handleSubmitPost(request({ headers: auth, body: { post: { ...withPhotos.post, accept_terms: accept } } }), d);
+    expect(d.createPost).toHaveBeenCalledWith('token.da.pessoa', expect.objectContaining({ accept_terms: accept }));
+  });
+
+  test('aceite malformado é recusado aqui (400), sem chegar ao banco', async () => {
+    const { deps: d } = deps();
+    for (const accept_terms of [
+      { name: 'Ana' }, // sem confirms_16: nada de aceite implícito
+      { confirms_16: 'sim' },
+      { confirms_16: true, rules_sha256: 'não é hash' },
+      { confirms_16: true, chave_inventada: 'x' },
+      'sim',
+      [],
+    ]) {
+      await expect(
+        handleSubmitPost(request({ headers: auth, body: { post: { ...withPhotos.post, accept_terms } } }), d),
+      ).resolves.toMatchObject({ status: 400 });
+    }
+    expect(d.createPost).not.toHaveBeenCalled();
+    expect(sanitizeAcceptTerms(undefined)).toBeNull();
+    expect(sanitizeAcceptTerms({ confirms_16: true })).toEqual({ confirms_16: true });
   });
 
   test('regra do banco (perfil incompleto) volta com o SQLSTATE; token vencido vira 401; o resto é genérico', async () => {

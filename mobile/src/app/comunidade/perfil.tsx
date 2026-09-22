@@ -10,6 +10,7 @@ import { AppText, Block, Button, Rule, StateView } from '@/ui/components';
 import { ministryChoice } from '@/ui/comunidade/perfil/EntradaFlow';
 import {
   AgeCheck,
+  AVATAR_CHANGE_TITLE,
   AVATAR_OPTIONAL_NOTE,
   AVATAR_STEP_TITLE,
   AvatarField,
@@ -168,8 +169,11 @@ function ProfileForm({ api, status }: { api: CommunityApi; status: CommunityStat
       ) : null}
 
       <View style={{ gap: spacing.md }}>
-        {/* Foto OPCIONAL (2026-09-22): um passo do perfil, nunca um portão para publicar. */}
-        <FieldHeader title={AVATAR_STEP_TITLE}>{AVATAR_OPTIONAL_NOTE}</FieldHeader>
+        {/* Foto OPCIONAL (2026-09-22): um passo do perfil, nunca um portão para
+            publicar. É a PRIMEIRA seção da tela, e o título muda quando já há
+            foto — "Coloque uma foto" para quem não tem, "Trocar a foto" para quem
+            veio justamente trocar. */}
+        <FieldHeader title={hasPhoto ? AVATAR_CHANGE_TITLE : AVATAR_STEP_TITLE}>{AVATAR_OPTIONAL_NOTE}</FieldHeader>
         <AvatarField
           api={api}
           name={shownName ?? ''}
