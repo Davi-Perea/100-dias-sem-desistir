@@ -1,8 +1,8 @@
 /**
  * Feed (C1, C2) e comentários (C6) com o cliente da Comunidade SIMULADO (mesmo
  * molde de comunidade-cliente.test.ts). Prova o comportamento das TELAS: os
- * portões honestos (sem servidor, sem conta, sem perfil, suspensa), o Amém sem
- * contador, o feed com fim (sem rolagem infinita), o "Em análise" só para o
+ * portões honestos (sem servidor, sem conta, sem perfil, suspensa), o Amém (sem número
+ * quando ninguém disse Amém), o feed com fim (sem rolagem infinita), o "Em análise" só para o
  * autor, as regras e o consentimento antes do primeiro Amém ou comentário, e
  * que o campo de comentário nunca vem pré-preenchido. Não prova o servidor.
  */
@@ -271,33 +271,32 @@ describe('C1: portões honestos antes do feed', () => {
 /* ------------------------------------------------------------------ feed */
 
 describe('C1: feed', () => {
-  test('cabeçalho: "Comunidade", pílula "Escrever" (vai para Publicar) e a linha do dia', async () => {
+  test('cabeçalho: "Comunidade", sino, pílula "Escrever" (vai para Publicar) e os filtros do grupo', async () => {
     setup();
     await render(<FeedScreen />);
     await waitFor(() => expect(screen.getByTestId(`post-${POST(0)}`)).toBeTruthy());
     expect(screen.getByText('Comunidade')).toBeTruthy();
-    expect(screen.getByTestId('feed-day-line')).toBeTruthy();
-    expect(screen.getByText(/^Dia 17/)).toBeTruthy();
+    expect(screen.getByTestId('feed-bell')).toBeTruthy();
+    expect(screen.getByTestId('feed-scope-igreja')).toBeTruthy();
+    expect(screen.getByText('Meu ministério')).toBeTruthy();
     await fireEvent.press(screen.getByTestId('feed-write'));
     expect(mockRouter.push).toHaveBeenCalledWith('/comunidade/publicar');
   });
 
-  test('cartão: autor, "Dia 9 · há 1 h", texto, Amém, comentar e "Ver comentários" — sem número nenhum', async () => {
+  test('cartão: "Ana · há 1 h", "Dia 9", texto, Amém e comentar — sem número quando ninguém disse Amém', async () => {
     setup();
     await render(<FeedScreen />);
     await waitFor(() => expect(screen.getByTestId(`post-${POST(0)}`)).toBeTruthy());
-    expect(screen.getAllByText('Ana').length).toBeGreaterThan(0);
-    expect(screen.getByText('Dia 9 · há 1 h')).toBeTruthy();
+    expect(screen.getByText('Ana · há 1 h')).toBeTruthy();
+    expect(screen.getAllByText('Dia 9')).toHaveLength(2);
     expect(screen.getByText('Palavra 0')).toBeTruthy();
     expect(screen.getAllByLabelText('Amém')).toHaveLength(2);
     expect(screen.getAllByLabelText('Comentar')).toHaveLength(2);
-    expect(screen.getAllByText('Ver comentários')).toHaveLength(2);
-    // Nada de "3 améns", "Ver 4 comentários" ou contagem ao lado dos ícones.
-    expect(allText()).not.toMatch(/\d+\s*(améns?|amém|comentários?|reações?)/i);
+    // Zero não vira número: sem Amém e sem comentário, nada ao lado dos ícones.
     expect(screen.queryByText(/^\d+$/)).toBeNull();
   });
 
-  test('C4: "Nome · Ministério X" no cartão (só o nome com "Nenhum") e a foto de perfil assinada', async () => {
+  test('F1: grupo no topo ("Toda a igreja") e a foto de perfil assinada', async () => {
     const avatar = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee.jpg';
     const { createSignedUrls } = setup({
       community_feed: {
@@ -306,8 +305,8 @@ describe('C1: feed', () => {
     });
     await render(<FeedScreen />);
     await waitFor(() => expect(screen.getByTestId(`post-${POST(0)}`)).toBeTruthy());
-    expect(screen.getByTestId(`post-author-${POST(0)}`).props.children).toBe('Ana · Ministério Comunicação');
-    expect(screen.getByTestId(`post-author-${POST(1)}`).props.children).toBe('Bruno');
+    expect(screen.getByTestId(`post-author-${POST(0)}`).props.children).toBe('Ana · há 1 h');
+    expect(screen.getByTestId(`post-group-${POST(0)}`, { includeHiddenElements: true }).props.children).toBe('Toda a igreja');
     await waitFor(() => expect(createSignedUrls).toHaveBeenCalledWith([avatar], expect.any(Number)));
   });
 
@@ -458,9 +457,9 @@ describe('C1: feed', () => {
     await render(<FeedScreen />);
     await waitFor(() => expect(screen.getByTestId(`post-in-review-${POST(90)}`)).toBeTruthy());
     expect(screen.getByText('Em análise · só você vê')).toBeTruthy();
-    expect(screen.getAllByText('Davi').length).toBeGreaterThan(0);
+    expect(screen.getByText('Davi · há 5 min')).toBeTruthy();
     expect(screen.queryByTestId(`post-amen-${POST(90)}`)).toBeNull();
-    expect(screen.queryByTestId(`post-see-comments-${POST(90)}`)).toBeNull();
+    expect(screen.queryByTestId(`post-comment-${POST(90)}`)).toBeNull();
     // Só um selo: o do meu post em análise. Os posts dos outros nunca têm.
     expect(screen.getAllByText('Em análise · só você vê')).toHaveLength(1);
     expect(screen.queryByTestId(`post-in-review-${POST(0)}`)).toBeNull();
@@ -499,12 +498,14 @@ describe('C1: feed', () => {
     expect(screen.getByText('A comunidade volta quando a internet voltar.')).toBeTruthy();
   });
 
-  test('"Ver comentários" abre C6 pelo id do post', async () => {
-    setup();
+  test('comentar abre a folha "Comentários" (F4) pelo id do post, sem sair do feed', async () => {
+    const { rpc } = setup({ community_post_comments: { data: [] } });
     await render(<FeedScreen />);
-    await waitFor(() => expect(screen.getByTestId(`post-see-comments-${POST(0)}`)).toBeTruthy());
-    await fireEvent.press(screen.getByTestId(`post-see-comments-${POST(0)}`));
-    expect(mockRouter.push).toHaveBeenCalledWith({ pathname: '/comunidade/post/[id]', params: { id: POST(0) } });
+    await waitFor(() => expect(screen.getByTestId(`post-comment-${POST(0)}`)).toBeTruthy());
+    await fireEvent.press(screen.getByTestId(`post-comment-${POST(0)}`));
+    await waitFor(() => expect(screen.getByTestId('comments-sheet')).toBeTruthy());
+    expect(calls(rpc, 'community_post_comments')[0][1]).toEqual({ target_post: POST(0) });
+    expect(mockRouter.push).not.toHaveBeenCalled();
   });
 });
 

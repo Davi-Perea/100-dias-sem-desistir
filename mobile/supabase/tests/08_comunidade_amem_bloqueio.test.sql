@@ -3,12 +3,15 @@
 -- Ainda NÃO EXECUTADO no Supabase real (sem Docker/CLI nesta máquina): o primeiro db reset continua obrigatório.
 -- Rodar com: supabase test db
 --
--- Amém: cada pessoa sabe só se ELA deu Amém; ninguém (nem o autor) lê contagem.
+-- Amém: MUDANÇA DE REGRA em 2026-09-22 (decisão do fundador, F3; migration
+-- 20260922180000_comunidade_diario.sql). Antes: "ninguém (nem o autor) lê contagem".
+-- Agora o feed mostra o número e até 3 rostinhos (nome + foto aprovada), nunca o
+-- user_id; a TABELA continua fechada (cada um lê só a própria linha, sem user_id).
 -- Bloqueio: esconde nos DOIS sentidos (posts, comentários, Amém, comentar).
 -- =============================================================================
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(22);
+select plan(25);
 
 update private.community_settings set value = 'v-teste' where key in ('publish_consent_version', 'rules_version');
 update private.community_settings set value = repeat('a', 64) where key = 'publish_consent_sha256';
@@ -59,7 +62,7 @@ set local role authenticated;
 select is((select i_said_amen from public.community_feed() where post_id = '20000000-0000-4000-8000-000000000801'),
   false, 'a autora não herda o Amém de outra pessoa');
 select is((select count(*)::int from public.community_amens where post_id = '20000000-0000-4000-8000-000000000801'),
-  0, 'a autora NÃO conta os Amém do próprio post (RLS: cada um lê só o seu)');
+  0, 'pela TABELA a autora continua sem ler os Amém dos outros (RLS: cada um lê só o seu)');
 select throws_ok($$ select user_id from public.community_amens $$, '42501', null,
   'ninguém lê a coluna user_id dos Amém');
 select throws_ok($$ insert into public.community_amens (user_id, post_id)
@@ -76,18 +79,30 @@ select is(public.set_amen('20000000-0000-4000-8000-000000000801', false), false,
   'desmarcar continua livre, mesmo sem consentimento');
 reset role;
 
+-- F3 (2026-09-22): o número e os rostinhos aparecem no feed, para a autora e para todos.
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-8000-0000000008a1","role":"authenticated"}', true);
+set local role authenticated;
+select is((select amen_count from public.community_feed() where post_id = '20000000-0000-4000-8000-000000000801'),
+  1, 'F3: a autora vê QUANTAS pessoas disseram Amém (Dora desmarcou; Bruno marcou uma vez só)');
+select is((select amen_faces -> 0 ->> 'name' from public.community_feed() where post_id = '20000000-0000-4000-8000-000000000801'),
+  'Bruno', 'F3: e o rostinho de quem disse Amém, pelo nome');
+select is((select array_agg(k order by k) from jsonb_object_keys(
+            (select amen_faces -> 0 from public.community_feed() where post_id = '20000000-0000-4000-8000-000000000801')) k),
+  array['avatar_path', 'is_mine', 'name'], 'F3: o rostinho tem só nome, foto e se é o meu (nenhum identificador)');
+reset role;
 select ok(
   not exists (
     select 1 from pg_proc p cross join lateral unnest(p.proargnames) as a(name)
     where p.pronamespace = 'public'::regnamespace
-      and (a.name ilike '%amen%' and a.name not in ('amen', 'i_said_amen'))
+      and p.proname in ('community_feed', 'my_community_posts', 'my_community_activity')
+      and a.name in ('user_id', 'author_id', 'actor_id')
   ),
-  'nenhuma RPC devolve contagem ou lista de Amém'
+  'F3: o feed mostra quem disse Amém sem devolver user_id de ninguém'
 );
 select ok(
   not exists (select 1 from information_schema.columns
               where table_schema = 'public' and table_name = 'community_posts' and column_name ilike '%amen%'),
-  'community_posts não tem coluna de contagem de Amém'
+  'community_posts não tem coluna de contagem de Amém (o número é calculado na leitura)'
 );
 
 -- ---------------------------------------------------------------------------

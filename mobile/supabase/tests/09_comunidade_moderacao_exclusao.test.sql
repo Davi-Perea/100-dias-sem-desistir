@@ -52,7 +52,7 @@ insert into storage.objects (bucket_id, name, owner_id) values
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-8000-0000000009a1","role":"authenticated"}', true);
 set local role authenticated;
 select is((select status from public.create_community_post(
-            post_body => 'Culto de hoje', post_photo_path => '9a1f0000-0000-4000-8000-000000000001.jpg')),
+            post_body => 'Culto de hoje', post_photo_paths => array['9a1f0000-0000-4000-8000-000000000001.jpg'])),
   'in_review', 'post com foto vai SEMPRE para análise humana');
 select is((select hold_reason from public.my_community_posts() where photo_path = '9a1f0000-0000-4000-8000-000000000001.jpg'),
   'foto', 'a autora vê que está em análise por causa da foto');
@@ -65,7 +65,7 @@ select ok(not exists (select 1 from public.community_feed() where body = 'Culto 
 select is((select count(*)::int from storage.objects where name = '9a1f0000-0000-4000-8000-000000000001.jpg'),
   0, 'outro membro não alcança o arquivo da foto em análise (nem para URL assinada)');
 select throws_ok(
-  $$ select * from public.create_community_post(post_photo_path => '9a1f0000-0000-4000-8000-000000000001.jpg') $$,
+  $$ select * from public.create_community_post(post_photo_paths => array['9a1f0000-0000-4000-8000-000000000001.jpg']) $$,
   'P0002', null, 'ninguém publica a foto que outra pessoa subiu');
 select is_empty($$ select * from public.community_moderation_queue() $$,
   'quem não modera recebe a fila vazia');

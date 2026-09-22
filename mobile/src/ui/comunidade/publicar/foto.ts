@@ -1,4 +1,5 @@
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
+import Constants from 'expo-constants';
 import * as ImagePicker from 'expo-image-picker';
 
 import { assertPhotoSafeToUpload, PHOTO_JPEG_QUALITY, PHOTO_MAX_DIMENSION } from '@/community/photos';
@@ -14,9 +15,11 @@ import { assertPhotoSafeToUpload, PHOTO_JPEG_QUALITY, PHOTO_MAX_DIMENSION } from
  *
  * Nada sobe para a rede nesta etapa. A foto só é enviada quando a pessoa publica.
  *
- * Só a galeria: sem câmera (o desenho C3 pede "Escolher uma foto"), o que evita
- * pedir a permissão da câmera. No iOS 14+ e no Android 13+ o seletor do sistema
- * não pede permissão de fotos.
+ * Galeria (até 4 fotos, F2) e câmera. No iOS 14+ e no Android 13+ o seletor do
+ * sistema não pede permissão de fotos. A câmera pede a permissão só quando a
+ * pessoa toca em "Câmera", e só se a build declarou o texto de finalidade
+ * (`cameraConfigured`). A foto da câmera passa pela MESMA preparação (1600 px,
+ * JPEG 0,8, sem EXIF/XMP/IPTC) antes de qualquer envio.
  */
 
 export type PickedAsset = { uri: string; width: number; height: number };
@@ -125,4 +128,62 @@ export async function pickFromLibrary(): Promise<PickedAsset | null> {
   const asset = result.assets?.[0];
   if (!asset?.uri) return null;
   return { uri: asset.uri, width: asset.width ?? 0, height: asset.height ?? 0 };
+}
+
+/**
+ * Galeria com várias fotos (F2: até 4 por post). `limit` = quantas ainda cabem.
+ * Com 1, é o mesmo seletor de sempre. Cada foto ainda passa por `preparePhoto`.
+ */
+export async function pickManyFromLibrary(limit: number): Promise<PickedAsset[]> {
+  if (limit <= 0) return [];
+  const result = await ImagePicker.launchImageLibraryAsync({
+    mediaTypes: ['images'],
+    allowsEditing: false,
+    allowsMultipleSelection: limit > 1,
+    selectionLimit: limit,
+    orderedSelection: true,
+    exif: false,
+    base64: false,
+    quality: 1,
+  });
+  if (result.canceled) return [];
+  return (result.assets ?? [])
+    .filter((asset) => Boolean(asset?.uri))
+    .slice(0, limit)
+    .map((asset) => ({ uri: asset.uri, width: asset.width ?? 0, height: asset.height ?? 0 }));
+}
+
+/**
+ * A câmera só existe se a build declarar o texto de finalidade da câmera
+ * (plugin `expo-image-picker`, `cameraPermission`). Sem ele, o iOS encerra o app
+ * ao pedir a permissão; por isso a tela pergunta aqui antes de abrir.
+ */
+export function cameraConfigured(config: unknown = Constants.expoConfig): boolean {
+  const plugins = (config as { plugins?: unknown[] } | null | undefined)?.plugins;
+  if (!Array.isArray(plugins)) return false;
+  return plugins.some(
+    (entry) =>
+      Array.isArray(entry) &&
+      entry[0] === 'expo-image-picker' &&
+      typeof (entry[1] as { cameraPermission?: unknown } | undefined)?.cameraPermission === 'string',
+  );
+}
+
+export type CameraResult = { kind: 'photo'; asset: PickedAsset } | { kind: 'canceled' } | { kind: 'denied' };
+
+/** Tira uma foto agora. Pede a permissão da câmera só neste momento (nunca antes). */
+export async function takePhoto(): Promise<CameraResult> {
+  const permission = await ImagePicker.requestCameraPermissionsAsync();
+  if (!permission.granted) return { kind: 'denied' };
+  const result = await ImagePicker.launchCameraAsync({
+    mediaTypes: ['images'],
+    allowsEditing: false,
+    exif: false,
+    base64: false,
+    quality: 1,
+  });
+  if (result.canceled) return { kind: 'canceled' };
+  const asset = result.assets?.[0];
+  if (!asset?.uri) return { kind: 'canceled' };
+  return { kind: 'photo', asset: { uri: asset.uri, width: asset.width ?? 0, height: asset.height ?? 0 } };
 }

@@ -16,6 +16,7 @@ import {
   type CommunityClient,
 } from '@/community/api';
 import { CommunityError } from '@/community/errors';
+import { normalizeNewPost } from '@/community/validation';
 import { COMMUNITY_ENABLED } from '@/config/features';
 
 // jest.mock é içado pelo babel-jest para antes dos imports.
@@ -107,23 +108,45 @@ describe('feed com fim', () => {
     expect(toFeedPage(null)).toEqual({ posts: [], ended: true, nextCursor: null });
   });
 
-  test('o post do feed não carrega nenhum identificador de pessoa nem contagem', async () => {
-    const { community } = api({ community_feed: { data: [{ ...feedRow(0), author_id: 'vazou', amen_count: 7 }] } });
+  test('o post do feed não carrega nenhum identificador de pessoa (F3: número e rostinhos, sem id)', async () => {
+    const { community } = api({
+      community_feed: {
+        data: [
+          {
+            ...feedRow(0),
+            author_id: 'vazou',
+            amen_count: 7,
+            amen_faces: [{ name: 'Bruno', avatar_path: null, is_mine: false, user_id: 'vazou' }],
+          },
+        ],
+      },
+    });
     const page = await community.feedPage();
     expect(Object.keys(page.posts[0]).sort()).toEqual(
       [
+        'amenCount',
+        'amenFaces',
+        'audience',
+        'audienceMinistry',
         'authorAvatarPath',
         'authorMinistry',
         'authorName',
         'body',
+        'commentCount',
         'dayNumber',
         'iSaidAmen',
         'isMine',
+        'kind',
         'photoPath',
+        'photoPaths',
         'postId',
         'publishedAt',
+        'verse',
       ].sort(),
     );
+    expect(page.posts[0].amenCount).toBe(7);
+    expect(page.posts[0].amenFaces).toEqual([{ name: 'Bruno', avatarPath: null, isMine: false }]);
+    expect(JSON.stringify(page.posts[0])).not.toContain('vazou');
   });
 });
 
@@ -133,8 +156,14 @@ describe('publicar e comentar', () => {
     await expect(community.createPost({ body: '  Deus é fiel  ' })).resolves.toEqual({ id: POST, status: 'published' });
     expect(rpc).toHaveBeenCalledWith('create_community_post', {
       post_body: 'Deus é fiel',
-      post_photo_path: null,
+      post_photo_paths: null,
       post_day: null,
+      post_activity: 'livre',
+      post_verse_book: null,
+      post_verse_chapter: null,
+      post_verse_start: null,
+      post_verse_end: null,
+      post_audience: 'igreja',
     });
   });
 
@@ -166,7 +195,7 @@ describe('publicar e comentar', () => {
   });
 });
 
-describe('Amém sem contagem', () => {
+describe('Amém (desde 2026-09-22 o número e os rostinhos vêm no feed; set_amen devolve só o meu estado)', () => {
   test('liga e desliga só o MEU Amém; a resposta é o meu estado', async () => {
     const { community, rpc } = api({ set_amen: { data: true } });
     await expect(community.setAmen(POST, true)).resolves.toBe(true);
@@ -443,5 +472,188 @@ describe('perfil (feedback de 2026-09-22: C1, C4, N3)', () => {
   test('perfil incompleto no servidor (CM007) vira mensagem própria', async () => {
     const { community } = api({ create_community_post: { error: { code: 'CM007' } } });
     await expectCode(community.createPost({ body: 'Oi' }), 'needs_profile');
+  });
+});
+
+describe('diário compartilhado (F1, F3, F5, F6, F8 — 2026-09-22)', () => {
+  const PHOTO_A = 'aaaaaaaa-0000-4000-8000-000000000001.jpg';
+  const PHOTO_B = 'aaaaaaaa-0000-4000-8000-000000000002.jpg';
+
+  function withFunctions(result: { data?: unknown; error?: unknown } | Error, rpcResults: Record<string, RpcResult> = {}) {
+    const fake = fakeClient(rpcResults);
+    const invoke = jest.fn(async (_name: string, _options: { body: Record<string, unknown> }) => {
+      if (result instanceof Error) throw result;
+      return { data: result.data ?? null, error: result.error ?? null };
+    });
+    const client: CommunityClient = { ...fake.client, functions: { invoke } };
+    return { ...fake, invoke, community: createCommunityApi(client, { randomUUID: () => 'x' }) };
+  }
+  function edgeError(status: number, body: unknown) {
+    return { name: 'FunctionsHttpError', context: { status, json: async () => body } };
+  }
+
+  test('F1: tipo, dia, versículo (só a referência) e público vão para a RPC', async () => {
+    const { community, rpc } = api({ create_community_post: { data: [{ post_id: POST, status: 'published' }] } });
+    await community.createPost({
+      body: ' Deus falou comigo ',
+      kind: 'versiculo',
+      day: 3,
+      verse: { book: 'JHN', chapter: 3, verseStart: 16, verseEnd: 17 },
+      audience: 'ministerio',
+    });
+    expect(rpc).toHaveBeenCalledWith('create_community_post', {
+      post_body: 'Deus falou comigo',
+      post_photo_paths: null,
+      post_day: 3,
+      post_activity: 'versiculo',
+      post_verse_book: 'JHN',
+      post_verse_chapter: 3,
+      post_verse_start: 16,
+      post_verse_end: 17,
+      post_audience: 'ministerio',
+    });
+  });
+
+  test('F1: "Jejum" sem texto sai; vazio de tudo, 5 fotos, foto repetida, livro inexistente ou capítulo além do livro não saem', async () => {
+    const { community, rpc } = api({ create_community_post: { data: [{ post_id: POST, status: 'published' }] } });
+    await expect(community.createPost({ kind: 'jejum' })).resolves.toEqual({ id: POST, status: 'published' });
+    rpc.mockClear();
+    await expectCode(community.createPost({}), 'invalid_input');
+    await expectCode(community.createPost({ photoPaths: [PHOTO_A, PHOTO_B, PHOTO_A.replace('1.jpg', '3.jpg'), PHOTO_A.replace('1.jpg', '4.jpg'), PHOTO_A.replace('1.jpg', '5.jpg')] }), 'invalid_input');
+    await expectCode(community.createPost({ photoPaths: [PHOTO_A, PHOTO_A] }), 'invalid_input');
+    await expectCode(community.createPost({ kind: 'versiculo' }), 'invalid_input');
+    await expectCode(community.createPost({ verse: { book: 'XYZ', chapter: 1, verseStart: 1, verseEnd: null } }), 'invalid_input');
+    await expectCode(community.createPost({ verse: { book: 'JUD', chapter: 2, verseStart: 1, verseEnd: null } }), 'invalid_input');
+    await expectCode(community.createPost({ verse: { book: 'PSA', chapter: 23, verseStart: 4, verseEnd: 2 } }), 'invalid_input');
+    await expectCode(community.createPost({ body: 'oi', kind: 'corrida' as never }), 'invalid_input');
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  test('photoPath antigo repetido em photoPaths conta uma vez só', () => {
+    const ok = () => true;
+    expect(normalizeNewPost({ photoPaths: [PHOTO_A], photoPath: PHOTO_A }, ok)?.photoPaths).toEqual([PHOTO_A]);
+    expect(normalizeNewPost({ photoPaths: [PHOTO_A], photoPath: PHOTO_B }, ok)?.photoPaths).toEqual([PHOTO_A, PHOTO_B]);
+    expect(normalizeNewPost({ photoPaths: [PHOTO_A, PHOTO_A] }, ok)).toBeNull();
+  });
+
+  test('F5: post com foto vai por submit-post (filtro automático) e pode sair publicado na hora', async () => {
+    const { community, invoke, rpc } = withFunctions({ data: { post_id: POST, status: 'published', photo_check: 'feito' } });
+    await expect(community.createPost({ body: 'Culto', photoPaths: [PHOTO_A, PHOTO_B] })).resolves.toEqual({
+      id: POST,
+      status: 'published',
+    });
+    expect(invoke).toHaveBeenCalledWith('submit-post', {
+      body: { post: expect.objectContaining({ post_body: 'Culto', post_photo_paths: [PHOTO_A, PHOTO_B] }) },
+    });
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  test('F5: a foto antiga (photoPath) também serve; sem filtro no servidor volta "em análise"', async () => {
+    const { community } = withFunctions({ data: { post_id: POST, status: 'in_review', photo_check: 'sem_filtro' } });
+    await expect(community.createPost({ photoPath: PHOTO_A })).resolves.toEqual({ id: POST, status: 'in_review' });
+  });
+
+  test('F5: texto sem foto vai direto pela RPC, mesmo com as funções disponíveis', async () => {
+    const { community, invoke, rpc } = withFunctions(
+      { data: {} },
+      { create_community_post: { data: [{ post_id: POST, status: 'published' }] } },
+    );
+    await community.createPost({ body: 'Li hoje.' });
+    expect(invoke).not.toHaveBeenCalled();
+    expect(rpc).toHaveBeenCalledWith('create_community_post', expect.anything());
+  });
+
+  test('F5: função não publicada (404) cai na RPC; regra do banco vem traduzida; rede fora vira "sem conexão"', async () => {
+    const missing = withFunctions(
+      { error: edgeError(404, {}) },
+      { create_community_post: { data: [{ post_id: POST, status: 'in_review' }] } },
+    );
+    await expect(missing.community.createPost({ photoPaths: [PHOTO_A] })).resolves.toEqual({ id: POST, status: 'in_review' });
+    expect(missing.rpc).toHaveBeenCalledWith('create_community_post', expect.objectContaining({ post_photo_paths: [PHOTO_A] }));
+
+    const profile = withFunctions({ error: edgeError(400, { error: 'rejected', code: 'CM007' }) });
+    await expectCode(profile.community.createPost({ photoPaths: [PHOTO_A] }), 'needs_profile');
+    expect(profile.rpc).not.toHaveBeenCalled();
+
+    const offline = withFunctions({ error: { name: 'FunctionsFetchError' } });
+    await expectCode(offline.community.createPost({ photoPaths: [PHOTO_A] }), 'offline');
+    // Sem repetir pela RPC: a função pode ter criado o post antes de cair.
+    expect(offline.rpc).not.toHaveBeenCalled();
+
+    const expired = withFunctions({ error: edgeError(401, { error: 'unauthorized' }) });
+    await expectCode(expired.community.createPost({ photoPaths: [PHOTO_A] }), 'session_expired');
+  });
+
+  test('F6: escopo "ministério" do feed', async () => {
+    const { community, rpc } = api({ community_feed: { data: [] } });
+    await community.feedPage(null, { scope: 'ministerio' });
+    expect(rpc).toHaveBeenCalledWith('community_feed', { feed_scope: 'ministerio' });
+    await community.feedPage(null, { scope: 'igreja' });
+    expect(rpc).toHaveBeenLastCalledWith('community_feed', {});
+  });
+
+  test('F1/F3/F6: campos novos do feed, lidos com segurança', async () => {
+    const { community } = api({
+      community_feed: {
+        data: [
+          {
+            ...feedRow(0),
+            activity: 'leitura',
+            verse_book: 'PSA',
+            verse_chapter: 23,
+            verse_start: 1,
+            verse_end: null,
+            photo_path: PHOTO_A,
+            photo_paths: [PHOTO_A, PHOTO_B, '../x.jpg'],
+            audience: 'ministerio',
+            audience_ministry: 'Louvor',
+            amen_count: 1,
+            amen_faces: [
+              { name: 'Eu', avatar_path: PHOTO_B, is_mine: true },
+              { name: 'Ana' },
+              { name: '  ' },
+              { name: 'Bia' },
+              { name: 'Caio' },
+            ],
+            comment_count: 2,
+          },
+          { ...feedRow(1), activity: 'livre', audience: 'outra-coisa' },
+        ],
+      },
+    });
+    const [first, second] = (await community.feedPage()).posts;
+    expect(first).toMatchObject({
+      kind: 'leitura',
+      verse: { book: 'PSA', chapter: 23, verseStart: 1, verseEnd: null },
+      photoPath: PHOTO_A,
+      photoPaths: [PHOTO_A, PHOTO_B],
+      audience: 'ministerio',
+      audienceMinistry: 'Louvor',
+      commentCount: 2,
+    });
+    // No máximo 3 rostos; o número nunca é menor que os rostos que vieram.
+    expect(first.amenFaces?.map((f) => f.name)).toEqual(['Eu', 'Ana', 'Bia']);
+    expect(first.amenCount).toBe(3);
+    expect(second).toMatchObject({ kind: null, audience: 'igreja', audienceMinistry: null, amenCount: 0, amenFaces: [], photoPaths: [] });
+  });
+
+  test('F8: atividade (Amém e comentário), sem nome vira "Alguém da comunidade", linha estranha some; marcar como visto', async () => {
+    const { community, rpc } = api({
+      my_community_activity: {
+        data: [
+          { activity_id: '60000000-0000-4000-8000-000000000001', kind: 'comentario', post_id: POST, actor_name: 'Ana', actor_avatar_path: null, created_at: '2026-10-01T12:00:00Z', preview: 'Que bom!', unread: true },
+          { activity_id: '60000000-0000-4000-8000-000000000002', kind: 'amen', post_id: POST, actor_name: null, actor_avatar_path: null, created_at: '2026-10-01T11:00:00Z', preview: 'ignorado', unread: false },
+          { activity_id: '60000000-0000-4000-8000-000000000003', kind: 'seguiu', post_id: POST },
+        ],
+      },
+      my_community_status: { data: [{ is_member: true, has_new_activity: true }] },
+    });
+    await expect(community.myActivity()).resolves.toEqual([
+      { activityId: '60000000-0000-4000-8000-000000000001', kind: 'comment', postId: POST, actorName: 'Ana', actorAvatarPath: null, at: '2026-10-01T12:00:00Z', preview: 'Que bom!', unread: true },
+      { activityId: '60000000-0000-4000-8000-000000000002', kind: 'amen', postId: POST, actorName: 'Alguém da comunidade', actorAvatarPath: null, at: '2026-10-01T11:00:00Z', preview: null, unread: false },
+    ]);
+    await expect(community.getStatus()).resolves.toMatchObject({ hasNewActivity: true });
+    await community.markActivitySeen();
+    expect(rpc).toHaveBeenCalledWith('mark_community_activity_seen', undefined);
   });
 });

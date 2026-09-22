@@ -293,7 +293,9 @@ export default ({ config, projectRoot }: ConfigContext): ExpoConfig => {
       'expo-secure-store',
       'expo-font',
       [
-        // Comunidade (C3): só a galeria do sistema, sem câmera nem microfone. No
+        // Comunidade (C3 + F2 de 2026-09-22): galeria e câmera, sem microfone. A câmera
+        // só pede permissão quando a pessoa toca em Câmera no Criar post; sem este
+        // texto de finalidade o iOS encerraria o app (ver cameraConfigured em foto.ts). No
         // iOS 14+ e no Android 13+ o seletor do sistema não pede permissão, mas o
         // módulo entra no binário mesmo com a Comunidade desligada, e a App Store
         // recusa binário que cita a fototeca sem texto de finalidade (ITMS-90683).
@@ -301,7 +303,8 @@ export default ({ config, projectRoot }: ConfigContext): ExpoConfig => {
         {
           photosPermission:
             'O app usa a sua galeria só quando você escolhe uma foto para publicar na comunidade da igreja.',
-          cameraPermission: false,
+          cameraPermission:
+            'O app usa a câmera só quando você escolhe tirar uma foto para publicar na comunidade da igreja.',
           microphonePermission: false,
         },
       ],

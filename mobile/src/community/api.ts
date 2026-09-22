@@ -9,31 +9,38 @@ import { communityError, toCommunityError } from './errors';
 import { assertPhotoSafeToUpload, isPhotoPath, newPhotoPath, PHOTO_BUCKET, SIGNED_URL_TTL_SECONDS } from './photos';
 import { isValidContactEmail, profileArgs, type ProfileUpdate } from './profile';
 import type {
+  ActivityItem,
+  AmenFace,
   AvatarStatus,
   CommunityStatus,
   ContentStatus,
+  DiaryFields,
   FeedCursor,
   FeedPage,
   FeedPost,
+  FeedScope,
   HoldReason,
   MemberStatus,
   MyBlock,
   MyPost,
+  NewPost,
   PostComment,
+  PostKind,
   PublishResult,
   ReportReason,
   ReportTarget,
   TermsPurpose,
+  VerseAttachment,
 } from './types';
-import { REPORT_REASONS } from './types';
+import { MAX_AMEN_FACES, POST_KINDS, REPORT_REASONS } from './types';
 import {
   cleanText,
   isUuid,
   isValidCommentBody,
   isValidDisplayName,
-  isValidPostBody,
   LIMITS,
   charLength,
+  normalizeNewPost,
 } from './validation';
 
 /**
@@ -63,6 +70,12 @@ export type CommunityClient = {
       remove(paths: string[]): PromiseLike<Result<unknown>>;
     };
   };
+  /**
+   * Edge Functions (supabase.functions). Post com foto vai por submit-post, que
+   * passa as fotos pelo filtro automático (F5). Sem isto, o post vai pela RPC e a
+   * foto espera a aprovação humana (o padrão seguro).
+   */
+  functions?: FunctionsInvoker;
 };
 
 type Row = Record<string, unknown>;
@@ -92,11 +105,65 @@ function rows(data: unknown): Row[] {
   return Array.isArray(data) ? (data as Row[]) : [];
 }
 
-export function toFeedPost(row: Row): FeedPost {
+function toVerse(row: Row): VerseAttachment | null {
+  const book = str(row.verse_book);
+  const chapter = num(row.verse_chapter);
+  const verseStart = num(row.verse_start);
+  if (!book || chapter === null || verseStart === null) return null;
+  return { book, chapter, verseStart, verseEnd: num(row.verse_end) };
+}
+
+function toPhotoPaths(row: Row): string[] {
+  const listed = Array.isArray(row.photo_paths)
+    ? row.photo_paths.filter((p): p is string => typeof p === 'string' && isPhotoPath(p))
+    : [];
+  const first = str(row.photo_path);
+  const paths = listed.length > 0 ? listed : first && isPhotoPath(first) ? [first] : [];
+  return paths.slice(0, LIMITS.postPhotos);
+}
+
+/** Rostinhos de quem disse Amém: só nome, foto e se é o meu. Qualquer outra chave é ignorada. */
+function toFaces(value: unknown): AmenFace[] {
+  if (!Array.isArray(value)) return [];
+  const faces: AmenFace[] = [];
+  for (const item of value) {
+    if (item === null || typeof item !== 'object') continue;
+    const face = item as Row;
+    const name = cleanText(str(face.name));
+    if (!name) continue;
+    faces.push({ name, avatarPath: str(face.avatar_path), isMine: bool(face.is_mine) });
+  }
+  return faces.slice(0, MAX_AMEN_FACES);
+}
+
+function count(value: unknown): number {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? Math.floor(value) : 0;
+}
+
+/** Campos do diário compartilhado (F1, F3, F6). 'livre' vira kind null. */
+function toDiary(row: Row): DiaryFields {
+  const audience: FeedScope = row.audience === 'ministerio' ? 'ministerio' : 'igreja';
+  const amenFaces = toFaces(row.amen_faces);
   return {
+    kind: oneOf<PostKind>(row.activity, POST_KINDS),
+    verse: toVerse(row),
+    photoPaths: toPhotoPaths(row),
+    audience,
+    audienceMinistry: audience === 'ministerio' ? str(row.audience_ministry) : null,
+    // O número nunca fica menor que os rostos que vieram.
+    amenCount: Math.max(count(row.amen_count), amenFaces.length),
+    amenFaces,
+    commentCount: count(row.comment_count),
+  };
+}
+
+export function toFeedPost(row: Row): FeedPost & DiaryFields {
+  const diary = toDiary(row);
+  return {
+    ...diary,
     postId: str(row.post_id) ?? '',
     body: str(row.body),
-    photoPath: str(row.photo_path),
+    photoPath: diary.photoPaths[0] ?? null,
     dayNumber: num(row.day_number),
     publishedAt: str(row.published_at) ?? '',
     authorName: str(row.author_name) ?? '',
@@ -130,12 +197,14 @@ export function toComment(row: Row): PostComment {
   };
 }
 
-export function toMyPost(row: Row): MyPost {
+export function toMyPost(row: Row): MyPost & DiaryFields {
   const decidedBy = row.decided_by === 'pessoa' || row.decided_by === 'automatico' ? row.decided_by : null;
+  const diary = toDiary(row);
   return {
+    ...diary,
     postId: str(row.post_id) ?? '',
     body: str(row.body),
-    photoPath: str(row.photo_path),
+    photoPath: diary.photoPaths[0] ?? null,
     dayNumber: num(row.day_number),
     status: contentStatus(row.status),
     holdReason: oneOf(row.hold_reason, HOLD_REASONS),
@@ -174,8 +243,55 @@ export function toStatus(data: unknown): CommunityStatus {
     publishConsentVersion: str(row.publish_consent_version) ?? 'PENDENTE',
     rulesVersion: str(row.rules_version) ?? 'PENDENTE',
     isModerator: bool(row.is_moderator),
+    hasNewActivity: bool(row.has_new_activity),
   };
 }
+
+/** Quem disse Amém sem ter escolhido nome ainda. */
+export const ANONYMOUS_ACTOR = 'Alguém da comunidade';
+
+/** Atividade (F8). Linha estranha é descartada; nunca vira item inventado. */
+export function toActivity(row: Row): ActivityItem | null {
+  const kind = row.kind === 'amen' ? 'amen' : row.kind === 'comentario' ? 'comment' : null;
+  const activityId = str(row.activity_id);
+  const postId = str(row.post_id);
+  if (!kind || !activityId || !postId) return null;
+  return {
+    activityId,
+    kind,
+    postId,
+    actorName: cleanText(str(row.actor_name)) ?? ANONYMOUS_ACTOR,
+    actorAvatarPath: str(row.actor_avatar_path),
+    at: str(row.created_at) ?? '',
+    preview: kind === 'comment' ? str(row.preview) : null,
+    unread: bool(row.unread),
+  };
+}
+
+export const SUBMIT_POST_FUNCTION = 'submit-post';
+
+/**
+ * Argumentos de create_community_post (e do corpo de submit-post), validados no
+ * aparelho com as mesmas regras do servidor (que confere tudo de novo).
+ */
+export function postArgs(input: NewPost): Record<string, unknown> {
+  const post = normalizeNewPost(input, isPhotoPath);
+  if (!post) throw communityError('invalid_input');
+  return {
+    post_body: post.body,
+    post_photo_paths: post.photoPaths.length > 0 ? post.photoPaths : null,
+    post_day: post.day,
+    post_activity: post.kind ?? 'livre',
+    post_verse_book: post.verse?.book ?? null,
+    post_verse_chapter: post.verse?.chapter ?? null,
+    post_verse_start: post.verse?.verseStart ?? null,
+    post_verse_end: post.verse?.verseEnd ?? null,
+    post_audience: post.audience,
+  };
+}
+
+/** Códigos do banco que submit-post devolve em `code` (o resto vira erro genérico). */
+const PASSTHROUGH_CODES = new Set(['CM001', 'CM002', 'CM003', 'CM004', 'CM005', 'CM006', 'CM007', '22023', 'P0002', '42501']);
 
 function toPublishResult(data: unknown, idKey: 'post_id' | 'comment_id'): PublishResult {
   const row = rows(data)[0];
@@ -293,13 +409,29 @@ export function createCommunityApi(client: CommunityClient, deps: { randomUUID: 
       await call('set_community_display_name', { new_name: name.trim() });
     },
 
-    /** Primeira página sem cursor; as seguintes com o nextCursor da anterior. */
-    async feedPage(cursor?: FeedCursor | null): Promise<FeedPage> {
-      const data = await call(
-        'community_feed',
-        cursor ? { before_published_at: cursor.beforePublishedAt, before_post: cursor.beforePost } : {},
-      );
-      return toFeedPage(data);
+    /**
+     * Primeira página sem cursor; as seguintes com o nextCursor da anterior.
+     * scope 'igreja' (padrão) = tudo o que eu posso ver; 'ministerio' = só o que
+     * foi publicado para o meu ministério (F6).
+     */
+    async feedPage(cursor?: FeedCursor | null, options: { scope?: FeedScope } = {}): Promise<FeedPage> {
+      const args: Record<string, unknown> = cursor
+        ? { before_published_at: cursor.beforePublishedAt, before_post: cursor.beforePost }
+        : {};
+      if (options.scope === 'ministerio') args.feed_scope = 'ministerio';
+      return toFeedPage(await call('community_feed', args));
+    },
+
+    /** Atividade no app (F8): Amém e comentários de outras pessoas nos meus posts. */
+    async myActivity(): Promise<ActivityItem[]> {
+      return rows(await call('my_community_activity'))
+        .map(toActivity)
+        .filter((item): item is ActivityItem => item !== null);
+    },
+
+    /** Marca toda a minha atividade como vista (apaga o ponto do sino). */
+    async markActivitySeen(): Promise<void> {
+      await call('mark_community_activity_seen');
     },
 
     async postComments(postId: string): Promise<PostComment[]> {
@@ -312,21 +444,22 @@ export function createCommunityApi(client: CommunityClient, deps: { randomUUID: 
       return rows(await call('my_community_posts')).map(toMyPost);
     },
 
-    /** Texto limpo volta 'published'; texto segurado pelo filtro e toda foto voltam 'in_review'. */
-    async createPost(input: { body?: string | null; photoPath?: string | null; day?: number | null }): Promise<PublishResult> {
-      const body = cleanText(input.body);
-      const photoPath = input.photoPath ?? null;
-      if (!body && !photoPath) throw communityError('invalid_input');
-      if (!isValidPostBody(body)) throw communityError('invalid_input');
-      if (photoPath && !isPhotoPath(photoPath)) throw communityError('invalid_input');
-      const day = input.day ?? null;
-      if (day !== null && (!Number.isInteger(day) || day < 1 || day > 100)) throw communityError('invalid_input');
-      const data = await call('create_community_post', {
-        post_body: body,
-        post_photo_path: photoPath,
-        post_day: day,
-      });
-      return toPublishResult(data, 'post_id');
+    /**
+     * Publica o post do dia (F1): tipo, texto, até 4 fotos (já enviadas com
+     * uploadPhoto), dia da campanha, versículo (só a referência) e público (F6).
+     *
+     * Sem foto: RPC direta; texto limpo volta 'published'. Com foto: submit-post,
+     * que passa as fotos pelo filtro automático (F5) e devolve 'published' se tudo
+     * estiver limpo, ou 'in_review' (suspeita, filtro não configurado, fora do ar).
+     * Texto segurado pelo filtro de texto volta sempre 'in_review'.
+     */
+    async createPost(input: NewPost): Promise<PublishResult> {
+      const args = postArgs(input);
+      if (args.post_photo_paths && client.functions) {
+        const viaFunction = await submitPost(client.functions, args);
+        if (viaFunction) return viaFunction;
+      }
+      return toPublishResult(await call('create_community_post', args), 'post_id');
     },
 
     async deletePost(postId: string): Promise<void> {
@@ -348,7 +481,7 @@ export function createCommunityApi(client: CommunityClient, deps: { randomUUID: 
       await call('delete_my_community_comment', { target_comment: requireUuid(commentId) });
     },
 
-    /** Liga/desliga o MEU Amém. Devolve só o meu novo estado; não existe total. */
+    /** Liga/desliga o MEU Amém. Devolve só o meu novo estado; o número e os rostinhos (F3) vêm no feed. */
     async setAmen(postId: string, amen: boolean): Promise<boolean> {
       const data = await call('set_amen', { target_post: requireUuid(postId), amen });
       return data === true;
@@ -455,9 +588,40 @@ export async function termsSha256(text: string): Promise<string> {
   return hex.toLowerCase();
 }
 
+/**
+ * Chama submit-post (F5). Devolve null SÓ quando a função não está publicada no
+ * projeto (404): aí o post vai pela RPC e a foto espera uma pessoa. Qualquer
+ * outra falha vira erro: repetir pela RPC poderia criar o post duas vezes (a
+ * função pode ter criado antes de cair).
+ */
+async function submitPost(functions: FunctionsInvoker, args: Record<string, unknown>): Promise<PublishResult | null> {
+  let result: { data: unknown; error: unknown };
+  try {
+    result = await functions.invoke(SUBMIT_POST_FUNCTION, { body: { post: args } });
+  } catch (error) {
+    throw toCommunityError(error);
+  }
+  if (!result.error) {
+    const row = (result.data ?? {}) as Row;
+    const id = str(row.post_id);
+    if (!id || !isUuid(id)) throw communityError('unknown');
+    return { id, status: contentStatus(row.status) };
+  }
+  const name = (result.error as { name?: unknown } | null)?.name;
+  if (name === 'FunctionsFetchError') throw communityError('offline');
+  const context = (result.error as { context?: unknown } | null)?.context as { status?: unknown } | undefined;
+  if (context?.status === 404) return null;
+  const body = await edgeErrorBody(result.error);
+  if (str(body?.error) === 'unauthorized') throw communityError('session_expired');
+  const code = str(body?.code);
+  if (code && PASSTHROUGH_CODES.has(code)) throw toCommunityError({ code });
+  throw communityError('unknown');
+}
+
 /** Adapta o SupabaseClient ao cliente mínimo. */
 export function communityClientFrom(supabase: SupabaseClient): CommunityClient {
   return {
+    functions: supabase.functions,
     rpc: (fn, args) => supabase.rpc(fn, args),
     storage: {
       from: (bucket) => {
@@ -511,15 +675,19 @@ export type FunctionsInvoker = {
 export const DELETE_ACCOUNT_FUNCTION = 'delete-account';
 
 /** Lê o `{ error: '…' }` do corpo de uma resposta não-2xx da Edge Function. */
-async function edgeErrorCode(error: unknown): Promise<string | null> {
+async function edgeErrorBody(error: unknown): Promise<Row | null> {
   const context = (error as { context?: unknown } | null)?.context as { json?: () => Promise<unknown> } | undefined;
   if (!context || typeof context.json !== 'function') return null;
   try {
     const body = await context.json();
-    return str((body as Row | null)?.error);
+    return body !== null && typeof body === 'object' ? (body as Row) : null;
   } catch {
     return null;
   }
+}
+
+async function edgeErrorCode(error: unknown): Promise<string | null> {
+  return str((await edgeErrorBody(error))?.error);
 }
 
 /**

@@ -246,7 +246,7 @@ set local role authenticated;
 insert into storage.objects (bucket_id, name, owner_id)
   values ('community-photos', 'a1a10000-0000-4000-8000-000000000001.jpg', '00000000-0000-4000-8000-0000000012a1'),
          ('community-photos', 'a1a10000-0000-4000-8000-000000000002.jpg', '00000000-0000-4000-8000-0000000012a1');
-select is((select status from public.create_community_post(post_photo_path => 'a1a10000-0000-4000-8000-000000000001.jpg')),
+select is((select status from public.create_community_post(post_photo_paths => array['a1a10000-0000-4000-8000-000000000001.jpg'])),
   'in_review', 'post só com foto vai para análise');
 delete from storage.objects where name = 'a1a10000-0000-4000-8000-000000000001.jpg';
 delete from storage.objects where name = 'a1a10000-0000-4000-8000-000000000002.jpg';

@@ -7,31 +7,38 @@ import { communityError } from './errors';
 import { assertPhotoSafeToUpload } from './photos';
 import { EMPTY_PROFILE, isProfileComplete, isValidContactEmail, profileArgs, type ProfileUpdate } from './profile';
 import type {
+  ActivityItem,
+  AmenFace,
   AvatarStatus,
   CommunityProfile,
   CommunityStatus,
   ContentStatus,
+  DiaryFields,
   FeedCursor,
   FeedPage,
   FeedPost,
+  FeedScope,
   HoldReason,
   MyBlock,
   MyPost,
+  NewPost,
   PostComment,
+  PostKind,
   PublishResult,
   ReportReason,
   ReportTarget,
   TermsPurpose,
+  VerseAttachment,
 } from './types';
-import { REPORT_REASONS } from './types';
+import { MAX_AMEN_FACES, REPORT_REASONS } from './types';
 import {
   charLength,
   cleanText,
   isUuid,
   isValidCommentBody,
   isValidDisplayName,
-  isValidPostBody,
   LIMITS,
+  normalizeNewPost,
 } from './validation';
 
 /**
@@ -55,6 +62,15 @@ import {
  * Desde 2026-09-22 (C2) não há passo de e-mail: a entrada é direta, como a
  * conta ligada ao aparelho do app real. A foto de perfil fica só na memória
  * (o arquivo preparado no aparelho), em análise, como no real.
+ *
+ * Diário compartilhado (2026-09-22, F1, F3, F5, F6, F8): as publicações de
+ * exemplo têm tipos variados (leitura, oração, jejum, versículo — só a
+ * REFERÊNCIA, nunca o texto bíblico — e livre), números de Amém de
+ * DEMONSTRAÇÃO (DEMO_AMEN_NOTE) com rostinhos de nomes "(exemplo)", e uma delas
+ * vai para "o ministério de quem está vendo" (só aparece com ministério no
+ * perfil). Fotos de post aparecem na hora, como com o filtro automático
+ * configurado (F5, simulado: nada sai do aparelho). Ao publicar, "Maria
+ * (exemplo)" diz Amém e o sino (F8) acende.
  */
 
 /** Caminho fictício da foto de perfil na demonstração (o arquivo fica no aparelho). */
@@ -63,6 +79,9 @@ export const DEMO_BADGE = 'Demonstração · nada é enviado';
 /** Aviso nas regras e no consentimento enquanto o texto é rascunho (PENDENTE). */
 export const DEMO_TERMS_NOTICE =
   'Rascunho em revisão (PENDENTE). No app de verdade este texto ainda não pode ser aceito; na demonstração, dá para seguir.';
+
+/** Os números de Amém dos exemplos são fictícios. */
+export const DEMO_AMEN_NOTE = 'Números de Amém de demonstração';
 
 const DEMO_DAY_DEFAULT = 3;
 
@@ -126,15 +145,24 @@ type DemoPost = {
   postId: string;
   author: Author;
   body: string | null;
-  /** Foto (só na memória, como data URI). */
-  photoPath?: string | null;
+  /** Fotos (só na memória, como data URI), na ordem do carrossel. */
+  photoPaths: string[];
   dayNumber: number | null;
+  kind: PostKind | null;
+  verse: VerseAttachment | null;
+  audience: FeedScope;
+  /** Com audience 'ministerio': null = "o ministério de quem está vendo" (exemplo). */
+  audienceMinistry: string | null;
   createdAt: string;
   publishedAt: string | null;
   status: ContentStatus;
   holdReason: HoldReason | null;
   amen: boolean;
+  /** Amém de outras pessoas (demonstração): o número e os rostinhos. */
+  otherAmens: number;
+  otherFaces: AmenFace[];
 };
+type DemoActivity = { activityId: string; postId: string; kind: 'amen' | 'comment'; actorName: string; at: string; preview: string | null; unread: boolean };
 type DemoComment = {
   commentId: string;
   postId: string;
@@ -155,6 +183,7 @@ type State = {
   posts: DemoPost[];
   comments: DemoComment[];
   blocks: DemoBlock[];
+  activity: DemoActivity[];
   reports: number;
   nextId: number;
   /** Relógio da demonstração: o "agora" do seed mais o tempo real passado desde então. */
@@ -196,39 +225,80 @@ function seed(now = Date.now()): State {
   const carla: Author = { key: 'carla', name: 'Carla (exemplo)' };
   const rafael: Author = { key: 'rafael', name: 'Rafael (exemplo)' };
 
-  const post = (n: number, author: Author, body: string, dayNumber: number, minutes: number): DemoPost => ({
+  const face = (name: string): AmenFace => ({ name, avatarPath: null, isMine: false });
+  const post = (
+    n: number,
+    author: Author,
+    body: string,
+    dayNumber: number | null,
+    minutes: number,
+    extra: Partial<DemoPost> = {},
+  ): DemoPost => ({
     postId: uuid(n),
     author,
     body,
+    photoPaths: [],
     dayNumber,
+    kind: null,
+    verse: null,
+    audience: 'igreja',
+    audienceMinistry: null,
     createdAt: minutesAgo(now, minutes),
     publishedAt: minutesAgo(now, minutes),
     status: 'published',
     holdReason: null,
     amen: false,
+    otherAmens: 0,
+    otherFaces: [],
+    ...extra,
   });
 
+  // Números de Amém de DEMONSTRAÇÃO (DEMO_AMEN_NOTE); rostinhos só de nomes "(exemplo)".
   const posts: DemoPost[] = [
-    post(101, maria, 'Hoje separei quinze minutos antes do trabalho para ler. Parece pouco, mas mudou o tom do meu dia.', d(0), 12),
-    post(102, joao, 'Estou orando pela minha família todos os dias desta semana. Quem quiser, ore comigo também.', d(0), 55),
-    post(103, ana, 'Confesso que atrasei um dia, mas voltei. Ler junto com a igreja me ajuda a não desistir.', d(1), 60 * 20),
-    post(104, pedro, 'O jejum de ontem foi mais difícil do que eu esperava. Terminei o dia grato e em paz.', d(1), 60 * 26),
-    post(105, lucas, 'Comecei a ler com meu filho à noite. Ele faz perguntas em que eu nunca tinha pensado.', d(2), 60 * 45),
+    post(101, maria, 'Hoje separei quinze minutos antes do trabalho para ler. Parece pouco, mas mudou o tom do meu dia.', d(0), 12, {
+      kind: 'leitura',
+      otherAmens: 12,
+      otherFaces: [face('Carla (exemplo)'), face('João (exemplo)'), face('Rafael (exemplo)')],
+    }),
+    post(102, joao, 'Estou orando pela minha família todos os dias desta semana. Quem quiser, ore comigo também.', d(0), 55, {
+      kind: 'oracao',
+      otherAmens: 23,
+      otherFaces: [face('Rafael (exemplo)'), face('Ana (exemplo)'), face('Maria (exemplo)')],
+    }),
+    // Versículo: só a REFERÊNCIA (Salmos 119:105). O app mostra o texto da tradução aberta do aparelho.
+    post(103, ana, 'Confesso que atrasei um dia, mas voltei. Ler junto com a igreja me ajuda a não desistir.', d(1), 60 * 20, {
+      kind: 'versiculo',
+      verse: { book: 'PSA', chapter: 119, verseStart: 105, verseEnd: null },
+      otherAmens: 7,
+      otherFaces: [face('Pedro (exemplo)'), face('Lucas (exemplo)')],
+    }),
+    post(104, pedro, 'O jejum de ontem foi mais difícil do que eu esperava. Terminei o dia grato e em paz.', d(1), 60 * 26, {
+      kind: 'jejum',
+      otherAmens: 4,
+      otherFaces: [face('Maria (exemplo)')],
+    }),
+    post(105, lucas, 'Comecei a ler com meu filho à noite. Ele faz perguntas em que eu nunca tinha pensado.', d(2), 60 * 45, {
+      otherAmens: 9,
+      otherFaces: [face('Ana (exemplo)'), face('Carla (exemplo)'), face('João (exemplo)')],
+    }),
+    // Para "o ministério de quem está vendo": só aparece com ministério no perfil (F6).
+    post(107, carla, 'Nosso ministério vai orar junto hoje às 21h, cada um da sua casa.', null, 90, {
+      kind: 'oracao',
+      audience: 'ministerio',
+      otherAmens: 5,
+      otherFaces: [face('Rafael (exemplo)'), face('Pedro (exemplo)')],
+    }),
   ];
   // A própria pessoa: um exemplo de publicação que ficou "em análise" (só ela vê).
   // Some no modo "pessoa nova" (EXPO_PUBLIC_DEMO_SEED=false): quem acabou de entrar não publicou nada.
   if (process.env.EXPO_PUBLIC_DEMO_SEED !== 'false') {
-    posts.push({
-      postId: uuid(106),
-      author: { key: 'me', name: '' },
-      body: 'Exemplo de publicação em análise: é assim que aparece um texto que a equipe da igreja ainda vai olhar.',
-      dayNumber: d(1),
-      createdAt: minutesAgo(now, 60 * 3),
-      publishedAt: null,
-      status: 'in_review',
-      holdReason: 'termo',
-      amen: false,
-    });
+    posts.push(
+      post(106, { key: 'me', name: '' }, 'Exemplo de publicação em análise: é assim que aparece um texto que a equipe da igreja ainda vai olhar.', d(1), 60 * 3, {
+        publishedAt: null,
+        status: 'in_review',
+        holdReason: 'termo',
+      }),
+    );
   }
 
   const comments: DemoComment[] = [
@@ -259,6 +329,7 @@ function seed(now = Date.now()): State {
     posts,
     comments,
     blocks: [],
+    activity: [],
     reports: 0,
     nextId: 1000,
     seededAt: now,
@@ -355,7 +426,60 @@ function toStatus(s: State): CommunityStatus {
     publishConsentVersion: 'PENDENTE',
     rulesVersion: 'PENDENTE',
     isModerator: false,
+    hasNewActivity: s.member && visibleActivity(s).some((a) => a.unread),
   };
+}
+
+/** Público do post (F6): toda a igreja, o meu próprio, ou o ministério de quem vê. */
+function audienceAllows(s: State, p: DemoPost): boolean {
+  if (p.audience === 'igreja' || isMe(p.author)) return true;
+  const mine = s.profile.ministry;
+  return mine !== null && (p.audienceMinistry === null || p.audienceMinistry === mine);
+}
+
+function audienceMinistryOf(s: State, p: DemoPost): string | null {
+  if (p.audience !== 'ministerio') return null;
+  return p.audienceMinistry ?? s.profile.ministry;
+}
+
+function myFace(s: State): AmenFace {
+  return {
+    name: s.profile.displayName ?? 'Você',
+    avatarPath: s.profile.avatarPath,
+    isMine: true,
+  };
+}
+
+/** Os campos do diário (F1, F3, F6) como o servidor devolve para quem está vendo. */
+function diaryOf(s: State, p: DemoPost): DiaryFields {
+  const blocked = blockedKeys(s);
+  const others = p.otherFaces.filter((f) => !blocked.has(faceKey(f.name)));
+  const faces = (p.amen ? [myFace(s), ...others] : others).slice(0, MAX_AMEN_FACES);
+  return {
+    kind: p.kind,
+    verse: p.verse,
+    photoPaths: [...p.photoPaths],
+    audience: p.audience,
+    audienceMinistry: audienceMinistryOf(s, p),
+    amenCount: Math.max(p.otherAmens - (p.otherFaces.length - others.length), 0) + (p.amen ? 1 : 0),
+    amenFaces: faces,
+    commentCount: s.comments.filter((c) => c.postId === p.postId && c.status === 'published' && !blocked.has(c.author.key))
+      .length,
+  };
+}
+
+/** "Maria (exemplo)" → "maria": o rostinho some quando a pessoa de exemplo está bloqueada. */
+function faceKey(name: string): string {
+  return name
+    .replace(/ \(exemplo\)$/, '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+}
+
+function visibleActivity(s: State): DemoActivity[] {
+  const blocked = blockedKeys(s);
+  return s.activity.filter((a) => !blocked.has(faceKey(a.actorName)));
 }
 
 /**
@@ -466,12 +590,14 @@ function createDemoCommunityApi(): CommunityApi {
       s.profile.newsOptIn = input.wantsNews;
     },
 
-    async feedPage(cursor?: FeedCursor | null): Promise<FeedPage> {
+    async feedPage(cursor?: FeedCursor | null, options: { scope?: FeedScope } = {}): Promise<FeedPage> {
       const s = current();
       requireMember(s);
       const blocked = blockedKeys(s);
       const visible = s.posts
         .filter((p) => p.status === 'published' && p.publishedAt && !blocked.has(p.author.key))
+        .filter((p) => audienceAllows(s, p))
+        .filter((p) => options.scope !== 'ministerio' || (p.audience === 'ministerio' && s.profile.ministry !== null))
         .sort((a, b) => (b.publishedAt ?? '').localeCompare(a.publishedAt ?? '') || b.postId.localeCompare(a.postId));
       const start = cursor
         ? visible.findIndex(
@@ -481,10 +607,11 @@ function createDemoCommunityApi(): CommunityApi {
           )
         : 0;
       const slice = start < 0 ? [] : visible.slice(start, start + LIMITS.feedPage);
-      const posts: FeedPost[] = slice.map((p) => ({
+      const posts: (FeedPost & DiaryFields)[] = slice.map((p) => ({
+        ...diaryOf(s, p),
         postId: p.postId,
         body: p.body,
-        photoPath: p.photoPath ?? null,
+        photoPath: p.photoPaths[0] ?? null,
         dayNumber: p.dayNumber,
         publishedAt: p.publishedAt ?? '',
         authorName: authorName(s, p.author),
@@ -532,47 +659,79 @@ function createDemoCommunityApi(): CommunityApi {
         .filter((p) => isMe(p.author))
         .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
         .map((p) => ({
+          ...diaryOf(s, p),
           postId: p.postId,
           body: p.body,
-          photoPath: p.photoPath ?? null,
+          photoPath: p.photoPaths[0] ?? null,
           dayNumber: p.dayNumber,
           status: p.status,
           holdReason: p.holdReason,
           createdAt: p.createdAt,
           publishedAt: p.publishedAt,
-          decidedBy: p.holdReason ? ('automatico' as const) : null,
+          decidedBy: p.holdReason || p.photoPaths.length > 0 ? ('automatico' as const) : null,
           reason: null,
           noteForAuthor: null,
         }));
     },
 
-    async createPost(input: { body?: string | null; photoPath?: string | null; day?: number | null }): Promise<PublishResult> {
+    async createPost(input: NewPost): Promise<PublishResult> {
       const s = current();
       requireConsent(s);
       requireProfile(s);
-      const photoPath = input.photoPath ?? null;
-      if (photoPath && !demoPhotos.has(photoPath)) throw communityError('invalid_input');
-      const body = cleanText(input.body);
-      if ((!body && !photoPath) || !isValidPostBody(body)) throw communityError('invalid_input');
-      const day = input.day ?? null;
-      if (day !== null && (!Number.isInteger(day) || day < 1 || day > 100)) throw communityError('invalid_input');
-      // Como no servidor: toda foto vai para análise; texto só se o filtro segurar.
-      const hold: HoldReason | null = photoPath ? 'foto' : holdFor(body);
+      const post = normalizeNewPost(input, (path) => demoPhotos.has(path));
+      if (!post) throw communityError('invalid_input');
+      // "Meu ministério" é o ministério do perfil (F6), como no servidor.
+      if (post.audience === 'ministerio' && !s.profile.ministry) throw communityError('invalid_input');
+      // Como no servidor com o filtro automático configurado (F5, aqui SIMULADO):
+      // foto aparece na hora; texto que o filtro de texto segura vai para análise.
+      const hold: HoldReason | null = holdFor(post.body);
       const now = stamp(s);
-      const post: DemoPost = {
+      const created: DemoPost = {
         postId: newId(s),
         author: { key: 'me', name: '' },
-        body,
-        photoPath,
-        dayNumber: day,
+        body: post.body,
+        photoPaths: post.photoPaths,
+        dayNumber: post.day,
+        kind: post.kind,
+        verse: post.verse,
+        audience: post.audience,
+        audienceMinistry: post.audience === 'ministerio' ? s.profile.ministry : null,
         createdAt: now,
         publishedAt: hold ? null : now,
         status: hold ? 'in_review' : 'published',
         holdReason: hold,
         amen: false,
+        otherAmens: 0,
+        otherFaces: [],
       };
-      s.posts.push(post);
-      return { id: post.postId, status: post.status };
+      s.posts.push(created);
+      if (!hold) {
+        // Para mostrar o sino (F8): alguém de exemplo diz Amém no que acabou de sair.
+        created.otherAmens = 1;
+        created.otherFaces = [{ name: 'Maria (exemplo)', avatarPath: null, isMine: false }];
+        s.activity.unshift({
+          activityId: newId(s),
+          postId: created.postId,
+          kind: 'amen',
+          actorName: 'Maria (exemplo)',
+          at: stamp(s),
+          preview: null,
+          unread: true,
+        });
+      }
+      return { id: created.postId, status: created.status };
+    },
+
+    async myActivity(): Promise<ActivityItem[]> {
+      const s = current();
+      requireMember(s);
+      return visibleActivity(s).map((a) => ({ ...a, actorAvatarPath: null }));
+    },
+
+    async markActivitySeen() {
+      const s = current();
+      requireMember(s);
+      for (const item of s.activity) item.unread = false;
     },
 
     async deletePost(postId: string) {
@@ -583,6 +742,7 @@ function createDemoCommunityApi(): CommunityApi {
       if (!post || !isMe(post.author)) throw communityError('invalid_input');
       s.posts = s.posts.filter((p) => p.postId !== id);
       s.comments = s.comments.filter((c) => c.postId !== id);
+      s.activity = s.activity.filter((a) => a.postId !== id);
     },
 
     async createComment(postId: string, body: string): Promise<PublishResult> {
@@ -592,7 +752,9 @@ function createDemoCommunityApi(): CommunityApi {
       const id = requireId(postId);
       const cleaned = cleanText(body);
       if (!isValidCommentBody(cleaned) || !cleaned) throw communityError('invalid_input');
-      if (!s.posts.some((p) => p.postId === id && p.status === 'published')) throw communityError('invalid_input');
+      if (!s.posts.some((p) => p.postId === id && p.status === 'published' && audienceAllows(s, p))) {
+        throw communityError('invalid_input');
+      }
       const comment: DemoComment = {
         commentId: newId(s),
         postId: id,
@@ -614,12 +776,15 @@ function createDemoCommunityApi(): CommunityApi {
       s.comments = s.comments.filter((c) => c.commentId !== id);
     },
 
-    /** Só o MEU Amém; não existe contador. */
+    /** Liga/desliga o MEU Amém; o número e o meu rostinho (F3) saem de diaryOf. */
     async setAmen(postId: string, amen: boolean) {
       const s = current();
       requireConsent(s);
       const post = s.posts.find((p) => p.postId === requireId(postId));
-      if (!post) throw communityError('invalid_input');
+      if (!post || (amen && (post.status !== 'published' || !audienceAllows(s, post)))) {
+        throw communityError('invalid_input');
+      }
+      // O número e o meu rostinho (F3) saem de diaryOf: marcar soma 1 e põe o meu rosto na frente.
       post.amen = amen;
       return post.amen;
     },
@@ -678,6 +843,8 @@ function createDemoCommunityApi(): CommunityApi {
       s.consentAccepted = false;
       s.posts = s.posts.filter((p) => !isMe(p.author));
       s.comments = s.comments.filter((c) => !isMe(c.author));
+      for (const p of s.posts) p.amen = false;
+      s.activity = [];
     },
 
     async leaveCommunity() {
@@ -690,6 +857,8 @@ function createDemoCommunityApi(): CommunityApi {
       s.consentAccepted = false;
       s.posts = s.posts.filter((p) => !isMe(p.author));
       s.comments = s.comments.filter((c) => !isMe(c.author));
+      for (const p of s.posts) p.amen = false;
+      s.activity = [];
       s.blocks = [];
     },
 

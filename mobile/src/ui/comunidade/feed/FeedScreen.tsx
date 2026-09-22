@@ -5,20 +5,22 @@ import { Pressable, RefreshControl, ScrollView, View } from 'react-native';
 import type { CommunityApi } from '@/community/api';
 import { DEMO_BADGE, isCommunityDemo } from '@/community/demoApi';
 import type { CommunityStatus } from '@/community/types';
-import { getDay } from '@/journey/datasetSource';
-import { readingSummary } from '@/journey/readingSummary';
 import { useJourney } from '@/journey/useJourney';
 import { useOnline } from '@/net/useOnline';
-import { AppText, Button, DevContentBanner, OfflineBanner, Rule, SaveErrorNotice, Screen } from '@/ui/components';
+import { AppText, Button, DevContentBanner, OfflineBanner, Pill, Rule, SaveErrorNotice, Screen } from '@/ui/components';
+import { Icon } from '@/ui/icons';
 import { MAX_CONTENT_WIDTH, MIN_TOUCH, spacing, useTheme } from '@/ui/theme';
 import { announceNotice } from '@/ui/voce/announce';
 
+import { CommentsSheet, type CommentsTarget } from '../sheets/CommentsSheet';
 import { ReportSheet, type SheetTarget } from '../sheets/ReportSheet';
+import { AFTER_CONSENT_COMMENT } from './comentarios';
 import { FeedEmpty, FeedEnd, FeedError, FeedSkeleton, GateView } from './FeedStates';
 import { PostCard } from './PostCard';
-import { commentsHref, COMMUNITY_ROUTES, consentHref } from './rotas';
+import { ACTIVITY_ROUTE, COMMUNITY_ROUTES, consentHref, readerHref } from './rotas';
 import { needsConsent, useCommunity } from './useCommunity';
 import { useFeed } from './useFeed';
+import { type FeedScope, hasNewActivity } from './v2';
 
 /** Calha das telas de lista e feed (TELAS, convenções): 20. */
 const FEED_GUTTER = 20;
@@ -28,10 +30,13 @@ export const AFTER_CONSENT_FEED = 'Pronto. Agora você pode dizer Amém e coment
 const COLUMN = { flex: 1, width: '100%', maxWidth: MAX_CONTENT_WIDTH + FEED_GUTTER * 2, alignSelf: 'center' } as const;
 
 /**
- * C1 · Feed da Comunidade.
+ * C1 · Comunidade como "diário compartilhado" (FEEDBACK_DAVI_2026-09-22, F1–F8):
+ * cada pessoa conta o seu dia com a Bíblia, e a igreja acompanha.
  *
- * Cabeçalho ("Comunidade" + pílula "Escrever"), a linha do dia que a igreja
- * está lendo (o feed nunca esquece de onde veio), os cartões e o fim explícito.
+ * Topo: "Comunidade", o sino da Atividade (F8, com ponto quando há novidade),
+ * "Escrever", e os filtros "Toda a igreja · Meu ministério" (F6: sem
+ * seguidores). Depois os posts do dia e o fim explícito.
+ *
  * Estados: sem servidor, sem conta, sem perfil, suspensa, carregando (esqueleto
  * na forma do post), erro (F5), vazio (C2) e sem internet (o feed fica
  * indisponível, a jornada não).
@@ -40,15 +45,16 @@ export function FeedScreen() {
   const { gate, reload } = useCommunity();
   const journey = useJourney();
   const online = useOnline();
+  const [scope, setScope] = useState<FeedScope>('igreja');
 
+  const ready = gate.kind === 'ready';
   const header = (
     <FeedHeader
-      canWrite={gate.kind === 'ready'}
-      onWrite={() => {
-        if (gate.kind !== 'ready') return;
-        router.push(COMMUNITY_ROUTES.publicar);
-      }}
-      day={journey.phase === 'before_start' ? null : journey.officialDay}
+      ready={ready}
+      unread={ready ? hasNewActivity(gate.status) : false}
+      scope={scope}
+      onScope={setScope}
+      onWrite={() => ready && router.push(COMMUNITY_ROUTES.publicar)}
     />
   );
 
@@ -62,6 +68,7 @@ export function FeedScreen() {
             status={gate.status}
             online={online}
             day={Math.max(1, journey.officialDay)}
+            scope={scope}
           />
         </View>
       </Screen>
@@ -95,10 +102,20 @@ export function FeedScreen() {
   );
 }
 
-function FeedHeader({ canWrite, onWrite, day }: { canWrite: boolean; onWrite: () => void; day: number | null }) {
+function FeedHeader({
+  ready,
+  unread,
+  scope,
+  onScope,
+  onWrite,
+}: {
+  ready: boolean;
+  unread: boolean;
+  scope: FeedScope;
+  onScope: (scope: FeedScope) => void;
+  onWrite: () => void;
+}) {
   const { colors } = useTheme();
-  const reading = day ? readingSummary(getDay(day)) : null;
-  const line = day ? `Dia ${day}${reading ? ` · a igreja está lendo ${reading.label}` : ''}` : null;
   return (
     <View>
       <View
@@ -106,56 +123,88 @@ function FeedHeader({ canWrite, onWrite, day }: { canWrite: boolean; onWrite: ()
           flexDirection: 'row',
           alignItems: 'center',
           flexWrap: 'wrap',
-          gap: spacing.md,
+          gap: spacing.sm,
           paddingHorizontal: FEED_GUTTER,
           paddingTop: spacing.md,
-          paddingBottom: spacing.sm,
+          paddingBottom: spacing.xs,
         }}
       >
         <AppText variant="screenTitle" accessibilityRole="header" style={{ flex: 1, minWidth: 160 }}>
           Comunidade
         </AppText>
-        {canWrite ? (
-          <Pressable
-            onPress={onWrite}
-            accessibilityRole="button"
-            accessibilityLabel="Escrever para a comunidade"
-            testID="feed-write"
-            style={({ pressed }) => [
-              {
-                minHeight: MIN_TOUCH,
-                paddingVertical: spacing.sm,
-                paddingHorizontal: 20,
-                borderRadius: 999,
-                backgroundColor: colors.blue,
-                alignItems: 'center',
-                justifyContent: 'center',
-              },
-              pressed && { opacity: 0.72 },
-            ]}
-          >
-            <AppText variant="action" style={{ color: colors.onBlue }}>
-              Escrever
-            </AppText>
-          </Pressable>
+        {ready ? (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+            <Pressable
+              onPress={() => router.push(ACTIVITY_ROUTE)}
+              accessibilityRole="button"
+              accessibilityLabel={unread ? 'Atividade, tem novidade' : 'Atividade'}
+              testID="feed-bell"
+              style={({ pressed }) => [
+                { width: MIN_TOUCH, minHeight: MIN_TOUCH, alignItems: 'center', justifyContent: 'center' },
+                pressed && { opacity: 0.72 },
+              ]}
+            >
+              <View>
+                <Icon name="bell" size={24} color={colors.text} />
+                {unread ? (
+                  // Ponto em `danger` (não amarelo: 1,46:1 no claro) com anel da página.
+                  <View
+                    testID="feed-bell-dot"
+                    aria-hidden
+                    style={{
+                      position: 'absolute',
+                      top: -2,
+                      right: -3,
+                      width: 11,
+                      height: 11,
+                      borderRadius: 6,
+                      backgroundColor: colors.danger,
+                      borderWidth: 2,
+                      borderColor: colors.background,
+                    }}
+                  />
+                ) : null}
+              </View>
+            </Pressable>
+            <Pressable
+              onPress={onWrite}
+              accessibilityRole="button"
+              accessibilityLabel="Escrever para a comunidade"
+              testID="feed-write"
+              style={({ pressed }) => [
+                {
+                  minHeight: MIN_TOUCH,
+                  paddingVertical: spacing.sm,
+                  paddingHorizontal: 20,
+                  borderRadius: 999,
+                  backgroundColor: colors.blue,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                },
+                pressed && { opacity: 0.72 },
+              ]}
+            >
+              <AppText variant="action" style={{ color: colors.onBlue }}>
+                Escrever
+              </AppText>
+            </Pressable>
+          </View>
         ) : null}
       </View>
       {isCommunityDemo() ? <DemoBadge /> : null}
-      {line ? (
-        <Pressable
-          onPress={() => router.navigate(COMMUNITY_ROUTES.jornada)}
-          accessibilityRole="link"
-          accessibilityLabel={`Dia ${day}${reading ? `, a igreja está lendo ${reading.label.replace(/·/g, ',')}` : ''}. Abrir a Jornada`}
-          testID="feed-day-line"
-          style={({ pressed }) => [
-            { minHeight: MIN_TOUCH, paddingVertical: spacing.sm, paddingHorizontal: FEED_GUTTER, justifyContent: 'center' },
-            pressed && { opacity: 0.72 },
-          ]}
+      {ready ? (
+        <View
+          style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: spacing.sm, paddingHorizontal: FEED_GUTTER, paddingBottom: spacing.xs }}
+          testID="feed-scope"
         >
-          <AppText variant="rowLabel" style={{ fontSize: 13, lineHeight: 18, color: colors.blue }}>
-            {line}
-          </AppText>
-        </Pressable>
+          <Pill label="Toda a igreja" active={scope === 'igreja'} onPress={() => onScope('igreja')} testID="feed-scope-igreja" />
+          <Pill
+            label="Meu ministério"
+            active={scope === 'ministerio'}
+            onPress={() => onScope('ministerio')}
+            testID="feed-scope-ministerio"
+          />
+        </View>
       ) : null}
       <Rule />
     </View>
@@ -196,24 +245,48 @@ function OfflineNotice() {
   );
 }
 
+/** "Meu ministério" sem ministério no perfil: diz isso e leva ao perfil. */
+function NoMinistry() {
+  return (
+    <View style={{ paddingHorizontal: FEED_GUTTER, paddingVertical: spacing.xl, gap: spacing.md }} testID="feed-no-ministry">
+      <AppText variant="action" style={{ textAlign: 'center' }}>
+        Você ainda não escolheu um ministério
+      </AppText>
+      <AppText variant="bodySm" style={{ textAlign: 'center' }}>
+        Escolha o seu no perfil para ver aqui o que as pessoas dele estão compartilhando.
+      </AppText>
+      <Button title="Escolher no perfil" variant="outline" onPress={() => router.push(COMMUNITY_ROUTES.perfil)} testID="feed-no-ministry-profile" />
+    </View>
+  );
+}
+
+type CommentsOpen = { target: CommentsTarget; text: string; notice: string | null };
+
 function ReadyFeed({
   header,
   api,
   status,
   online,
   day,
+  scope,
 }: {
   header: ReactNode;
   api: CommunityApi;
   status: CommunityStatus;
   online: boolean;
   day: number;
+  scope: FeedScope;
 }) {
   const journey = useJourney();
-  const feed = useFeed(api, status.displayName ?? 'Você', status.profile.ministry, status.profile.avatarPath);
+  const ministry = status.profile.ministry;
+  const noMinistry = scope === 'ministerio' && !ministry;
+  const feed = useFeed(api, status.displayName ?? 'Você', ministry, status.profile.avatarPath, noMinistry ? 'igreja' : scope);
   const [sheet, setSheet] = useState<SheetTarget | null>(null);
+  const [comments, setComments] = useState<CommentsOpen | null>(null);
+  // Rascunho de comentário guardado quando a folha fechou para o aceite.
+  const draft = useRef<{ postId: string; text: string } | null>(null);
 
-  // Carrega ao aparecer e se atualiza ao voltar de Publicar, dos comentários ou do consentimento.
+  // Carrega ao aparecer e se atualiza ao voltar de Publicar, da Atividade ou do consentimento.
   useFocusEffect(feed.onFocus);
 
   const gated = needsConsent(status);
@@ -232,9 +305,21 @@ function ReadyFeed({
     router.push(consentHref(status));
   };
 
-  let list: ReactNode;
+  const openComments = (target: CommentsTarget) => {
+    const saved = draft.current?.postId === target.postId ? draft.current : null;
+    draft.current = null;
+    setComments({
+      target,
+      text: saved?.text ?? '',
+      notice: saved && !gated ? AFTER_CONSENT_COMMENT : null,
+    });
+  };
+
   const state = feed.state;
-  if (state.phase === 'loading') {
+  let list: ReactNode;
+  if (noMinistry) {
+    list = <NoMinistry />;
+  } else if (state.phase === 'loading') {
     list = <FeedSkeleton gutter={FEED_GUTTER} />;
   } else if (state.phase === 'error') {
     list = (
@@ -245,7 +330,7 @@ function ReadyFeed({
   } else if (state.posts.length === 0 && state.inReview.length === 0) {
     list = (
       <View style={{ paddingHorizontal: FEED_GUTTER }}>
-        <FeedEmpty day={day} firstDay={day <= 1} />
+        <FeedEmpty day={day} firstDay={day <= 1} ministry={scope === 'ministerio'} />
       </View>
     );
   } else {
@@ -257,8 +342,7 @@ function ReadyFeed({
             key={`${card.inReview ? 'r' : 'p'}-${card.postId}`}
             card={card}
             gutter={FEED_GUTTER}
-            photoUrl={card.photoPath ? feed.photos.get(card.photoPath) : undefined}
-            avatarUrl={card.avatarPath ? feed.photos.get(card.avatarPath) : undefined}
+            photos={feed.photos}
             onAmen={(next) => {
               if (gated) {
                 openConsent();
@@ -267,21 +351,22 @@ function ReadyFeed({
               setConsentNotice(null);
               feed.toggleAmen(card.postId, next);
             }}
-            onComments={() => router.push(commentsHref(card.postId))}
+            onComments={() => openComments({ postId: card.postId, authorName: card.authorName })}
+            onOpenReading={(readingDay) => router.push(readerHref(readingDay))}
             onMore={() =>
               setSheet({
                 kind: 'post',
                 postId: card.postId,
                 authorName: card.authorName,
                 isMine: card.isMine,
-                hasPhoto: Boolean(card.photoPath),
+                hasPhoto: card.photoPaths.length > 0,
               })
             }
           />
         ))}
         <View style={{ paddingHorizontal: FEED_GUTTER }}>
           {state.ended ? (
-            <FeedEnd />
+            <FeedEnd ministry={scope === 'ministerio'} />
           ) : (
             <View style={{ gap: spacing.sm, paddingVertical: spacing.lg }}>
               <Button
@@ -320,7 +405,7 @@ function ReadyFeed({
           ) : null}
         </View>
         {list}
-        {state.phase === 'ready' ? (
+        {state.phase === 'ready' || noMinistry ? (
           <View style={{ paddingHorizontal: FEED_GUTTER, gap: spacing.xs }}>
             <Button
               title="Minhas publicações"
@@ -344,6 +429,20 @@ function ReadyFeed({
         onDeleted={(t) => t.kind === 'post' && feed.removeCard(t.postId)}
         onHidden={(t) => t.kind === 'post' && feed.removeCard(t.postId)}
         onBlocked={(t) => feed.afterBlock(t.kind === 'post' ? t.postId : null)}
+      />
+      <CommentsSheet
+        api={api}
+        status={status}
+        target={comments?.target ?? null}
+        initialText={comments?.text}
+        initialNotice={comments?.notice}
+        onClose={() => setComments(null)}
+        onNeedsConsent={(postId, text) => {
+          draft.current = { postId, text };
+          router.push(consentHref(status));
+        }}
+        onCountChange={feed.bumpComments}
+        onPostGone={() => feed.afterBlock(null)}
       />
     </>
   );

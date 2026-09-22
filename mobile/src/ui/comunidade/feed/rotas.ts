@@ -41,3 +41,11 @@ export function consentHref(status: CommunityStatus): Href {
 export function commentsHref(postId: string): Href {
   return { pathname: '/comunidade/post/[id]', params: { id: postId } } as unknown as Href;
 }
+
+/** F8 · Atividade: Amém e comentários nos meus posts, dentro do app (sem push). */
+export const ACTIVITY_ROUTE = '/comunidade/atividade' as Href;
+
+/** "Ver leitura": o leitor no dia anexado ao post. */
+export function readerHref(day: number): Href {
+  return { pathname: '/reader/[day]', params: { day: String(day) } } as unknown as Href;
+}

@@ -368,7 +368,9 @@ export const PHOTO_WARNING = {
     'Só publique o rosto de outra pessoa se ela concordou.',
     '**Não publique foto em que dê para reconhecer uma criança ou um adolescente**, nem se for seu filho ou sua filha.',
     'Na dúvida, não publique, ou escolha uma foto sem rostos.',
-    'Antes de aparecer, uma pessoa da equipe da igreja olha. Enquanto isso, a sua publicação fica "em análise" e só ' +
-      'você a vê.',
+    // F5 (2026-09-22): foto aparece na hora quando o filtro automático não desconfia; sem filtro configurado,
+    // toda foto espera uma pessoa. A frase vale para os dois casos.
+    'Toda foto passa por uma conferência antes de aparecer para todos. Se precisar do olhar de uma pessoa da equipe ' +
+      'da igreja, a sua publicação fica "em análise" e só você a vê até lá.',
   ],
 } as const;

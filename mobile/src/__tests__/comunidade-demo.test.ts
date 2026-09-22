@@ -145,7 +145,7 @@ describe('comunidade de demonstração em memória', () => {
     await expect(api.getStatus()).resolves.toMatchObject({ isMember: true, memberStatus: 'active', displayName: 'Davi' });
   });
 
-  it('feed com 5 publicações de exemplo, nomes fictícios marcados, sem foto e sem contador', async () => {
+  it('feed com 5 publicações de exemplo, nomes fictícios marcados, sem foto; Amém de demonstração só com rostos "(exemplo)"', async () => {
     const { api } = await join();
     const page = await api.feedPage();
     expect(page.posts).toHaveLength(5);
@@ -155,8 +155,13 @@ describe('comunidade de demonstração em memória', () => {
       expect(post.authorName).toMatch(/ \(exemplo\)$/);
       expect(post.photoPath).toBeNull();
       expect(post.isMine).toBe(false);
-      expect(Object.keys(post)).not.toContain('amenCount');
+      expect(post.amenCount).toBeGreaterThan(0);
+      for (const face of post.amenFaces ?? []) expect(face.name).toMatch(/ \(exemplo\)$/);
+      expect(post.audience).toBe('igreja');
     }
+    // F1: tipos variados; o versículo é só a referência.
+    expect(page.posts.map((p) => p.kind)).toEqual(['leitura', 'oracao', 'versiculo', 'jejum', null]);
+    expect(page.posts[2].verse).toEqual({ book: 'PSA', chapter: 119, verseStart: 105, verseEnd: null });
     // Ordem: mais recente primeiro; dias relativos ao dia simulado (3).
     expect(page.posts[0].dayNumber).toBe(3);
     expect(page.posts[4].dayNumber).toBe(1);
@@ -227,19 +232,84 @@ describe('comunidade de demonstração em memória', () => {
     await expect(api.getStatus()).resolves.toMatchObject({ profile: { contactEmail: 'davi@exemplo.com', newsOptIn: false } });
   });
 
-  it('C6: foto de post funciona na demonstração, só na memória, e vai "em análise" como no real', async () => {
+  it('F5: fotos de post (até 4) funcionam na demonstração, só na memória, e aparecem na hora (filtro simulado)', async () => {
     const { api, demo } = await join();
     await consent(api);
     await expect(api.uploadPhoto(new Uint8Array([1]))).rejects.toMatchObject({ code: 'photo_not_jpeg' });
     const path = await api.uploadPhoto(CLEAN_JPEG);
-    const post = await api.createPost({ photoPath: path, day: 3 });
-    expect(post.status).toBe('in_review');
+    const second = await api.uploadPhoto(CLEAN_JPEG);
+    const post = await api.createPost({ photoPaths: [path, second], day: 3, kind: 'leitura' });
+    expect(post.status).toBe('published');
     const mine = (await api.myPosts()).find((p) => p.postId === post.id);
-    expect(mine).toMatchObject({ photoPath: path, holdReason: 'foto', status: 'in_review' });
+    expect(mine).toMatchObject({ photoPath: path, photoPaths: [path, second], status: 'published', decidedBy: 'automatico' });
     const urls = await api.signPhotoUrls([path]);
     expect(urls.get(path)).toBe(`data:image/jpeg;base64,${demo._bytesToBase64ForTests(CLEAN_JPEG)}`);
     expect(demo._bytesToBase64ForTests(CLEAN_JPEG)).toBe(Buffer.from(CLEAN_JPEG).toString('base64'));
-    expect((await api.feedPage()).posts.some((p) => p.postId === post.id)).toBe(false);
+    expect((await api.feedPage()).posts[0]).toMatchObject({ postId: post.id, photoPaths: [path, second], kind: 'leitura' });
+    await expect(api.createPost({ photoPaths: ['nao-subiu.jpg'] })).rejects.toMatchObject({ code: 'invalid_input' });
+  });
+
+  it('F3: meu Amém soma 1 e põe o meu rosto na frente; desmarcar volta', async () => {
+    const { api } = await join();
+    await consent(api);
+    const maria = (await api.feedPage()).posts.find((p) => p.authorName === 'Maria (exemplo)')!;
+    await api.setAmen(maria.postId, true);
+    const after = (await api.feedPage()).posts.find((p) => p.postId === maria.postId)!;
+    expect(after.amenCount).toBe((maria.amenCount ?? 0) + 1);
+    expect(after.amenFaces?.[0]).toMatchObject({ name: 'Davi', isMine: true });
+    expect(after.amenFaces).toHaveLength(3);
+    await api.setAmen(maria.postId, false);
+    expect((await api.feedPage()).posts.find((p) => p.postId === maria.postId)?.amenCount).toBe(maria.amenCount);
+  });
+
+  it('F3: quem eu bloqueio sai dos rostinhos e da contagem', async () => {
+    const { api } = await join();
+    const before = (await api.feedPage()).posts.find((p) => p.authorName === 'Maria (exemplo)')!;
+    const joao = (await api.feedPage()).posts.find((p) => p.authorName === 'João (exemplo)')!;
+    await api.blockAuthor({ postId: joao.postId });
+    const after = (await api.feedPage()).posts.find((p) => p.postId === before.postId)!;
+    expect(after.amenFaces?.map((f) => f.name)).not.toContain('João (exemplo)');
+    expect(after.amenCount).toBe((before.amenCount ?? 0) - 1);
+  });
+
+  it('F6: o post do ministério só aparece com ministério no perfil; o escopo "ministério" filtra', async () => {
+    const { api } = await join();
+    expect((await api.feedPage()).posts.some((p) => p.audience === 'ministerio')).toBe(false);
+    await expect(api.feedPage(null, { scope: 'ministerio' })).resolves.toMatchObject({ posts: [] });
+    await api.updateProfile({ ministry: 'Comunicação' });
+    const all = await api.feedPage();
+    expect(all.posts).toHaveLength(6);
+    const ministry = await api.feedPage(null, { scope: 'ministerio' });
+    expect(ministry.posts).toHaveLength(1);
+    expect(ministry.posts[0]).toMatchObject({ audience: 'ministerio', audienceMinistry: 'Comunicação', kind: 'oracao' });
+  });
+
+  it('F6: publicar para "Meu ministério" exige ministério no perfil', async () => {
+    const { api } = await join();
+    await api.setAvatar({ bytes: CLEAN_JPEG, uri: 'file:///cache/eu.jpg' });
+    await api.updateProfile({ confirms16: true, noMinistry: true });
+    await api.acceptTerms({ purpose: 'community_rules', version: 'PENDENTE', sha256: SHA, appVersion: 't' });
+    await api.acceptTerms({ purpose: 'community_publish', version: 'PENDENTE', sha256: SHA, appVersion: 't' });
+    await expect(api.createPost({ body: 'Oi', audience: 'ministerio' })).rejects.toMatchObject({ code: 'invalid_input' });
+    await api.updateProfile({ ministry: 'Comunicação' });
+    const post = await api.createPost({ body: 'Oi, ministério', audience: 'ministerio' });
+    const mine = (await api.myPosts()).find((p) => p.postId === post.id);
+    expect(mine).toMatchObject({ audience: 'ministerio', audienceMinistry: 'Comunicação' });
+  });
+
+  it('F8: ao publicar, alguém de exemplo diz Amém e o sino acende; ver apaga', async () => {
+    const { api } = await join();
+    await consent(api);
+    await expect(api.getStatus()).resolves.toMatchObject({ hasNewActivity: false });
+    const post = await api.createPost({ kind: 'jejum' });
+    const activity = await api.myActivity();
+    expect(activity).toEqual([
+      expect.objectContaining({ kind: 'amen', postId: post.id, actorName: 'Maria (exemplo)', unread: true }),
+    ]);
+    await expect(api.getStatus()).resolves.toMatchObject({ hasNewActivity: true });
+    await api.markActivitySeen();
+    await expect(api.getStatus()).resolves.toMatchObject({ hasNewActivity: false });
+    expect((await api.myActivity())[0].unread).toBe(false);
   });
 
   it('Amém devolve só o meu estado; comentários funcionam', async () => {

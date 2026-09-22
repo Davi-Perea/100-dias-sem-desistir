@@ -1,9 +1,10 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type { CommunityApi } from '@/community/api';
-import type { FeedCursor, FeedPost, MyPost } from '@/community/types';
+import type { FeedCursor, FeedPost, MyPost, VerseAttachment } from '@/community/types';
 
 import { humanError } from './useCommunity';
+import { type AmenFace, feedExtras, type FeedScope, fetchFeedPage, MAX_FACES, type PostKind } from './v2';
 
 /**
  * Estado do feed (C1). O feed TEM FIM: a próxima página só vem quando a pessoa
@@ -22,8 +23,22 @@ export type CardModel = {
   /** Foto de perfil (aprovada; a própria sempre). null = iniciais. */
   avatarPath: string | null;
   body: string | null;
+  /** Primeira foto (compatível com a V2). */
   photoPath: string | null;
+  /** Até 4 fotos, na ordem do carrossel (F1). */
+  photoPaths: string[];
   dayNumber: number | null;
+  /** Leitura do dia, Oração, Jejum, Versículo (F1). */
+  kind: PostKind | null;
+  /** Versículo anexado: só a referência. */
+  verse: VerseAttachment | null;
+  /** Grupo no topo do cartão: toda a igreja ou o ministério (F6). */
+  audience: FeedScope;
+  audienceMinistry: string | null;
+  /** Quantas pessoas disseram Amém e até 3 rostos (F3, decisão do fundador). */
+  amenCount: number;
+  amenFaces: AmenFace[];
+  commentCount: number;
   /** Publicação (no feed) ou criação (em análise). */
   at: string;
   isMine: boolean;
@@ -33,13 +48,15 @@ export type CardModel = {
 };
 
 export function fromFeed(post: FeedPost): CardModel {
+  const extras = feedExtras(post);
   return {
+    ...extras,
     postId: post.postId,
     authorName: post.authorName,
     authorMinistry: post.authorMinistry,
     avatarPath: post.authorAvatarPath,
     body: post.body,
-    photoPath: post.photoPath,
+    photoPath: extras.photoPaths[0] ?? null,
     dayNumber: post.dayNumber,
     at: post.publishedAt,
     isMine: post.isMine,
@@ -49,13 +66,18 @@ export function fromFeed(post: FeedPost): CardModel {
 }
 
 export function fromMine(post: MyPost, myName: string, myMinistry: string | null = null, myAvatar: string | null = null): CardModel {
+  const extras = feedExtras({ ...post, publishedAt: post.createdAt, authorName: myName, authorMinistry: myMinistry, authorAvatarPath: myAvatar, isMine: true, iSaidAmen: false });
   return {
+    ...extras,
+    amenCount: 0,
+    amenFaces: [],
+    commentCount: 0,
     postId: post.postId,
     authorName: myName,
     authorMinistry: myMinistry,
     avatarPath: myAvatar,
     body: post.body,
-    photoPath: post.photoPath,
+    photoPath: extras.photoPaths[0] ?? null,
     dayNumber: post.dayNumber,
     at: post.createdAt,
     isMine: true,
@@ -75,11 +97,27 @@ type FeedState =
       ended: boolean;
     };
 
+/**
+ * Meu Amém no cartão: número e rostinhos andam junto (F3). O MEU rosto entra na
+ * frente ao marcar e sai ao desmarcar; os dos outros não mudam.
+ */
+export function withMyAmen(card: CardModel, next: boolean, me: AmenFace): CardModel {
+  if (card.iSaidAmen === next) return card;
+  const others = card.amenFaces.filter((f) => !f.isMine);
+  return {
+    ...card,
+    iSaidAmen: next,
+    amenCount: Math.max(0, card.amenCount + (next ? 1 : -1)),
+    amenFaces: next ? [{ ...me, isMine: true }, ...others].slice(0, MAX_FACES) : others,
+  };
+}
+
 export function useFeed(
   api: CommunityApi | null,
   myName: string,
   myMinistry: string | null = null,
   myAvatar: string | null = null,
+  scope: FeedScope = 'igreja',
 ) {
   const [state, setState] = useState<FeedState>({ phase: 'loading' });
   const [photos, setPhotos] = useState<Map<string, string>>(new Map());
@@ -96,7 +134,9 @@ export function useFeed(
       if (!api) return;
       try {
         // Fotos dos posts e as fotos de perfil, numa chamada só.
-        const urls = await api.signPhotoUrls(cards.flatMap((c) => [c.photoPath, c.avatarPath]));
+        const urls = await api.signPhotoUrls(
+          cards.flatMap((c) => [...c.photoPaths, c.avatarPath, ...c.amenFaces.map((f) => f.avatarPath)]),
+        );
         if (urls.size === 0) return;
         setPhotos((prev) => new Map([...prev, ...urls]));
       } catch {
@@ -115,13 +155,15 @@ export function useFeed(
       setMoreError(null);
       try {
         const [page, mine] = await Promise.all([
-          api.feedPage(),
+          fetchFeedPage(api, null, scope),
           // "Minhas publicações" é só para o selo "Em análise": se falhar, o feed segue.
           api.myPosts().catch(() => [] as MyPost[]),
         ]);
         if (generation.current !== id) return;
+        // No escopo do ministério, o "em análise" só aparece se foi para o ministério.
         const inReview = mine
           .filter((p) => p.status === 'in_review')
+          .filter((p) => scope === 'igreja' || p.audience === 'ministerio')
           .map((p) => fromMine(p, myName, myMinistry, myAvatar));
         const posts = page.posts.map(fromFeed);
         setState({ phase: 'ready', inReview, posts, cursor: page.nextCursor, ended: page.ended });
@@ -133,7 +175,7 @@ export function useFeed(
         if (generation.current === id) setRefreshing(false);
       }
     },
-    [api, myName, myMinistry, myAvatar, sign],
+    [api, myName, myMinistry, myAvatar, scope, sign],
   );
 
   const refresh = useCallback(() => load('refresh'), [load]);
@@ -143,10 +185,24 @@ export function useFeed(
    * Publicar, dos comentários, do consentimento) atualiza sem apagar a lista.
    */
   const loadedOnce = useRef(false);
-  const onFocus = useCallback(() => {
-    load(loadedOnce.current ? 'refresh' : 'initial');
-    loadedOnce.current = true;
+  // O foco usa sempre o `load` mais novo sem mudar de identidade: trocar o
+  // escopo não dispara o foco de novo (o efeito abaixo cuida disso).
+  const loadRef = useRef(load);
+  useEffect(() => {
+    loadRef.current = load;
   }, [load]);
+  const onFocus = useCallback(() => {
+    loadRef.current(loadedOnce.current ? 'refresh' : 'initial');
+    loadedOnce.current = true;
+  }, []);
+
+  // Trocou "Toda a igreja" ↔ "Meu ministério": outra lista, começa do esqueleto.
+  const lastScope = useRef(scope);
+  useEffect(() => {
+    if (lastScope.current === scope) return;
+    lastScope.current = scope;
+    if (loadedOnce.current) load('initial');
+  }, [scope, load]);
 
   const loadMore = useCallback(async () => {
     if (!api || state.phase !== 'ready' || state.ended || !state.cursor || loadingMore) return;
@@ -154,7 +210,7 @@ export function useFeed(
     setLoadingMore(true);
     setMoreError(null);
     try {
-      const page = await api.feedPage(state.cursor);
+      const page = await fetchFeedPage(api, state.cursor, scope);
       if (generation.current !== id) return;
       const next = page.posts.map(fromFeed);
       setState((prev) => {
@@ -173,7 +229,7 @@ export function useFeed(
     } finally {
       setLoadingMore(false);
     }
-  }, [api, state, loadingMore, sign]);
+  }, [api, state, loadingMore, scope, sign]);
 
   const patch = useCallback((postId: string, change: (card: CardModel) => CardModel | null) => {
     setState((prev) => {
@@ -188,24 +244,32 @@ export function useFeed(
     });
   }, []);
 
-  /** Marca ou desmarca o MEU Amém. Não existe total em lugar nenhum. */
+  /** Marca ou desmarca o MEU Amém; o número e os rostinhos acompanham (F3). */
   const toggleAmen = useCallback(
     async (postId: string, next: boolean) => {
       if (!api || amenInFlight.current.has(postId)) return;
       amenInFlight.current.add(postId);
       setNotice(null);
-      patch(postId, (card) => ({ ...card, iSaidAmen: next }));
+      const me: AmenFace = { name: myName, avatarPath: myAvatar };
+      patch(postId, (card) => withMyAmen(card, next, me));
       try {
         const confirmed = await api.setAmen(postId, next);
-        patch(postId, (card) => ({ ...card, iSaidAmen: confirmed }));
+        patch(postId, (card) => withMyAmen(card, confirmed, me));
       } catch (error) {
-        patch(postId, (card) => ({ ...card, iSaidAmen: !next }));
+        patch(postId, (card) => withMyAmen(card, !next, me));
         setNotice(humanError(error));
       } finally {
         amenInFlight.current.delete(postId);
       }
     },
-    [api, patch],
+    [api, patch, myName, myAvatar],
+  );
+
+  /** Comentário enviado ou apagado pela folha: o número do cartão acompanha. */
+  const bumpComments = useCallback(
+    (postId: string, delta: number) =>
+      patch(postId, (card) => ({ ...card, commentCount: Math.max(0, card.commentCount + delta) })),
+    [patch],
   );
 
   /** Tira um cartão da tela (apagado, denúncia urgente). */
@@ -236,6 +300,7 @@ export function useFeed(
     onFocus,
     loadMore,
     toggleAmen,
+    bumpComments,
     removeCard,
     afterBlock,
   };

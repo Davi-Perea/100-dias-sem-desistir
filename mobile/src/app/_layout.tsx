@@ -197,7 +197,9 @@ function AppRoot() {
           app leva até elas (a V1 fica igual).
         */}
         <Stack.Screen name="comunidade/depois/[day]" options={{ headerShown: false }} />
+        {/* publicar continua como cartão, não modal: ele empurra /regras e /comunidade/entrar, e no iOS uma tela empurrada a partir de um modal do native-stack pode abrir atrás dele (inferência; conferir em aparelho antes de virar modal). */}
         <Stack.Screen name="comunidade/publicar" options={{ headerShown: false }} />
+        <Stack.Screen name="comunidade/atividade" options={{ headerShown: false }} />
         <Stack.Screen name="comunidade/regras" options={{ headerShown: false }} />
         <Stack.Screen name="comunidade/consentimento" options={{ headerShown: false }} />
         <Stack.Screen name="comunidade/post/[id]" options={{ headerShown: false }} />

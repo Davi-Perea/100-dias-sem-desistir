@@ -423,7 +423,6 @@ describe('C3 · Publicar', () => {
 
   test('formulário: aviso de quem vê acima do campo, campo VAZIO e "Publicar" desligado até haver texto', async () => {
     useFakeApi({ my_community_status: { data: [statusRow()] } });
-    mockParams = { day: '17' };
     await render(<PublishScreen />);
     const input = await screen.findByTestId('publish-input');
     expect(screen.getByTestId('audience-notice')).toBeTruthy();
@@ -453,11 +452,21 @@ describe('C3 · Publicar', () => {
     await fireEvent.press(screen.getByTestId('publish-send'));
     expect(await screen.findByText('Publicado')).toBeTruthy();
     expect(rpcCalls(rpc, 'create_community_post')).toEqual([
-      { post_body: 'Deus foi fiel.', post_photo_path: null, post_day: 17 },
+      {
+        post_body: 'Deus foi fiel.',
+        post_photo_paths: null,
+        post_day: 17,
+        post_activity: 'leitura',
+        post_verse_book: null,
+        post_verse_chapter: null,
+        post_verse_start: null,
+        post_verse_end: null,
+        post_audience: 'igreja',
+      },
     ]);
   });
 
-  test('desmarcar o dia publica sem dia', async () => {
+  test('tirar o chip da leitura publica sem dia', async () => {
     const { rpc } = useFakeApi({
       my_community_status: { data: [statusRow()] },
       create_community_post: { data: [{ post_id: POST, status: 'published' }] },
@@ -465,7 +474,8 @@ describe('C3 · Publicar', () => {
     mockParams = { day: '17' };
     await render(<PublishScreen />);
     await fireEvent.changeText(await screen.findByTestId('publish-input'), 'Oração');
-    await fireEvent.press(screen.getByTestId('publish-mark-day'));
+    expect(screen.getByTestId('chip-leitura')).toBeTruthy();
+    await fireEvent.press(screen.getByTestId('chip-leitura-remove'));
     await fireEvent.press(screen.getByTestId('publish-send'));
     await screen.findByText('Publicado');
     expect(rpcCalls(rpc, 'create_community_post')[0]).toMatchObject({ post_day: null });
@@ -490,15 +500,18 @@ describe('C3 · Publicar', () => {
     });
     mockLaunch.mockResolvedValue({ canceled: false, assets: [{ uri: 'file:///galeria.jpg', width: 4000, height: 3000 }] });
     await render(<PublishScreen />);
-    await fireEvent.press(await screen.findByTestId('photo-open'));
+    await fireEvent.press(await screen.findByTestId('attach-galeria'));
     expect(screen.getByTestId('photo-warning')).toBeTruthy();
     expect(screen.getByText(/Só publique o rosto de outra pessoa se ela concordou/)).toBeTruthy();
     expect(screen.getByText(/reconhecer uma criança ou um adolescente/)).toBeTruthy();
     expect(mockLaunch).not.toHaveBeenCalled();
 
     await fireEvent.press(screen.getByTestId('photo-pick'));
-    await screen.findByTestId('photo-preview');
-    expect(mockLaunch).toHaveBeenCalledWith(expect.objectContaining({ exif: false, mediaTypes: ['images'] }));
+    await screen.findByTestId('photo-thumb-0');
+    // F2: até 4 fotos por post, na ordem da escolha.
+    expect(mockLaunch).toHaveBeenCalledWith(
+      expect.objectContaining({ exif: false, mediaTypes: ['images'], allowsMultipleSelection: true, selectionLimit: 4 }),
+    );
     expect(upload).not.toHaveBeenCalled(); // nada sobe na escolha
 
     expect(screen.getByTestId('publish-send').props.accessibilityState.disabled).toBe(false); // só foto basta
@@ -506,7 +519,12 @@ describe('C3 · Publicar', () => {
     expect(await screen.findByText('Em análise')).toBeTruthy();
     expect(upload).toHaveBeenCalledTimes(1);
     expect(rpcCalls(rpc, 'create_community_post')).toEqual([
-      { post_body: null, post_photo_path: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee.jpg', post_day: null },
+      expect.objectContaining({
+        post_body: null,
+        post_photo_paths: ['aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee.jpg'],
+        post_day: null,
+        post_activity: 'livre',
+      }),
     ]);
   });
 
@@ -515,11 +533,11 @@ describe('C3 · Publicar', () => {
     mockEncoded = EXIF_JPEG;
     mockLaunch.mockResolvedValue({ canceled: false, assets: [{ uri: 'file:///g.jpg', width: 800, height: 600 }] });
     await render(<PublishScreen />);
-    await fireEvent.press(await screen.findByTestId('photo-open'));
+    await fireEvent.press(await screen.findByTestId('attach-galeria'));
     await fireEvent.press(screen.getByTestId('photo-pick'));
     expect(await screen.findByTestId('photo-error')).toBeTruthy();
     expect(screen.getByText('Não foi possível remover os dados de localização da foto. Ela não foi enviada.')).toBeTruthy();
-    expect(screen.queryByTestId('photo-preview')).toBeNull();
+    expect(screen.queryByTestId('photo-thumb-0')).toBeNull();
   });
 
   test('se o post falha depois do upload, a foto enviada é descartada', async () => {
@@ -529,15 +547,15 @@ describe('C3 · Publicar', () => {
     });
     mockLaunch.mockResolvedValue({ canceled: false, assets: [{ uri: 'file:///g.jpg', width: 800, height: 600 }] });
     await render(<PublishScreen />);
-    await fireEvent.press(await screen.findByTestId('photo-open'));
+    await fireEvent.press(await screen.findByTestId('attach-galeria'));
     await fireEvent.press(screen.getByTestId('photo-pick'));
-    await screen.findByTestId('photo-preview');
+    await screen.findByTestId('photo-thumb-0');
     await fireEvent.press(screen.getByTestId('publish-send'));
     expect(await screen.findByText('Você chegou ao limite por agora. Tente de novo mais tarde.')).toBeTruthy();
     expect(remove).toHaveBeenCalledWith(['aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee.jpg']);
   });
 
-  test('teclado aberto: a área da foto vira uma linha curta abaixo do campo; o aviso continua', async () => {
+  test('teclado aberto: o aviso de quem vê continua ACIMA do campo e Publicar fica no rodapé', async () => {
     const handlers: Record<string, ((event: unknown) => void)[]> = {};
     const spy = jest.spyOn(Keyboard, 'addListener').mockImplementation(((event: string, handler: (event: unknown) => void) => {
       (handlers[event] ??= []).push(handler);
@@ -547,12 +565,13 @@ describe('C3 · Publicar', () => {
     await render(<PublishScreen />);
     await screen.findByTestId('publish-input');
     const open = Object.keys(handlers).find((name) => name.endsWith('Show'));
-    expect(open).toBeDefined();
-    // O teclado do iOS (e o KeyboardAvoidingView, que também escuta) recebem o mesmo evento.
     const frame = { endCoordinates: { screenX: 0, screenY: 500, width: 390, height: 344 }, duration: 0 };
-    await act(async () => handlers[open!].forEach((handler) => handler(frame)));
-    expect(screen.getByTestId('audience-notice')).toBeTruthy();
-    expect(screen.getByTestId('photo-open').props.accessibilityLabel).toBe('Escolher uma foto (opcional)');
+    if (open) await act(async () => handlers[open].forEach((handler) => handler(frame)));
+    const json = JSON.stringify(screen.toJSON());
+    expect(json.indexOf('audience-notice')).toBeGreaterThan(-1);
+    expect(json.indexOf('audience-notice')).toBeLessThan(json.indexOf('publish-input'));
+    expect(json.indexOf('publish-input')).toBeLessThan(json.indexOf('publish-footer'));
+    expect(screen.getByTestId('publish-send')).toBeTruthy();
     spy.mockRestore();
   });
 });

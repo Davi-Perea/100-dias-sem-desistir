@@ -5,8 +5,9 @@ import path from 'path';
  * AUDITORIA ESTÁTICA das migrations da Comunidade (V2).
  *
  * PROVA: que as regras que decidimos estão ESCRITAS no SQL (RLS em tudo, nada de
- * tabela para o app, Amém sem contagem, foto só com aprovação, padrão private +
- * invólucro invoker, exclusão em cascata, bucket privado).
+ * tabela para o app, Amém visível sem user_id (F3, decisão do fundador de
+ * 2026-09-22; antes era "sem contagem"), foto só com aprovação humana ou do filtro
+ * automático, padrão private + invólucro invoker, exclusão em cascata, bucket privado).
  * NÃO PROVA: que o Postgres aplica. Isso é dos pgTAP 07–10 em supabase/tests/,
  * NÃO EXECUTADOS (não há banco nesta máquina).
  */
@@ -26,6 +27,9 @@ const COMMUNITY_TABLES = [
   'community_blocks',
   'community_reports',
   'community_moderation_actions',
+  // Diário compartilhado (2026-09-22): fotos do post (F1) e atividade no app (F8).
+  'community_post_photos',
+  'community_activity',
 ];
 
 type FnDef = { name: string; header: string; body: string };
@@ -41,13 +45,14 @@ function fn(name: string): FnDef {
 const policies = [...sql.matchAll(/create policy[\s\S]*?;/g)].map((m) => m[0]);
 
 describe('arquivos', () => {
-  test('migrations da comunidade depois da fundação (a 5ª é o perfil v2 de 2026-09-22) e os pgTAP', () => {
+  test('migrations da comunidade depois da fundação (5ª perfil v2, 6ª diário compartilhado, ambas de 2026-09-22) e os pgTAP', () => {
     expect(communityFiles).toEqual([
       '20260921130000_comunidade_tabelas.sql',
       '20260921130100_comunidade_funcoes.sql',
       '20260921130200_comunidade_storage.sql',
       '20260921140000_comunidade_edge_functions.sql',
       '20260922120000_comunidade_perfil_v2.sql',
+      '20260922180000_comunidade_diario.sql',
     ]);
     const foundation = allFiles.filter((f) => !f.includes('comunidade'));
     expect(foundation.every((f) => f < communityFiles[0])).toBe(true);
@@ -70,8 +75,8 @@ describe('arquivos', () => {
 describe('tabelas fechadas para o app', () => {
   test.each(COMMUNITY_TABLES)('%s tem RLS ligada e privilégios revogados de anon e authenticated', (table) => {
     expect(sql).toMatch(new RegExp(`alter table public\\.${table}\\s+enable row level security`));
-    const revoke = sql.match(/revoke all on public\.community_profiles[\s\S]*?from anon, authenticated;/)?.[0] ?? '';
-    expect(revoke).toContain(`public.${table}`);
+    const revokes = [...sql.matchAll(/revoke all on (public\.[\s\S]*?) from anon, authenticated;/g)].map((m) => m[1]);
+    expect(revokes.some((list) => list.split(/,\s*/).map((t) => t.trim()).includes(`public.${table}`))).toBe(true);
   });
 
   test('só existem duas policies nas tabelas da comunidade, ambas de leitura da própria linha', () => {
@@ -103,16 +108,33 @@ describe('tabelas fechadas para o app', () => {
   });
 });
 
-describe('Amém sem contagem', () => {
-  test('nenhuma tabela nem RPC tem contagem de Amém', () => {
-    expect(sql).not.toMatch(/amen_count|amens_count|count_amen/i);
-    const feed = fn('public.community_feed').header;
-    expect(feed).toMatch(/i_said_amen boolean/);
-    expect(feed).not.toMatch(/count/);
+describe('Amém visível (F3, decisão do fundador de 2026-09-22)', () => {
+  test('nenhuma TABELA guarda contagem: o número é calculado na leitura', () => {
+    const tableBlocks = [...sql.matchAll(/(create table|alter table)[\s\S]*?;/g)].map((m) => m[0]);
+    for (const block of tableBlocks) expect(block).not.toMatch(/amen_count|amens_count|count_amen/i);
   });
 
-  test('o feed só consulta o Amém de quem pergunta', () => {
-    expect(fn('private.community_feed').body).toMatch(/am\.post_id = p\.id and am\.user_id = \(select auth\.uid\(\)\)/);
+  test('o feed devolve número, rostinhos e o MEU Amém, e nenhum id de pessoa', () => {
+    const feed = fn('public.community_feed').header;
+    expect(feed).toMatch(/i_said_amen boolean/);
+    expect(feed).toMatch(/amen_count int/);
+    expect(feed).toMatch(/amen_faces jsonb/);
+    expect(feed).not.toMatch(/user_id|author_id|actor_id/);
+    expect(fn('private.community_feed').body).toMatch(/am\.post_id = pg\.id and am\.user_id = me\.uid/);
+  });
+
+  test('rostinho = nome, foto APROVADA (a minha sempre) e se é o meu; no máximo 3; bloqueio nos dois sentidos', () => {
+    const faces = fn('private.amen_faces_for').body;
+    expect(faces).toMatch(/jsonb_build_object\('name', f\.display_name, 'avatar_path', f\.avatar, 'is_mine', f\.mine\)/);
+    expect(faces).not.toMatch(/'user_id'|'id'/);
+    expect(faces).toMatch(/case when ap\.avatar_status = 'approved' or ap\.user_id = viewer then ap\.avatar_path end/);
+    expect(faces).toMatch(/limit 3/);
+    expect(faces).toMatch(/not private\.blocked_between\(viewer, am\.user_id\)/);
+    expect(fn('private.amen_count_for').body).toMatch(/not private\.blocked_between\(viewer, am\.user_id\)/);
+  });
+
+  test('a tabela de Amém continua fechada: cada um lê só a própria linha, sem user_id', () => {
+    expect(sql).toMatch(/grant select \(post_id, created_at\) on public\.community_amens to authenticated;/);
   });
 });
 
@@ -184,7 +206,7 @@ describe('regras de conteúdo', () => {
   test('feed com fim: janela de dias e teto fixo de 20', () => {
     const body = fn('private.community_feed').body;
     expect(body).toMatch(/feed_window_days/);
-    expect(body).toMatch(/limit 20;/);
+    expect(body).toMatch(/limit 20\s*\)/);
   });
 
   test('moderação exige papel, motivo para remover, e ninguém modera o próprio conteúdo', () => {
@@ -232,7 +254,7 @@ describe('regras de conteúdo', () => {
 
   test('C4: foto de perfil só aparece para os outros aprovada; a moderação decide pelo ticket, sem user_id', () => {
     expect(fn('private.community_feed').body).toMatch(
-      /case when a\.avatar_status = 'approved' or p\.author_id = \(select auth\.uid\(\)\) then a\.avatar_path end/,
+      /case when a\.avatar_status = 'approved' or p\.author_id = me\.uid then a\.avatar_path end/,
     );
     expect(fn('private.can_view_community_photo').body).toMatch(/cp\.avatar_status = 'approved'/);
     expect(fn('public.community_avatar_queue').header).not.toMatch(/user_id/);
@@ -279,8 +301,10 @@ describe('exclusão de conta e LGPD', () => {
   });
 
   test('foto de post apagado (inclusive em cascata) vai para a fila do Storage', () => {
-    expect(sql).toMatch(/create trigger community_posts_enqueue_photo\s+after delete or update of photo_path/);
-    expect(fn('private.enqueue_post_photo').header).toMatch(/security definer set search_path = ''/);
+    // Desde 2026-09-22 as fotos moram em community_post_photos (até 4 por post).
+    expect(sql).toMatch(/create trigger community_post_photos_enqueue\s+after delete on public\.community_post_photos/);
+    expect(fn('private.enqueue_post_photo_row').header).toMatch(/security definer set search_path = ''/);
+    expect(fn('private.enqueue_post_photo_row').body).toMatch(/insert into private\.storage_deletion_queue/);
   });
 
   test('bucket privado, só JPEG, com limite de tamanho', () => {
@@ -291,5 +315,44 @@ describe('exclusão de conta e LGPD', () => {
   test('código de entrada guardado só como hash', () => {
     expect(sql).toMatch(/code_sha256 text not null unique/);
     expect(sql).not.toMatch(/create table [\w.]*invite_codes[\s\S]*?\bcode\s+text/);
+  });
+});
+
+describe('diário compartilhado (F1, F5, F6, F8 — 2026-09-22)', () => {
+  test('F1: até 4 fotos por post, em ordem; versículo só como referência (nunca texto)', () => {
+    expect(sql).toMatch(/sort_order\s+smallint not null check \(sort_order between 0 and 3\)/);
+    expect(fn('private.create_community_post').body).toMatch(/if v_count > 4 then/);
+    const posts = sql.match(/alter table public\.community_posts\s+add column activity[\s\S]*?;/)?.[0] ?? '';
+    expect(posts).toMatch(/verse_book text/);
+    expect(posts).not.toMatch(/verse_text|texto/);
+  });
+
+  test('F5: foto espera o filtro ou uma pessoa; texto segurado nunca é publicado pelo filtro de imagem', () => {
+    const record = fn('private.service_record_photo_checks').body;
+    expect(record).toMatch(/v_status = 'in_review' and v_hold = 'foto' and v_decided is null and v_open = 0/);
+    expect(record).toMatch(/values \('automatico', 'approve', target_post, v_author\)/);
+    for (const name of ['service_record_photo_checks', 'service_post_photos_for_check', 'service_pending_photo_posts']) {
+      for (const schema of ['public', 'private']) {
+        expect(sql).toMatch(new RegExp(`revoke all on function ${schema}\\.${name}\\([^)]*\\)\\s+from public, anon, authenticated;`));
+        expect(sql).toMatch(new RegExp(`grant execute on function ${schema}\\.${name}\\([^)]*\\) to service_role;`));
+        expect(sql).not.toMatch(new RegExp(`grant execute on function ${schema}\\.${name}\\([^)]*\\) to authenticated`));
+      }
+    }
+  });
+
+  test('F6: a regra de visibilidade confere o público do post (toda a igreja ou o ministério de quem lê)', () => {
+    expect(fn('private.can_view_post').body).toMatch(
+      /private\.audience_allows\(p\.audience, p\.audience_ministry, p\.author_id, viewer\)/,
+    );
+    expect(fn('private.create_community_post').body).toMatch(
+      /select cp\.ministry into v_ministry from public\.community_profiles cp where cp\.user_id = v_uid/,
+    );
+  });
+
+  test('F8: a atividade não devolve id de pessoa e respeita o bloqueio; sem push', () => {
+    expect(fn('public.my_community_activity').header).not.toMatch(/actor_id|user_id|recipient_id/);
+    expect(fn('private.my_visible_activity').body).toMatch(/not private\.blocked_between\(\(select auth\.uid\(\)\), ac\.actor_id\)/);
+    expect(sql).toMatch(/revoke all on function private\.my_visible_activity\(\) from public, anon, authenticated;/);
+    expect(sql).not.toMatch(/expo_push|push_token/i);
   });
 });

@@ -1,13 +1,20 @@
-import { Pressable } from 'react-native';
+import { Pressable, View } from 'react-native';
+import Animated, { ZoomIn } from 'react-native-reanimated';
 
+import { AppText } from '@/ui/components';
+import { ProfileAvatar } from '@/ui/comunidade/perfil/ProfileAvatar';
 import { Icon } from '@/ui/icons';
-import { MIN_TOUCH, useTheme } from '@/ui/theme';
+import { MIN_TOUCH, MOTION_MS, spacing, useReducedMotion, useTheme } from '@/ui/theme';
+
+import { type AmenFace, amenSpoken, MAX_FACES } from './v2';
 
 /**
- * Amém (REGRAS 19 e 33): marca e desmarca, alternando contorno (`bold`) e cheio
- * (`fill`). Sem número em lugar nenhum — nem para quem publicou. "Amém" é o nome
- * acessível; o estado vai em `checked`, então a forma e o leitor de tela dizem a
- * mesma coisa, sem depender de cor.
+ * Amém (REGRAS 19 e 33, F3): mão de oração que marca e desmarca, alternando
+ * contorno (`bold`) e cheio (`fill`). "Amém" é o nome acessível; o estado vai em
+ * `checked`, então a forma e o leitor de tela dizem a mesma coisa, sem cor.
+ *
+ * Movimento: ao marcar, a mão cheia entra com um zoom curto. Com "Reduzir
+ * movimento", troca na hora.
  */
 export function AmenButton({
   checked,
@@ -24,6 +31,7 @@ export function AmenButton({
   testID?: string;
 }) {
   const { colors } = useTheme();
+  const reduced = useReducedMotion();
   return (
     <Pressable
       onPress={() => onToggle(!checked)}
@@ -39,7 +47,72 @@ export function AmenButton({
         pressed && !disabled && { opacity: 0.72 },
       ]}
     >
-      <Icon name={checked ? 'amen-filled' : 'amen'} size={size} color={colors.text} />
+      <Animated.View
+        key={checked ? 'on' : 'off'}
+        entering={checked && !reduced ? ZoomIn.duration(MOTION_MS) : undefined}
+      >
+        <Icon name={checked ? 'amen-filled' : 'amen'} size={size} color={colors.text} />
+      </Animated.View>
     </Pressable>
+  );
+}
+
+const FACE = 24;
+const OVERLAP = 8;
+
+/**
+ * Até 3 rostinhos sobrepostos de quem disse Amém e o número (F3, decisão do
+ * fundador de 2026-09-22, que substitui a regra antiga de não mostrar contagem).
+ * Sem ninguém, nada aparece: zero não vira número na tela.
+ *
+ * Um só elemento para o leitor de tela ("Você e mais 2 pessoas disseram Amém").
+ */
+export function AmenSummary({
+  count,
+  iSaidAmen,
+  faces,
+  urls,
+  testID,
+}: {
+  count: number;
+  iSaidAmen: boolean;
+  faces: AmenFace[];
+  /** Fotos de perfil assinadas, por caminho. */
+  urls: Map<string, string>;
+  testID?: string;
+}) {
+  const { colors } = useTheme();
+  if (count <= 0) return null;
+  const shown = faces.slice(0, MAX_FACES);
+  return (
+    <View
+      accessible
+      accessibilityLabel={amenSpoken(count, iSaidAmen, shown)}
+      testID={testID}
+      style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, minHeight: MIN_TOUCH }}
+    >
+      {shown.length ? (
+        <View style={{ flexDirection: 'row' }} aria-hidden>
+          {shown.map((face, index) => (
+            <View
+              key={`${face.name}-${index}`}
+              testID={testID ? `${testID}-face` : undefined}
+              style={{
+                marginLeft: index === 0 ? 0 : -OVERLAP,
+                borderRadius: (FACE + 4) / 2,
+                borderWidth: 2,
+                borderColor: colors.background,
+                zIndex: shown.length - index,
+              }}
+            >
+              <ProfileAvatar name={face.name} uri={face.avatarPath ? urls.get(face.avatarPath) : undefined} size={FACE} />
+            </View>
+          ))}
+        </View>
+      ) : null}
+      <AppText variant="rowLabel" testID={testID ? `${testID}-count` : undefined}>
+        {count.toLocaleString('pt-BR')}
+      </AppText>
+    </View>
   );
 }

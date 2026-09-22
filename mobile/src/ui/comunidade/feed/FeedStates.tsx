@@ -53,16 +53,17 @@ export function FeedSkeleton({ gutter }: { gutter: number }) {
  * quer dizer alguma coisa". Isso depende da ponte B4 existir nesta build; a
  * frase aqui só convida, sem prometer o que outra tela faz.
  */
-export function FeedEmpty({ day, firstDay }: { day: number; firstDay: boolean }) {
+export function FeedEmpty({ day, firstDay, ministry = false }: { day: number; firstDay: boolean; ministry?: boolean }) {
+  const title = ministry ? 'Ninguém do seu ministério escreveu ainda.' : firstDay ? 'Hoje começa.' : 'Ninguém escreveu ainda.';
   return (
     <StateLayout
       kind="empty"
       inset="vertical"
       testID="feed-empty"
       glyph={<Dove width={84} />}
-      title={firstDay ? 'Hoje começa.' : 'Ninguém escreveu ainda.'}
+      title={title}
       message={
-        firstDay
+        firstDay && !ministry
           ? 'Ninguém escreveu nada ainda — o primeiro dia é assim. Quando terminar a leitura de hoje, conte aqui o que ficou com você. Pode ser a sua a primeira.'
           : 'Quando terminar a leitura de hoje, conte aqui o que ficou com você. Pode ser a sua a primeira.'
       }
@@ -81,12 +82,13 @@ export function FeedEmpty({ day, firstDay }: { day: number; firstDay: boolean })
  * Fim do feed, explícito (ECA Digital / Decreto 12.880: não esconder o ponto
  * de parada). Não há rolagem infinita: a página seguinte só vem por toque.
  */
-export function FeedEnd() {
+export function FeedEnd({ ministry = false }: { ministry?: boolean } = {}) {
+  const where = ministry ? 'do seu ministério' : 'da comunidade';
   return (
     <View
       testID="feed-end"
       accessible
-      accessibilityLabel="Fim. Você viu todas as publicações da comunidade."
+      accessibilityLabel={`Fim. Você viu todas as publicações ${where}.`}
       style={{ alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.xl }}
     >
       <IconCircle name="check" size={48} />
@@ -94,7 +96,7 @@ export function FeedEnd() {
         Fim
       </AppText>
       <AppText variant="caption" style={{ textAlign: 'center' }}>
-        Você viu todas as publicações da comunidade.
+        {`Você viu todas as publicações ${where}.`}
       </AppText>
     </View>
   );

@@ -93,8 +93,9 @@ export function sentCopy(sent: Sent): { title: string; message: string } {
     return {
       title: 'Em análise',
       message:
-        'Antes de aparecer, uma pessoa da equipe da igreja olha a sua foto. Enquanto isso, a sua publicação fica ' +
-        '"em análise" e só você a vê, em "Minhas publicações".',
+        // F5: o filtro automático desconfiou da foto (ou não há filtro, e toda foto espera uma pessoa).
+        'Antes de aparecer para todos, a sua foto passa pelo olhar de uma pessoa da equipe da igreja. Enquanto isso, ' +
+        'a sua publicação fica "em análise" e só você a vê, em "Minhas publicações".',
     };
   }
   return {
