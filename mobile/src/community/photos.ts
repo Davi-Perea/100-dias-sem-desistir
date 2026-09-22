@@ -91,6 +91,50 @@ export function inspectJpeg(bytes: Uint8Array): JpegInspection {
 }
 
 /**
+ * Tira do JPEG os segmentos de metadado (APP0–APP15 e comentário), que é onde
+ * moram EXIF, XMP, IPTC e a localização. O iOS grava EXIF de orientação mesmo
+ * no arquivo reencodado pelo manipulador; sem esta limpeza a foto era RECUSADA
+ * na última barreira e a pessoa via "não foi possível preparar esta foto" sem
+ * entender por quê (relato do fundador, 2026-09-22). Os dados da imagem em si
+ * (quantização, Huffman, SOF, SOS) ficam intactos.
+ */
+export function stripJpegMetadata(bytes: Uint8Array): Uint8Array {
+  if (bytes.length < 4 || bytes[0] !== 0xff || bytes[1] !== 0xd8) return bytes;
+  const keep: { start: number; end: number }[] = [{ start: 0, end: 2 }];
+  let offset = 2;
+  while (offset + 4 <= bytes.length) {
+    if (bytes[offset] !== 0xff) return bytes; // malformado: não mexe
+    const marker = bytes[offset + 1];
+    if (marker === 0xff) {
+      offset += 1;
+      continue;
+    }
+    if (marker === 0xda || marker === 0xd9) {
+      keep.push({ start: offset, end: bytes.length }); // SOS: o resto é imagem
+      break;
+    }
+    if (marker === 0x01 || (marker >= 0xd0 && marker <= 0xd7)) {
+      keep.push({ start: offset, end: offset + 2 });
+      offset += 2;
+      continue;
+    }
+    const length = (bytes[offset + 2] << 8) | bytes[offset + 3];
+    if (length < 2 || offset + 2 + length > bytes.length) return bytes;
+    const isMetadata = (marker >= 0xe0 && marker <= 0xef) || marker === 0xfe;
+    if (!isMetadata) keep.push({ start: offset, end: offset + 2 + length });
+    offset += 2 + length;
+  }
+  const size = keep.reduce((total, part) => total + (part.end - part.start), 0);
+  const out = new Uint8Array(size);
+  let written = 0;
+  for (const part of keep) {
+    out.set(bytes.subarray(part.start, part.end), written);
+    written += part.end - part.start;
+  }
+  return out;
+}
+
+/**
  * Última barreira antes do upload. Lança CommunityError se a foto não pode subir.
  */
 export function assertPhotoSafeToUpload(bytes: Uint8Array): void {

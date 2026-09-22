@@ -3,7 +3,7 @@ import Constants from 'expo-constants';
 import * as ImagePicker from 'expo-image-picker';
 
 import { CommunityError, communityError } from '@/community/errors';
-import { assertPhotoSafeToUpload, PHOTO_JPEG_QUALITY, PHOTO_MAX_DIMENSION } from '@/community/photos';
+import { assertPhotoSafeToUpload, PHOTO_JPEG_QUALITY, PHOTO_MAX_DIMENSION, stripJpegMetadata } from '@/community/photos';
 
 /**
  * Foto da publicação (C3): escolher na galeria e preparar no aparelho.
@@ -162,7 +162,9 @@ export const encodeWithManipulator: PhotoEncoder = async (uri, plan) => {
  */
 export async function preparePhoto(asset: PickedAsset, encode: PhotoEncoder = encodeWithManipulator): Promise<PreparedPhoto> {
   const encoded = await encode(asset.uri, ({ width, height }) => fitWithin(width, height));
-  const bytes = base64ToBytes(encoded.base64);
+  // Limpa EXIF/XMP/IPTC antes de conferir: o iOS grava EXIF de orientação mesmo
+  // no arquivo reencodado, e a conferência recusava a foto por causa disso.
+  const bytes = stripJpegMetadata(base64ToBytes(encoded.base64));
   assertPhotoSafeToUpload(bytes);
   return { uri: encoded.uri, width: encoded.width, height: encoded.height, bytes };
 }

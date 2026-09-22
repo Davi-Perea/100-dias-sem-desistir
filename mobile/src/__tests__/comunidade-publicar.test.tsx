@@ -16,6 +16,7 @@ import RulesScreen from '@/app/comunidade/regras';
 import { createCommunityApi, type CommunityApi, type CommunityClient } from '@/community/api';
 import { CommunityError } from '@/community/errors';
 import { LIMITS } from '@/community/validation';
+import { inspectJpeg } from '@/community/photos';
 import {
   fitsWithoutScroll,
   parseDay,
@@ -114,6 +115,8 @@ const CLEAN_JPEG = Uint8Array.from([0xff, 0xd8, 0xff, 0xdb, 0x00, 0x04, 0x00, 0x
 const EXIF_JPEG = Uint8Array.from([
   0xff, 0xd8, 0xff, 0xe1, 0x00, 0x08, 0x45, 0x78, 0x69, 0x66, 0x00, 0x00, 0xff, 0xda, 0x00, 0x02,
 ]);
+/** Não é JPEG (cabeçalho de PNG): o preparo não tem como salvar. */
+const NOT_JPEG = Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 const b64 = (bytes: Uint8Array) => Buffer.from(bytes).toString('base64');
 
 let mockEncoded = CLEAN_JPEG;
@@ -402,12 +405,24 @@ describe('foto', () => {
     expect(prepared.uri).toBe('file:///cache/preparada.jpg');
   });
 
-  test('se o reencode deixar EXIF, a foto é recusada antes de qualquer rede', async () => {
+  // 2026-09-22: o iOS grava EXIF de orientação mesmo no arquivo reencodado, e a
+  // foto era recusada por isso ("não carrega"). Agora o app LIMPA os metadados
+  // antes de conferir; só o que não é JPEG continua sendo recusado.
+  test('se o reencode deixar EXIF, o app limpa os metadados antes de enviar', async () => {
     mockEncoded = EXIF_JPEG;
-    const attempt = preparePhoto({ uri: 'file:///galeria.jpg', width: 1000, height: 800 });
+    const prepared = await preparePhoto({ uri: 'file:///galeria.jpg', width: 1000, height: 800 });
+    const inspection = inspectJpeg(prepared.bytes);
+    expect(inspection.isJpeg).toBe(true);
+    expect(inspection.hasExif).toBe(false);
+    expect(prepared.bytes.length).toBeLessThan(EXIF_JPEG.length);
+  });
+
+  test('o que não é JPEG continua recusado antes de qualquer rede', async () => {
+    mockEncoded = NOT_JPEG;
+    const attempt = preparePhoto({ uri: 'file:///galeria.png', width: 1000, height: 800 });
     await expect(attempt).rejects.toBeInstanceOf(CommunityError);
-    await expect(preparePhoto({ uri: 'file:///g.jpg', width: 1, height: 1 })).rejects.toMatchObject({
-      code: 'photo_has_metadata',
+    await expect(preparePhoto({ uri: 'file:///g.png', width: 1, height: 1 })).rejects.toMatchObject({
+      code: 'photo_not_jpeg',
     });
   });
 });
@@ -585,15 +600,15 @@ describe('C3 · Publicar', () => {
     ]);
   });
 
-  test('foto com metadado que não saiu: recusada na escolha, com o motivo', async () => {
+  test('foto que o preparo não consegue abrir: recusada na escolha, com o motivo', async () => {
     useFakeApi({ my_community_status: { data: [statusRow()] } });
-    mockEncoded = EXIF_JPEG;
+    mockEncoded = NOT_JPEG;
     mockLaunch.mockResolvedValue({ canceled: false, assets: [{ uri: 'file:///g.jpg', width: 800, height: 600 }] });
     await render(<PublishScreen />);
     await fireEvent.press(await screen.findByTestId('attach-galeria'));
     await fireEvent.press(screen.getByTestId('photo-pick'));
     expect(await screen.findByTestId('photo-error')).toBeTruthy();
-    expect(screen.getByText('Não foi possível remover os dados de localização da foto. Ela não foi enviada.')).toBeTruthy();
+    expect(screen.getByText('Não foi possível preparar esta foto. Tente outra.')).toBeTruthy();
     expect(screen.queryByTestId('photo-thumb-0')).toBeNull();
   });
 
