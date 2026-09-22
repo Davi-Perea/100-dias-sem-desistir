@@ -107,25 +107,32 @@ export default function ReaderScreen() {
   // Dia trancado: nada é pedido ao provedor. Com uma tradução licenciada, isso
   // seria uma requisição de conteúdo de um dia que ainda não abriu. No guia
   // também não: o provedor sem licença não tem texto para dar.
+  // Os três efeitos abaixo são separados de propósito: a posição voltar do
+  // disco (positionReady) não pode pedir o capítulo de novo nem jogar a
+  // rolagem para o topo de quem já começou a ler um capítulo longo (Salmo 119).
   useEffect(() => {
-    if (!reference || !unlocked) return;
+    if (!reference || !unlocked || !hasLicensedText) return;
     let alive = true;
-    if (hasLicensedText) {
-      provider.getPassage(reference).then(
-        (loaded) => alive && setResult({ key: chapterKey, passage: loaded }),
-        (err: unknown) =>
-          alive && setResult({ key: chapterKey, error: err instanceof Error ? err : new Error(String(err)) }),
-      );
-    }
-    if (positionReady) {
-      // Gravação de conveniência: se o disco falhar, a leitura segue igual.
-      saveReaderPosition({ dayNumber, readingIndex: 0, chapterIndex }).catch(() => {});
-    }
-    scrollRef.current?.scrollTo({ y: 0, animated: false });
+    provider.getPassage(reference).then(
+      (loaded) => alive && setResult({ key: chapterKey, passage: loaded }),
+      (err: unknown) =>
+        alive && setResult({ key: chapterKey, error: err instanceof Error ? err : new Error(String(err)) }),
+    );
     return () => {
       alive = false;
     };
-  }, [reference, chapterKey, dayNumber, chapterIndex, provider, hasLicensedText, unlocked, positionReady]);
+  }, [reference, chapterKey, provider, hasLicensedText, unlocked]);
+
+  useEffect(() => {
+    if (!positionReady || !unlocked || chapters.length === 0) return;
+    // Gravação de conveniência: se o disco falhar, a leitura segue igual.
+    saveReaderPosition({ dayNumber, readingIndex: 0, chapterIndex }).catch(() => {});
+  }, [positionReady, unlocked, chapters.length, dayNumber, chapterIndex]);
+
+  // Capítulo novo começa do topo; o mesmo capítulo nunca é rolado de volta.
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ y: 0, animated: false });
+  }, [chapterIndex]);
 
   const completionsReady = journey.completions != null;
   const dayDone = isDayCompleted(journey.completions, dayNumber);
@@ -268,6 +275,7 @@ export default function ReaderScreen() {
     <Screen edges={['left', 'right']}>
       <ScrollView
         ref={scrollRef}
+        testID="reader-scroll"
         contentInsetAdjustmentBehavior="never"
         contentContainerStyle={{
           paddingHorizontal: READER_GUTTER,

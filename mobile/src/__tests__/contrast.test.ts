@@ -396,3 +396,59 @@ describe('regras do sistema visual', () => {
     expect(contrastRatio('#111111', '#111111')).toBeCloseTo(1, 5);
   });
 });
+
+/**
+ * TEMA_ESCURO_PROPOSTA (docs/design): correções técnicas de contraste do tema
+ * escuro, cada uma com o número de ANTES e o de DEPOIS. Os tokens não mudaram;
+ * mudou como os componentes os combinam. O tema claro fica como estava.
+ */
+describe('tema escuro: correções (antes → depois)', () => {
+  const d = palettes.dark;
+  const l = palettes.light;
+  const r2 = (a: string, b: string) => Math.round(contrastRatio(a, b) * 100) / 100;
+
+  test('achado 1 · palavra no realce amarelo: branco 1,46 → tinta 12,92', () => {
+    // PROVISÓRIO (pergunta 1 ao designer).
+    expect(r2(d.text, BRAND_YELLOW)).toBeCloseTo(1.46, 2);
+    expect(r2('#111111', BRAND_YELLOW)).toBeCloseTo(12.92, 2);
+    expect(contrastRatio('#111111', BRAND_YELLOW)).toBeGreaterThanOrEqual(4.5);
+  });
+
+  test('achado 2 · bloco surface sobre fundo quente: 1,01 → 1,11 (claro 1,09)', () => {
+    // PROVISÓRIO (pergunta 2 ao designer).
+    expect(r2(d.surface, d.surfaceWarm)).toBeCloseTo(1.01, 2);
+    expect(r2(d.surfaceMuted, d.surfaceWarm)).toBeCloseTo(1.11, 2);
+    expect(contrastRatio(d.surfaceMuted, d.surfaceWarm)).toBeGreaterThanOrEqual(
+      contrastRatio(l.surface, l.surfaceWarm),
+    );
+  });
+
+  test('achado 2 · bloco quente sobre a folha (B3): 1,01 → 1,10 (claro 1,09)', () => {
+    expect(r2(d.surfaceWarm, d.surface)).toBeCloseTo(1.01, 2);
+    expect(r2(d.surfaceMuted, d.surface)).toBeCloseTo(1.1, 2);
+  });
+
+  test('achado 2 · a borda do bloco elevado segue visível: 10% de branco sobre #232220, contra o quente, 1,50', () => {
+    expect(r2(composite('#FFFFFF', d.surfaceMuted, 0.1), d.surfaceWarm)).toBeCloseTo(1.5, 2);
+  });
+
+  test('achado 3 · folha contra o véu: 1,16 → filete de topo 1,64 (claro 3,54)', () => {
+    // PROVISÓRIO (pergunta 3 ao designer). Continua abaixo de 3:1: a alça e o
+    // conteúdo identificam a folha; o filete só a separa do véu.
+    const veuEscuro = composite('#000000', d.background, 0.6);
+    const veuClaro = composite('#111111', l.background, 0.5);
+    expect(r2(d.surface, veuEscuro)).toBeCloseTo(1.16, 2);
+    expect(r2(composite('#FFFFFF', d.surface, 0.12), veuEscuro)).toBeCloseTo(1.64, 2);
+    expect(r2(l.surface, veuClaro)).toBeCloseTo(3.54, 1);
+  });
+
+  test('achado 4 · anel de "não leu" (D4) e borda da caixa de jejum (A3): borderStrong 1,54 → controlBorder 4,75', () => {
+    // PROVISÓRIO (pergunta 4 ao designer).
+    expect(r2(d.borderStrong, d.surface)).toBeCloseTo(1.54, 2);
+    expect(r2(d.controlBorder, d.surface)).toBeCloseTo(4.75, 2);
+    expect(r2(d.controlBorder, d.surfaceWarm)).toBeCloseTo(4.79, 2);
+    // No claro o mesmo troca 1,45 por 3,59 e 3,29: passa nos dois temas.
+    expect(contrastRatio(l.controlBorder, l.surface)).toBeGreaterThanOrEqual(3);
+    expect(contrastRatio(l.controlBorder, l.surfaceWarm)).toBeGreaterThanOrEqual(3);
+  });
+});

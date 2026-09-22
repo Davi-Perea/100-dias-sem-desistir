@@ -1,4 +1,4 @@
-import React, { type PropsWithChildren, type ReactNode } from 'react';
+import React, { createContext, type PropsWithChildren, type ReactNode, useContext } from 'react';
 import {
   ActivityIndicator,
   Modal,
@@ -62,6 +62,28 @@ export function useFace(): (face: string) => string {
 
 /* ------------------------------------------------------------------ layout */
 
+/**
+ * Sobre que superfície um bloco está desenhado. Existe por uma correção de
+ * contraste do tema escuro (TEMA_ESCURO_PROPOSTA, achado 2): no claro, o bloco
+ * branco sobre o fundo quente mede 1,09:1; no escuro os dois tokens quase
+ * coincidem (1,01:1) e o bloco some. O Block lê o fundo de trás daqui e, só no
+ * escuro, sobe um degrau. Screen, Sheet e o próprio Block declaram o fundo.
+ */
+export type Backdrop = 'page' | 'warm' | 'surface' | 'muted' | 'fixed';
+
+const BackdropContext = createContext<Backdrop>('page');
+
+/** O fundo sob o componente atual (para quem desenha bloco próprio). */
+export function useBackdrop(): Backdrop {
+  return useContext(BackdropContext);
+}
+
+function toneBackdrop(tone: ScreenTone): Backdrop {
+  if (tone === 'warm') return 'warm';
+  if (tone === 'ink' || tone === 'yellow') return 'fixed';
+  return 'page';
+}
+
 export type ScreenTone = 'default' | 'warm' | 'reader' | 'ink' | 'yellow';
 
 function toneBackground(tone: ScreenTone, colors: Palette): string {
@@ -88,7 +110,7 @@ export function Screen({
       edges={edges ?? ['top', 'left', 'right']}
       style={[{ flex: 1, backgroundColor: toneBackground(tone, colors) }, style]}
     >
-      {children}
+      <BackdropContext.Provider value={toneBackdrop(tone)}>{children}</BackdropContext.Provider>
     </SafeAreaView>
   );
 }
@@ -268,6 +290,11 @@ export function Cap({
  * Realce amarelo tipo marca-texto. O amarelo é FUNDO e a tinta continua #111:
  * 12,92:1. O TELAS (A1) pede "padding 0 4 raio 4", mas texto aninhado no React
  * Native não aceita padding nem raio; o realce fica rente à palavra.
+ *
+ * A tinta é fixa e não `colors.text`: no tema escuro a palavra herdaria o
+ * branco da frase e mediria 1,46:1 sobre o amarelo (TEMA_ESCURO_PROPOSTA,
+ * achado 1). Fixa, mede 12,92:1 nos dois temas.
+ * PROVISÓRIO (pergunta 1 ao designer): confirmar #111111 dentro do realce.
  */
 export function Highlight({ children }: PropsWithChildren) {
   return <Text style={{ backgroundColor: BRAND_YELLOW, color: '#111111' }}>{children}</Text>;
@@ -305,13 +332,8 @@ export function Block({
   testID?: string;
 }>) {
   const { colors, isDark } = useTheme();
-  const background = {
-    surface: colors.surface,
-    warm: colors.surfaceWarm,
-    muted: colors.surfaceMuted,
-    ink: '#111111',
-    blueSoft: colors.blueSoft,
-  }[tone];
+  const backdrop = useBackdrop();
+  const background = blockFill(tone, backdrop, colors, isDark);
   const base: ViewStyle = {
     backgroundColor: background,
     borderRadius: radius.block,
@@ -329,6 +351,7 @@ export function Block({
     minHeight: MIN_TOUCH,
     justifyContent: 'center',
   };
+  const inner = <BackdropContext.Provider value={BLOCK_BACKDROP[tone]}>{children}</BackdropContext.Provider>;
   if (!onPress) {
     return (
       <View
@@ -337,7 +360,7 @@ export function Block({
         accessible={accessibilityLabel !== undefined}
         accessibilityLabel={accessibilityLabel}
       >
-        {children}
+        {inner}
       </View>
     );
   }
@@ -349,9 +372,41 @@ export function Block({
       testID={testID}
       style={({ pressed }) => [base, pressed && { opacity: 0.72 }, style]}
     >
-      {children}
+      {inner}
     </Pressable>
   );
+}
+
+/** O fundo que cada tom de bloco oferece aos blocos dentro dele. */
+const BLOCK_BACKDROP: Record<BlockTone, Backdrop> = {
+  surface: 'surface',
+  warm: 'warm',
+  muted: 'muted',
+  ink: 'fixed',
+  blueSoft: 'surface',
+};
+
+/**
+ * Preenchimento do bloco conforme o tom e o fundo de trás.
+ *
+ * CORREÇÃO TÉCNICA do tema escuro (TEMA_ESCURO_PROPOSTA, achado 2; A3, B3, D4,
+ * E1): bloco `surface` sobre fundo quente, ou bloco quente sobre folha, mede
+ * 1,01:1 no escuro — contra 1,09:1 no claro — e o bloco deixa de existir. No
+ * escuro ele sobe para `surfaceMuted` (1,11:1 e 1,10:1, o mesmo degrau do claro)
+ * e mantém a borda de 10% de branco. O tema claro não muda.
+ * PROVISÓRIO (pergunta 2 ao designer): `surfaceMuted` + borda é a proposta, não
+ * o desenho.
+ */
+export function blockFill(tone: BlockTone, backdrop: Backdrop, colors: Palette, isDark: boolean): string {
+  if (isDark && tone === 'surface' && backdrop === 'warm') return colors.surfaceMuted;
+  if (isDark && tone === 'warm' && backdrop === 'surface') return colors.surfaceMuted;
+  return {
+    surface: colors.surface,
+    warm: colors.surfaceWarm,
+    muted: colors.surfaceMuted,
+    ink: '#111111',
+    blueSoft: colors.blueSoft,
+  }[tone];
 }
 
 /** Compatibilidade: `Card` continua existindo com a aparência do bloco novo. */
@@ -1247,6 +1302,14 @@ export function Sheet({
           gap: spacing.lg,
           maxHeight: height * 0.88,
           ...floatShadow,
+          // CORREÇÃO TÉCNICA do tema escuro (TEMA_ESCURO_PROPOSTA, achado 3): o
+          // véu escurece uma página que já era escura, e a folha mede 1,16:1
+          // contra ele (no claro, 3,54:1). Nenhum cinza escuro chega a 3:1 sem
+          // virar "folha cinza"; o filete de 1px no topo sobe a borda para
+          // 1,64:1 contra o véu. A alça e o conteúdo continuam identificando a
+          // folha. O claro não muda.
+          // PROVISÓRIO (pergunta 3 ao designer): filete no topo, ou outra solução.
+          ...(isDark ? { borderTopWidth: 1, borderColor: glass.hairlineDark } : null),
         }}
       >
         <View
@@ -1266,7 +1329,9 @@ export function Sheet({
               {title}
             </AppText>
           ) : null}
-          {children}
+          {/* A folha é o fundo de trás do que vier dentro dela, inclusive
+              quando a tela que a abriu é quente (o Modal herda o contexto). */}
+          <BackdropContext.Provider value="surface">{children}</BackdropContext.Provider>
         </ScrollView>
       </View>
     </Modal>
@@ -1283,6 +1348,9 @@ export type JourneyNodeState = 'done' | 'open' | 'today' | 'future';
  *   em aberto · anel de 14, traço 3, em azul
  *   hoje · círculo de 20 em amarelo com anel de 3 em tinta
  *   futuro · ponto de 7 em `borderStrong`
+ * No escuro o anel de hoje é branco em volta do amarelo (1,46:1 entre os dois,
+ * 18,88:1 contra a página); o tamanho e a forma distinguem o nó.
+ * PROVISÓRIO (pergunta 8 ao designer): o anel continua branco no escuro?
  * Decorativo para o leitor de tela: o estado vai escrito no rótulo da linha.
  */
 export function JourneyNode({ state, testID }: { state: JourneyNodeState; testID?: string }) {
