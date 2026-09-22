@@ -83,6 +83,16 @@ const light = {
 /**
  * Tema escuro. O amarelo não muda de valor: muda de papel. Nenhuma tela escura
  * foi desenhada tela a tela ainda (etapa 8); estes valores são os do TOKENS.md.
+ *
+ * Nenhum valor daqui mudou com a TEMA_ESCURO_PROPOSTA: as correções de
+ * contraste dela estão em como os componentes COMBINAM estes tokens (medidas em
+ * `contrast.test.ts`, bloco "tema escuro: correções"):
+ *   - texto dentro do realce amarelo é sempre #111111 (achado 1);
+ *   - bloco `surface` sobre fundo quente, ou quente sobre folha, sobe para
+ *     `surfaceMuted` (achado 2; `blockFill` em components.tsx);
+ *   - a folha modal ganha filete no topo (achado 3);
+ *   - anel de "não leu" e borda de caixa usam `controlBorder`, nunca
+ *     `borderStrong` (achado 4): 4,75:1 contra 1,54:1.
  */
 const dark: Record<keyof typeof light, string> = {
   background: '#111111',

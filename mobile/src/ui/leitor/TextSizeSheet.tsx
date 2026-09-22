@@ -6,7 +6,7 @@ import {
   readLineHeight,
   readerFontFraction,
 } from '@/reader/readerFontSize';
-import { AppText, Button, Sheet, useFace } from '@/ui/components';
+import { AppText, blockFill, Button, Sheet, useBackdrop, useFace } from '@/ui/components';
 import { BRAND_YELLOW, faces, spacing, useTheme } from '@/ui/theme';
 
 import { LabelProbe, useOneLineFit } from './LabelProbe';
@@ -42,7 +42,6 @@ export function TextSizeSheet({
   onStep: (direction: 1 | -1) => void;
 }) {
   const { colors } = useTheme();
-  const face = useFace();
   const fit = useOneLineFit();
   // Os dois lado a lado enquanto o rótulo mais largo cabe em uma linha dentro de
   // metade da largura; senão empilham. Medido, não por escala (REGRAS 26).
@@ -54,21 +53,7 @@ export function TextSizeSheet({
     <Sheet visible={visible} onClose={onClose} title="Tamanho do texto" testID="text-size-sheet">
       {/* Amostra: bloco surfaceWarm raio 16, Source Serif no tamanho corrente,
           entrelinha 1,7×, SEM teto de escala — ver o comentário do topo. */}
-      <View
-        style={{ backgroundColor: colors.surfaceWarm, borderRadius: 16, padding: spacing.lg, minHeight: 48 }}
-      >
-        <Text
-          testID="text-size-sample"
-          style={{
-            fontFamily: face(faces.ss400),
-            fontSize: size,
-            lineHeight: readLineHeight(size),
-            color: colors.text,
-          }}
-        >
-          {SAMPLE}
-        </Text>
-      </View>
+      <SampleBox size={size} />
 
       <View
         onLayout={(event) => fit.setBoxWidth(Math.floor(event.nativeEvent.layout.width))}
@@ -160,5 +145,35 @@ export function TextSizeSheet({
           app atual até o designer decidir. */}
       <Button title="Pronto" variant="outline" onPress={onClose} testID="text-size-done" />
     </Sheet>
+  );
+}
+
+/**
+ * Amostra: bloco surfaceWarm raio 16. Fica num componente próprio para ler o
+ * fundo de dentro da folha ('surface'): no escuro o quente sobre a folha mede
+ * 1,01:1 e sobe para surfaceMuted pela mesma regra do Block (achado 2,
+ * PROVISÓRIO — pergunta 2 ao designer). O claro não muda.
+ */
+function SampleBox({ size }: { size: number }) {
+  const { colors, isDark } = useTheme();
+  const face = useFace();
+  const fill = blockFill('warm', useBackdrop(), colors, isDark);
+  return (
+    <View
+      testID="text-size-sample-box"
+      style={{ backgroundColor: fill, borderRadius: 16, padding: spacing.lg, minHeight: 48 }}
+    >
+      <Text
+        testID="text-size-sample"
+        style={{
+          fontFamily: face(faces.ss400),
+          fontSize: size,
+          lineHeight: readLineHeight(size),
+          color: colors.text,
+        }}
+      >
+        {SAMPLE}
+      </Text>
+    </View>
   );
 }
