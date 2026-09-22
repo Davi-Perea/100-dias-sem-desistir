@@ -126,8 +126,11 @@ export function useFeed(
   const [notice, setNotice] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const generation = useRef(0);
-  // Um Amém por vez por cartão: o segundo toque antes da resposta seria corrida.
+  // Um pedido de Amém por vez por cartão, mas nenhum toque se perde: enquanto
+  // um pedido está no ar, o último desejo fica guardado e é enviado em seguida
+  // (vale o último toque, e uma resposta velha não pinta por cima dele).
   const amenInFlight = useRef(new Set<string>());
+  const amenWanted = useRef(new Map<string, boolean>());
 
   const sign = useCallback(
     async (cards: CardModel[]) => {
@@ -247,18 +250,29 @@ export function useFeed(
   /** Marca ou desmarca o MEU Amém; o número e os rostinhos acompanham (F3). */
   const toggleAmen = useCallback(
     async (postId: string, next: boolean) => {
-      if (!api || amenInFlight.current.has(postId)) return;
-      amenInFlight.current.add(postId);
+      if (!api) return;
       setNotice(null);
       const me: AmenFace = { name: myName, avatarPath: myAvatar };
       patch(postId, (card) => withMyAmen(card, next, me));
+      amenWanted.current.set(postId, next);
+      if (amenInFlight.current.has(postId)) return;
+      amenInFlight.current.add(postId);
+      let sent: boolean | undefined;
+      let confirmed: boolean | undefined;
       try {
-        const confirmed = await api.setAmen(postId, next);
-        patch(postId, (card) => withMyAmen(card, confirmed, me));
+        while (amenWanted.current.has(postId) && amenWanted.current.get(postId) !== confirmed) {
+          sent = amenWanted.current.get(postId) as boolean;
+          confirmed = await api.setAmen(postId, sent);
+        }
+        const settled = confirmed as boolean;
+        patch(postId, (card) => withMyAmen(card, settled, me));
       } catch (error) {
-        patch(postId, (card) => withMyAmen(card, !next, me));
+        // Volta ao último estado que o servidor confirmou (ou ao de antes do toque).
+        const back = confirmed ?? !sent;
+        patch(postId, (card) => withMyAmen(card, back, me));
         setNotice(humanError(error));
       } finally {
+        amenWanted.current.delete(postId);
         amenInFlight.current.delete(postId);
       }
     },

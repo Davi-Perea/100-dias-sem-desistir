@@ -16,6 +16,7 @@ import { calendarDateInCampaignTz } from '@/journey/officialDay';
 import type { JourneyDataset } from '@/journey/types';
 import { useJourney } from '@/journey/useJourney';
 import { _resetCompletionsCacheForTests, COMPLETIONS_PREFIX, setDayCompleted } from '@/progress/completionsStore';
+import { simulatedCampaignDay, simulatedDailyReminderPlan } from '@/reminders/reminders';
 import { _resetSettingsCacheForTests, SETTINGS_KEY } from '@/settings/settingsStore';
 
 jest.mock('expo-router', () => ({
@@ -132,6 +133,33 @@ describe('com __DEV__ e o modo ligado', () => {
     expect(result.current.dayState(2)).toBe('pending');
     expect(result.current.dayState(3)).toBe('today');
     expect(await storedDays()).toEqual([1]);
+  });
+
+  test('Dia 1 (prévia do dia 23): pessoa nova, nada concluído e nada em aberto', async () => {
+    setDemoEnv('true', '1');
+    process.env.EXPO_PUBLIC_DEMO_SEED = 'false';
+    try {
+      const { result } = await mountJourney();
+      expect(result.current.phase).toBe('running');
+      expect(result.current.officialDay).toBe(1);
+      expect(result.current.dayState(1)).toBe('today');
+      await new Promise((r) => setTimeout(r, 20));
+      expect(result.current.completedCount).toBe(0);
+      expect(result.current.pendingDays).toEqual([]);
+      expect(await storedDays()).toEqual([]);
+    } finally {
+      delete process.env.EXPO_PUBLIC_DEMO_SEED;
+    }
+  });
+
+  test('Dia 1: os lembretes começam pela leitura do Dia 1 e seguem para o Dia 2', () => {
+    setDemoEnv('true', '1');
+    expect(simulatedCampaignDay()).toBe(1);
+    const now = new Date(2026, 8, 23, 6, 0, 0);
+    const plan = simulatedDailyReminderPlan({ hour: 7, minute: 0 }, devDataset().campaign, now, 1, 3);
+    expect(plan.map((p) => p.day)).toEqual([1, 2, 3]);
+    expect(plan[0].when.getDate()).toBe(23);
+    expect(plan[0].body).toMatch(/Dia 1|Leitura de hoje/);
   });
 
   test('o dia simulado não é gravado nas preferências: desligar volta à data real', async () => {

@@ -11,6 +11,7 @@ import { announceNotice } from '@/ui/voce/announce';
 import { useKeyboardVisible } from '@/ui/comunidade/publicar/partes';
 
 import { LimitNote } from '../LimitNote';
+import { AmenButton } from './AmenButton';
 import { relativeTime } from './tempo';
 import { humanError, needsConsent } from './useCommunity';
 
@@ -35,6 +36,53 @@ export type CommentsListState =
   | { phase: 'loading' }
   | { phase: 'error'; message: string }
   | { phase: 'ready'; items: PostComment[] };
+
+/**
+ * Amém em comentário que levou à tela de aceite: marcado sozinho quando a pessoa
+ * volta (o toque dela já disse o que queria; a tela de aceite só veio antes). Vale
+ * por 10 minutos: quem desistiu do aceite e volta outro dia não ganha um Amém
+ * que já esqueceu.
+ */
+const PENDING_AMEN_TTL_MS = 10 * 60 * 1000;
+let pendingCommentAmen: { postId: string; commentId: string; at: number } | null = null;
+
+export function rememberPendingCommentAmen(postId: string, commentId: string, now = Date.now()) {
+  pendingCommentAmen = { postId, commentId, at: now };
+}
+
+/** Tira o Amém pendente (deste post, se informado), se houver e ainda valer. */
+export function takePendingCommentAmen(postId?: string, now = Date.now()): { postId: string; commentId: string } | null {
+  const pending = pendingCommentAmen;
+  if (!pending) return null;
+  if (now - pending.at > PENDING_AMEN_TTL_MS) {
+    pendingCommentAmen = null;
+    return null;
+  }
+  if (postId !== undefined && pending.postId !== postId) return null;
+  pendingCommentAmen = null;
+  return { postId: pending.postId, commentId: pending.commentId };
+}
+
+/**
+ * Para quem abriu a folha (que fechou para o aceite): grava o Amém pendente sem
+ * precisar reabrir a conversa. Silencioso se falhar: a pessoa vê o estado real
+ * ao abrir os comentários.
+ */
+export async function flushPendingCommentAmen(api: CommunityApi): Promise<boolean> {
+  const pending = takePendingCommentAmen();
+  if (!pending) return false;
+  try {
+    return await api.setCommentAmen(pending.commentId, true);
+  } catch {
+    return false;
+  }
+}
+
+/** Meu Amém num comentário: o número acompanha. */
+export function withCommentAmen(comment: PostComment, next: boolean): PostComment {
+  if (comment.iSaidAmen === next) return comment;
+  return { ...comment, iSaidAmen: next, amenCount: Math.max(0, comment.amenCount + (next ? 1 : -1)) };
+}
 
 /** Só o que é público, mais o que é MEU em qualquer estado (com o selo). */
 export function visibleComments(items: PostComment[]): PostComment[] {
@@ -92,6 +140,90 @@ export function useComments({
     announceNotice(AFTER_CONSENT_COMMENT);
   }, [gated]);
 
+  // Amém nos comentários: marca na hora (otimista). Toques seguidos não travam:
+  // vale o último; quando a resposta chega, se a pessoa já mudou de ideia, manda
+  // de novo. Se o servidor recusar, volta ao que era e diz por quê.
+  const textRef = useRef(text);
+  useEffect(() => {
+    textRef.current = text;
+  }, [text]);
+  const amenWant = useRef(new Map<string, boolean>());
+  const amenBusy = useRef(new Set<string>());
+
+  const patchAmen = useCallback((commentId: string, next: boolean) => {
+    setList((prev) =>
+      prev.phase === 'ready'
+        ? { phase: 'ready', items: prev.items.map((c) => (c.commentId === commentId ? withCommentAmen(c, next) : c)) }
+        : prev,
+    );
+  }, []);
+
+  const syncAmen = useCallback(
+    async (commentId: string) => {
+      if (amenBusy.current.has(commentId)) return;
+      amenBusy.current.add(commentId);
+      try {
+        for (;;) {
+          const want = amenWant.current.get(commentId);
+          if (want === undefined) return;
+          try {
+            const got = await api.setCommentAmen(commentId, want);
+            if (amenWant.current.get(commentId) !== want) continue;
+            amenWant.current.delete(commentId);
+            patchAmen(commentId, got);
+            return;
+          } catch (err) {
+            if (amenWant.current.get(commentId) !== want) continue;
+            amenWant.current.delete(commentId);
+            patchAmen(commentId, !want);
+            setError(humanError(err));
+            return;
+          }
+        }
+      } finally {
+        amenBusy.current.delete(commentId);
+      }
+    },
+    [api, patchAmen],
+  );
+
+  const toggleAmen = useCallback(
+    (commentId: string, next: boolean) => {
+      if (next && gated) {
+        rememberPendingCommentAmen(postId, commentId);
+        openConsent(textRef.current);
+        return;
+      }
+      setError(null);
+      amenWant.current.set(commentId, next);
+      patchAmen(commentId, next);
+      void syncAmen(commentId);
+    },
+    [gated, postId, openConsent, patchAmen, syncAmen],
+  );
+
+  // Voltou do aceite com um Amém pendente neste post: marca agora.
+  const ready = list.phase === 'ready';
+  useEffect(() => {
+    if (gated || !ready) return;
+    const pending = takePendingCommentAmen(postId);
+    if (!pending) return;
+    // Fora do corpo do efeito (a marcação mexe no estado da lista).
+    let applied = false;
+    void Promise.resolve().then(() => {
+      if (applied) return;
+      applied = true;
+      toggleAmen(pending.commentId, true);
+    });
+    return () => {
+      // Desmontou antes: o pendente volta a esperar.
+      if (!applied) {
+        applied = true;
+        rememberPendingCommentAmen(pending.postId, pending.commentId);
+      }
+    };
+  }, [gated, ready, postId, toggleAmen]);
+
   const cleaned = cleanText(text);
   const length = cleaned === null ? 0 : charLength(cleaned);
   const tooLong = length > LIMITS.commentBody;
@@ -116,6 +248,8 @@ export function useComments({
         createdAt: new Date().toISOString(),
         authorName: status.displayName ?? 'Você',
         isMine: true,
+        amenCount: 0,
+        iSaidAmen: false,
       };
       setList((prev) => (prev.phase === 'ready' ? { phase: 'ready', items: [...prev.items, mine] } : prev));
       setText('');
@@ -142,7 +276,7 @@ export function useComments({
     });
   }
 
-  return { list, text, setText, send, sending, error, notice, length, canSend, load, drop };
+  return { list, text, setText, send, sending, error, notice, length, canSend, load, drop, toggleAmen };
 }
 
 function statusLabel(comment: PostComment): string | null {
@@ -152,10 +286,36 @@ function statusLabel(comment: PostComment): string | null {
   return 'Tirado do ar · só você vê';
 }
 
-export function CommentRow({ comment, onMore, gutter = COMMENTS_GUTTER }: { comment: PostComment; onMore: () => void; gutter?: number }) {
+/** Número de Amém dito em palavra, junto do botão (o botão diz "Amém" e se está marcado). */
+export function commentAmenSpoken(count: number, iSaidAmen: boolean): string {
+  if (count <= 0) return 'Ninguém disse Amém ainda';
+  if (iSaidAmen) {
+    const others = count - 1;
+    if (others <= 0) return 'Você disse Amém';
+    return `Você e mais ${others} ${others === 1 ? 'pessoa disseram' : 'pessoas disseram'} Amém`;
+  }
+  return `${count} ${count === 1 ? 'pessoa disse' : 'pessoas disseram'} Amém`;
+}
+
+/** Mão de 22 no alvo de 48: o recuo põe o desenho alinhado ao texto do comentário. */
+const COMMENT_AMEN_ICON = 22;
+
+export function CommentRow({
+  comment,
+  onMore,
+  onAmen,
+  gutter = COMMENTS_GUTTER,
+}: {
+  comment: PostComment;
+  onMore: () => void;
+  /** Sem ele (ou em comentário que não está publicado), não há Amém. */
+  onAmen?: (next: boolean) => void;
+  gutter?: number;
+}) {
   const { colors } = useTheme();
   const when = relativeTime(comment.createdAt);
   const label = statusLabel(comment);
+  const canAmen = onAmen !== undefined && comment.status === 'published';
   return (
     <View testID={`comment-${comment.commentId}`}>
       <View style={{ flexDirection: 'row', gap: spacing.md, paddingLeft: gutter, paddingRight: gutter - 12, paddingTop: spacing.md }}>
@@ -180,6 +340,34 @@ export function CommentRow({ comment, onMore, gutter = COMMENTS_GUTTER }: { comm
           <AppText variant="body" style={{ fontSize: 16, lineHeight: 26 }}>
             {comment.body}
           </AppText>
+          {canAmen && onAmen ? (
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                marginLeft: -(MIN_TOUCH - COMMENT_AMEN_ICON) / 2,
+                marginTop: -spacing.xs,
+              }}
+            >
+              <AmenButton
+                checked={comment.iSaidAmen}
+                onToggle={onAmen}
+                size={COMMENT_AMEN_ICON}
+                label={`Amém, comentário de ${comment.authorName}`}
+                testID={`comment-amen-${comment.commentId}`}
+              />
+              {comment.amenCount > 0 ? (
+                <AppText
+                  variant="captionStrong"
+                  accessibilityLabel={commentAmenSpoken(comment.amenCount, comment.iSaidAmen)}
+                  testID={`comment-amen-count-${comment.commentId}`}
+                  style={{ color: colors.text }}
+                >
+                  {comment.amenCount.toLocaleString('pt-BR')}
+                </AppText>
+              ) : null}
+            </View>
+          ) : null}
         </View>
         <Pressable
           onPress={onMore}

@@ -27,7 +27,7 @@ const MESSAGES: Record<CommunityOnlyCode, string> = {
   blocked_from_community: 'Sua participação na comunidade está suspensa.',
   terms_outdated: 'O texto foi atualizado. Leia a versão nova para continuar.',
   needs_adult_account: 'Para publicar, confirme no seu perfil que você tem 16 anos ou mais.',
-  needs_profile: 'Para publicar, complete o seu perfil: foto, nome, ministério e a confirmação de 16 anos ou mais.',
+  needs_profile: 'Para participar, confirme que tem 16 anos ou mais e diga o seu nome.',
   invalid_input: 'Confira o que você escreveu e tente de novo.',
   photo_not_jpeg: 'Não foi possível preparar esta foto. Tente outra.',
   photo_too_large: 'A foto ficou grande demais. Tente outra.',

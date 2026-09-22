@@ -62,8 +62,8 @@ select lives_ok($$ select public.accept_community_terms('community_rules', 'v-te
   'C2: conta do aparelho aceita as regras');
 select lives_ok($$ select public.accept_community_terms('community_publish', 'v-teste', repeat('a', 64), 't') $$,
   'C2: conta do aparelho consente');
-select is(public.set_amen('20000000-0000-4000-8000-0000000014b1', true), true,
-  'Amém não exige perfil completo (ninguém vê quem deu Amém)');
+select throws_ok($$ select public.set_amen('20000000-0000-4000-8000-0000000014b1', true)$$, 'CM007', null,
+  'Juntos: Amém exige nome e 16+ (o rostinho mostra o nome), como publicar');
 select throws_ok($$ select * from public.create_community_post(post_body => 'Oi') $$, 'CM007', null,
   'C4: sem nome, foto, ministério e 16+ não publica');
 select throws_ok($$ select * from public.create_community_comment('20000000-0000-4000-8000-0000000014b1', 'Amém') $$,

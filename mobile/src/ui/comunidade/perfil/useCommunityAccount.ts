@@ -25,7 +25,7 @@ export type CommunityAccount =
   | { kind: 'error'; message: string; retry: () => void }
   | { kind: 'ready'; api: CommunityApi; status: CommunityStatus; email: string | null; reload: () => void };
 
-export const GENERIC_ERROR = 'Não foi possível falar com a comunidade agora. Tente de novo em instantes.';
+export const GENERIC_ERROR = 'Não foi possível falar com o Juntos agora. Tente de novo em instantes.';
 
 /** Mensagem segura para a tela: a do cliente (já traduzida) ou a genérica. */
 export function communityMessage(error: unknown, fallback = GENERIC_ERROR): string {

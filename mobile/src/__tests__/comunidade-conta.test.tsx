@@ -5,7 +5,6 @@
  * e mostra. NÃO prova RLS nem as RPCs (pgTAP 07–10, não executados).
  */
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
-import { StyleSheet } from 'react-native';
 
 import AccountScreen from '@/app/conta';
 import CommunityAccountScreen from '@/app/comunidade/conta-e-privacidade';
@@ -13,12 +12,8 @@ import EntrarScreen from '@/app/comunidade/entrar';
 import CommunityProfileScreen from '@/app/comunidade/perfil';
 import MyPostsScreen from '@/app/comunidade/minhas-publicacoes';
 import { createCommunityApi, type CommunityClient } from '@/community/api';
-import { authorLine } from '@/community/profile';
-import { listMinistries } from '@/journey/ministries';
-import { NAME_TOO_LONG_COPY } from '@/ui/comunidade/perfil/EntradaFlow';
-import { AVATAR_NOTE, NEWS_LABEL } from '@/ui/comunidade/perfil/PerfilCampos';
-import { DEVICE_ACCOUNT_COPY } from '@/ui/comunidade/perfil/parts';
-import { AX5, resetViewport, setViewport } from './support/viewport';
+import { NEWS_LABEL } from '@/ui/comunidade/perfil/PerfilCampos';
+import { resetViewport } from './support/viewport';
 
 jest.mock('expo-crypto', () => ({
   randomUUID: jest.fn(() => 'AAAAAAAA-BBBB-4CCC-8DDD-EEEEEEEEEEEE'),
@@ -33,6 +28,10 @@ jest.mock('expo-router', () => ({
   useFocusEffect: () => {},
   Stack: { Screen: () => null },
   Link: ({ children }: { children: unknown }) => children,
+  Redirect: ({ href }: { href: string }) => {
+    const { View } = jest.requireActual('react-native');
+    return <View testID="redirect" accessibilityLabel={String(href)} />;
+  },
 }));
 
 jest.mock('react-native-safe-area-context', () => {
@@ -47,7 +46,11 @@ jest.mock('react-native-safe-area-context', () => {
 jest.mock('@expo/vector-icons', () => ({ Ionicons: () => null }));
 
 // Entrar sem e-mail (C2): a sessão do aparelho é do Supabase Auth, fora deste teste.
-jest.mock('@/community/deviceSession', () => ({ startDeviceSession: jest.fn(async () => {}) }));
+jest.mock('@/community/deviceSession', () => ({
+  startDeviceSession: jest.fn(async () => {}),
+  ensureDeviceSession: jest.fn(async () => {}),
+  ensureJoined: jest.fn(async () => {}),
+}));
 
 // Foto de perfil: galeria e reencode simulados (JPEG mínimo, sem metadados).
 const mockLaunch = jest.fn(async () => ({
@@ -167,7 +170,10 @@ function mockApiFactory() {
 
 const router = jest.requireMock('expo-router').router as { push: jest.Mock; replace: jest.Mock; back: jest.Mock };
 const auth = jest.requireMock('@/cloud/auth') as { signOut: jest.Mock; requestAccountDeletion: jest.Mock };
-const deviceSession = jest.requireMock('@/community/deviceSession') as { startDeviceSession: jest.Mock };
+const deviceSession = jest.requireMock('@/community/deviceSession') as {
+  startDeviceSession: jest.Mock;
+  ensureDeviceSession: jest.Mock;
+};
 
 function statusRow(patch: Record<string, unknown> = {}) {
   return {
@@ -194,20 +200,6 @@ const P2 = '20000000-0000-4000-8000-000000000002';
 const P3 = '20000000-0000-4000-8000-000000000003';
 const B1 = '40000000-0000-4000-8000-000000000001';
 
-type JsonNode = { type: string; props: Record<string, unknown>; children: (JsonNode | string)[] | null };
-/** Todos os campos de texto na tela (host TextInput). */
-function textInputs(): JsonNode[] {
-  const found: JsonNode[] = [];
-  const walk = (node: JsonNode | JsonNode[] | string | null) => {
-    if (!node || typeof node === 'string') return;
-    if (Array.isArray(node)) return node.forEach(walk);
-    if (node.type === 'TextInput') found.push(node);
-    (node.children ?? []).forEach(walk);
-  };
-  walk(screen.toJSON() as JsonNode | JsonNode[] | null);
-  return found;
-}
-
 function calls(fn: string) {
   return rpc.mock.calls.filter(([name]) => name === fn);
 }
@@ -230,17 +222,18 @@ beforeEach(() => {
   router.replace.mockClear();
   auth.signOut.mockClear();
   deviceSession.startDeviceSession.mockClear();
+  deviceSession.ensureDeviceSession.mockClear();
   mockLaunch.mockClear();
   auth.requestAccountDeletion.mockClear();
   resetViewport();
 });
 
 describe('estados honestos', () => {
-  test('Comunidade desligada: as três telas dizem que não está disponível e não chamam o servidor', async () => {
+  test('Juntos desligado: as telas de conta dizem que não está disponível e não chamam o servidor', async () => {
     mockEnv.enabled = false;
-    for (const Screen of [EntrarScreen, MyPostsScreen, CommunityAccountScreen]) {
+    for (const Screen of [MyPostsScreen, CommunityAccountScreen]) {
       const view = await render(<Screen />);
-      expect(screen.getByText('Comunidade indisponível')).toBeTruthy();
+      expect(screen.getByText('Juntos indisponível')).toBeTruthy();
       expect(screen.queryByText(/em breve/i)).toBeNull();
       await view.unmount();
     }
@@ -249,202 +242,44 @@ describe('estados honestos', () => {
 
   test('sem nuvem configurada também é indisponível, nunca dado falso', async () => {
     mockEnv.configured = false;
-    await render(<EntrarScreen />);
-    expect(screen.getByText('Comunidade indisponível')).toBeTruthy();
+    await render(<MyPostsScreen />);
+    expect(screen.getByText('Juntos indisponível')).toBeTruthy();
     expect(rpc).not.toHaveBeenCalled();
   });
 
-  test('sem conta: entra SEM e-mail, com um toque (C2); nada vai para o servidor da comunidade antes', async () => {
+  test('sem conta: cria a conta do aparelho SOZINHA, sem botão de entrar e sem e-mail (2026-09-22)', async () => {
     mockEnv.email = null;
-    await render(<EntrarScreen />);
-    expect(screen.getAllByText('Entrar na comunidade').length).toBeGreaterThan(0);
-    expect(screen.getByText(DEVICE_ACCOUNT_COPY)).toBeTruthy();
-    expect(screen.queryByText(/18 anos/)).toBeNull();
-    await fireEvent.press(screen.getByTestId('community-sign-in'));
-    expect(deviceSession.startDeviceSession).toHaveBeenCalledTimes(1);
+    await render(<MyPostsScreen />);
+    await waitFor(() => expect(deviceSession.ensureDeviceSession).toHaveBeenCalledTimes(1));
+    expect(screen.queryByText(/Entrar na comunidade|Criar meu perfil|código/i)).toBeNull();
     expect(router.push).not.toHaveBeenCalledWith('/conta?reason=comunidade');
     expect(rpc).not.toHaveBeenCalled();
   });
 
-  test('conta ligada ao aparelho (sessão anônima) vale: entra sem código e segue para a foto (C3)', async () => {
-    mockEnv.email = 'anon';
-    mockEnv.anonymous = true;
+  test('sem conta e a conta do aparelho falha: erro humano com "Tentar de novo"', async () => {
+    mockEnv.email = null;
+    deviceSession.ensureDeviceSession.mockRejectedValueOnce(new Error('TypeError: Network request failed'));
+    await render(<MyPostsScreen />);
+    await waitFor(() => expect(screen.getByText('Não deu para abrir agora')).toBeTruthy());
+    expect(screen.queryByText(/TypeError/)).toBeNull();
+    await fireEvent.press(screen.getByTestId('community-sign-in'));
+    expect(deviceSession.ensureDeviceSession).toHaveBeenCalledTimes(2);
+  });
+
+  test('/comunidade/entrar não é mais tela: leva direto ao Juntos', async () => {
     await render(<EntrarScreen />);
-    await waitFor(() => expect(screen.getByTestId('entrar-foto')).toBeTruthy());
-    expect(calls('join_community')).toEqual([['join_community', { chosen_name: null }]]);
+    expect(screen.getByTestId('redirect').props.accessibilityLabel).toBe('/juntos');
+    expect(rpc).not.toHaveBeenCalled();
   });
 
   test('servidor fora do ar: erro humano com "Tentar de novo", sem texto cru', async () => {
     mockRpc.results.my_community_status = { error: { message: 'TypeError: Network request failed' } };
-    await render(<EntrarScreen />);
+    await render(<MyPostsScreen />);
     await waitFor(() => expect(screen.getByText('Não deu para carregar')).toBeTruthy());
     expect(screen.queryByText(/TypeError/)).toBeNull();
-    mockRpc.results.my_community_status = statusRow();
-    await fireEvent.press(screen.getByTestId('community-retry'));
-    await waitFor(() => expect(screen.getByTestId('entrar-foto')).toBeTruthy());
   });
 });
 
-describe('entrada sem código: foto → nome e 16+ → ministério → bio (C1, C3, C4)', () => {
-  async function join() {
-    mockRpc.results.join_community = { data: true };
-    await render(<EntrarScreen />);
-    await waitFor(() => expect(screen.getByTestId('entrar-foto')).toBeTruthy());
-  }
-
-  test('sem código e sem aviso de 18+: abre direto no passo 1 de 4, a foto (C1, C3)', async () => {
-    await join();
-    expect(screen.getByText('Passo 1 de 4')).toBeTruthy();
-    expect(screen.queryByText(/18 anos|maiores de 18/)).toBeNull();
-    expect(screen.queryByText(/código/i)).toBeNull();
-    expect(calls('join_community')).toEqual([['join_community', { chosen_name: null }]]);
-  });
-
-  test('caminho completo: entra na hora; cada passo salva o que a pessoa escolheu', async () => {
-    mockRpc.results.set_community_avatar = { data: 'in_review' };
-    await join();
-    expect(screen.getByText('Passo 1 de 4')).toBeTruthy();
-
-    // Foto: as regras aparecem ANTES da galeria; volta "em análise".
-    expect(screen.getByTestId('entrar-foto-continuar').props.accessibilityState.disabled).toBe(true);
-    await fireEvent.press(screen.getByTestId('perfil-foto-abrir'));
-    expect(screen.getByTestId('perfil-foto-regras')).toBeTruthy();
-    expect(mockLaunch).not.toHaveBeenCalled();
-    await fireEvent.press(screen.getByTestId('perfil-foto-escolher'));
-    await waitFor(() => expect(screen.getByTestId('perfil-foto-estado').props.children).toBe(AVATAR_NOTE.in_review));
-    expect(calls('set_community_avatar')).toEqual([
-      ['set_community_avatar', { new_path: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee.jpg' }],
-    ]);
-    await fireEvent.press(screen.getByTestId('entrar-foto-continuar'));
-
-    // Nome + 16+ (nada marcado de antemão, nome nunca derivado do e-mail).
-    expect(screen.getByTestId('perfil-nome').props.value).toBe('');
-    expect(screen.getByTestId('perfil-idade').props.accessibilityState.checked).toBe(false);
-    await fireEvent.changeText(screen.getByTestId('perfil-nome'), '  Davi ');
-    await fireEvent.press(screen.getByTestId('perfil-idade'));
-    await fireEvent.press(screen.getByTestId('entrar-confirmar'));
-    await waitFor(() => expect(screen.getByTestId('entrar-ministerio')).toBeTruthy());
-    expect(calls('set_community_profile').at(-1)?.[1]).toMatchObject({ new_name: 'Davi', confirms_16: true });
-
-    // Ministério da lista do app, com "Nenhum" no topo.
-    expect(screen.getByTestId('perfil-ministerio-nenhum')).toBeTruthy();
-    await fireEvent.press(screen.getByTestId('perfil-ministerio-nenhum'));
-    await fireEvent.press(screen.getByTestId('entrar-ministerio-continuar'));
-    await waitFor(() => expect(screen.getByTestId('entrar-bio')).toBeTruthy());
-    expect(calls('set_community_profile').at(-1)?.[1]).toMatchObject({ no_ministry: true, new_ministry: null });
-
-    // Bio: opcional.
-    await fireEvent.press(screen.getByTestId('entrar-pular-bio'));
-    await waitFor(() => expect(screen.getByTestId('entrar-pronto')).toBeTruthy());
-    expect(screen.getByTestId('entrar-previa').props.accessibilityLabel).toBe('É assim que você aparece: Davi');
-    expect(screen.queryByTestId('entrar-falta')).toBeNull();
-    expect(screen.getByText(/mostra as regras da comunidade e pede o seu consentimento/)).toBeTruthy();
-  });
-
-  test('tudo pode ser pulado; o fim diz o que falta para publicar, sem bloquear quem só quer ler', async () => {
-    await join();
-    await fireEvent.press(screen.getByTestId('entrar-pular-foto'));
-    await fireEvent.press(screen.getByTestId('entrar-pular-nome'));
-    await fireEvent.press(screen.getByTestId('entrar-pular-ministerio'));
-    await fireEvent.press(screen.getByTestId('entrar-pular-bio'));
-    expect(screen.getByTestId('entrar-pronto')).toBeTruthy();
-    expect(calls('set_community_profile')).toHaveLength(0);
-    expect(screen.getByText(/Para publicar, falta: foto de perfil, nome, a confirmação de 16 anos ou mais e ministério/)).toBeTruthy();
-    await fireEvent.press(screen.getByTestId('entrar-completar'));
-    expect(router.replace).toHaveBeenCalledWith('/comunidade/perfil');
-  });
-
-  test('ministério aparece como "Nome · Ministério X"', async () => {
-    await join();
-    await fireEvent.press(screen.getByTestId('entrar-pular-foto'));
-    await fireEvent.changeText(screen.getByTestId('perfil-nome'), 'Davi');
-    await fireEvent.press(screen.getByTestId('entrar-confirmar'));
-    await waitFor(() => expect(screen.getByTestId('entrar-ministerio')).toBeTruthy());
-    const first = listMinistries()[0].name;
-    await fireEvent.press(screen.getByTestId(`perfil-ministerio-${first}`));
-    await fireEvent.press(screen.getByTestId('entrar-ministerio-continuar'));
-    await waitFor(() => expect(screen.getByTestId('entrar-bio')).toBeTruthy());
-    expect(calls('set_community_profile').at(-1)?.[1]).toMatchObject({ new_ministry: first, no_ministry: false });
-    await fireEvent.press(screen.getByTestId('entrar-pular-bio'));
-    expect(screen.getByTestId('entrar-previa').props.accessibilityLabel).toBe(
-      `É assim que você aparece: ${authorLine('Davi', first)}`,
-    );
-  });
-
-  test('nome longo demais: a tela diz por que o botão não funciona', async () => {
-    await join();
-    await fireEvent.press(screen.getByTestId('entrar-pular-foto'));
-    expect(screen.queryByTestId('perfil-nome-longo')).toBeNull();
-    await fireEvent.changeText(screen.getByTestId('perfil-nome'), 'M'.repeat(41));
-    expect(screen.getByTestId('perfil-nome-longo').props.children).toBe(NAME_TOO_LONG_COPY);
-    expect(screen.getByTestId('perfil-nome-longo').props.accessibilityLiveRegion).toBe('polite');
-    expect(screen.getByTestId('entrar-confirmar').props.accessibilityState.disabled).toBe(true);
-    await fireEvent.changeText(screen.getByTestId('perfil-nome'), 'Maria');
-    expect(screen.queryByTestId('perfil-nome-longo')).toBeNull();
-  });
-
-  test('falha ao entrar: erro humano com "Tentar de novo", sem texto do servidor', async () => {
-    mockRpc.results.join_community = { error: { message: 'TypeError: Network request failed' } };
-    await render(<EntrarScreen />);
-    await waitFor(() => expect(screen.getByText('Não foi possível entrar agora')).toBeTruthy());
-    expect(screen.queryByText(/TypeError/)).toBeNull();
-    mockRpc.results.join_community = { data: true };
-    await fireEvent.press(screen.getByTestId('entrar-tentar-de-novo'));
-    await waitFor(() => expect(screen.getByTestId('entrar-foto')).toBeTruthy());
-  });
-
-  test('bloqueio vindo do servidor na entrada (CM004): tela de suspensão', async () => {
-    mockRpc.results.join_community = { error: { code: 'CM004', message: 'entrada na comunidade bloqueada' } };
-    await render(<EntrarScreen />);
-    await waitFor(() => expect(screen.getByText('Participação suspensa')).toBeTruthy());
-    expect(screen.queryByText(/bloqueada/)).toBeNull();
-  });
-
-  test('a idade é uma caixa desmarcada; não há campo de nascimento, CPF ou telefone', async () => {
-    await join();
-    await fireEvent.press(screen.getByTestId('entrar-pular-foto'));
-    expect(textInputs().map((node) => node.props.accessibilityLabel)).toEqual(['Seu nome na comunidade']);
-    expect(screen.getAllByRole('checkbox')).toHaveLength(1);
-    expect(screen.queryByText(/CPF|telefone|nascimento:/i)).toBeNull();
-  });
-
-  test('suspenso ou removido: não entra de novo (nem tenta)', async () => {
-    mockRpc.results.my_community_status = statusRow({ member_status: 'suspended' });
-    await render(<EntrarScreen />);
-    await waitFor(() => expect(screen.getByText('Participação suspensa')).toBeTruthy());
-    expect(calls('join_community')).toHaveLength(0);
-    expect(screen.queryByTestId('entrar-foto')).toBeNull();
-  });
-
-  test('quem já é membro não refaz a entrada e pode editar o perfil', async () => {
-    mockRpc.results.my_community_status = MEMBER;
-    await render(<EntrarScreen />);
-    await waitFor(() => expect(screen.getByText('Você já está na comunidade')).toBeTruthy());
-    expect(screen.getByText('Você aparece como Ana.')).toBeTruthy();
-    await fireEvent.press(screen.getByTestId('entrar-editar-perfil'));
-    expect(router.push).toHaveBeenCalledWith('/comunidade/perfil');
-  });
-
-  test('"Voltar" no meio do perfil volta um passo, não sai da entrada', async () => {
-    await join();
-    await fireEvent.press(screen.getByTestId('entrar-pular-foto'));
-    expect(screen.getByTestId('entrar-perfil')).toBeTruthy();
-    await fireEvent.press(screen.getByTestId('back-button'));
-    expect(screen.getByTestId('entrar-foto')).toBeTruthy();
-    expect(router.back).not.toHaveBeenCalled();
-  });
-
-  test('fonte a 3,571×: os campos crescem (minHeight, nunca height) e a barra empilha', async () => {
-    setViewport(AX5);
-    await join();
-    expect(screen.getByTestId('back-bar-second-row')).toBeTruthy();
-    await fireEvent.press(screen.getByTestId('entrar-pular-foto'));
-    const style = StyleSheet.flatten(screen.getByTestId('perfil-nome').props.style);
-    expect(style.height).toBeUndefined();
-    expect(style.minHeight).toBeGreaterThanOrEqual(48);
-    expect(style.fontWeight).toBeUndefined();
-  });
-});
 
 describe('perfil da comunidade (C1, C4, N3)', () => {
   const COMPLETE = statusRow({

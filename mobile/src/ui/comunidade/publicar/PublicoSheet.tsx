@@ -69,7 +69,7 @@ export function PublicoSheet({
       <View style={{ gap: spacing.sm }}>
         <ChoiceRow
           label="Toda a igreja"
-          description="No feed da comunidade."
+          description="No Juntos, para toda a igreja."
           selected={audience === 'igreja'}
           onPress={() => onChoose('igreja')}
           testID="audience-church"

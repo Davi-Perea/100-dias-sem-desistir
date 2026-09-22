@@ -4,6 +4,7 @@ import { getSupabase } from '@/cloud/client';
 
 import { demoSignIn, isCommunityDemo } from './demoApi';
 import { communityError, toCommunityError } from './errors';
+import { cleanText, isValidDisplayName } from './validation';
 
 /**
  * Entrada na comunidade SEM e-mail (C2, feedback de 2026-09-22): a conta fica
@@ -43,4 +44,48 @@ export async function startDeviceSession(deps: { supabase?: SupabaseClient | nul
     throw toCommunityError(error);
   }
   if (result.error) throw toCommunityError(result.error);
+}
+
+/* --------------------------------------------------- entrada automática */
+
+/**
+ * "Juntos" (pedido do fundador, 2026-09-22): quem abre a aba JÁ ESTÁ dentro.
+ * Sem tela de entrar, sem código, sem e-mail, sem perfil para montar. As telas
+ * chamam estas duas funções sozinhas:
+ *
+ *   1. `ensureDeviceSession`: a conta ligada ao aparelho (acima).
+ *   2. `ensureJoined`: `join_community` com o nome que a pessoa deu na entrada
+ *      do app (settings.profile.name), ou sem nome, se ela pulou.
+ *
+ * Ler não expõe ninguém: entrar só dá acesso ao feed. O que expõe (publicar,
+ * comentar, Amém) passa antes pela tela única de aceite (16+, regras,
+ * consentimento destacado e o nome, se faltar).
+ *
+ * Várias telas podem pedir ao mesmo tempo (a aba, a tela de publicar): cada
+ * função tem uma só chamada em andamento, compartilhada.
+ */
+let sessionInFlight: Promise<void> | null = null;
+let joinInFlight: Promise<void> | null = null;
+
+export function ensureDeviceSession(): Promise<void> {
+  sessionInFlight ??= startDeviceSession().finally(() => {
+    sessionInFlight = null;
+  });
+  return sessionInFlight;
+}
+
+export function ensureJoined(
+  api: { joinCommunity(input?: { displayName?: string | null }): Promise<void> },
+  name: string | null,
+): Promise<void> {
+  joinInFlight ??= api.joinCommunity({ displayName: entryName(name) }).finally(() => {
+    joinInFlight = null;
+  });
+  return joinInFlight;
+}
+
+/** O nome da entrada do app, só se o servidor aceitaria (até 40, sem vazio). Senão, sem nome. */
+export function entryName(raw: string | null | undefined): string | null {
+  const name = cleanText(raw);
+  return name && isValidDisplayName(name) ? name : null;
 }

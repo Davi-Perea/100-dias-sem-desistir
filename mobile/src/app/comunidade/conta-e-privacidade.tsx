@@ -157,7 +157,7 @@ function AccountAndPrivacy({
         ) : null}
         {!member ? (
           <SettingRow
-            label="Entrar na comunidade"
+            label="Abrir o Juntos"
             onPress={() => router.push(COMMUNITY_ENTRY_ROUTE)}
             testID="account-enter"
           />

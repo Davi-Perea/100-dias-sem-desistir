@@ -311,12 +311,12 @@ describe('F1: o post do dia', () => {
     expect(screen.queryByTestId('feed-more')).toBeNull();
   });
 
-  test('selo da demonstração continua na demo', async () => {
+  test('prévia do dia 23: nem na demo o selo de demonstração aparece na tela (DEMO_LABELS_ON_SCREEN = false)', async () => {
     mockDemo = true;
     fakeApi();
     await render(<FeedScreen />);
-    expect(screen.getByTestId('feed-demo-badge')).toBeTruthy();
-    expect(screen.getByLabelText('Demonstração. Nada é enviado.')).toBeTruthy();
+    expect(screen.queryByTestId('feed-demo-badge')).toBeNull();
+    expect(screen.queryByLabelText('Demonstração. Nada é enviado.')).toBeNull();
   });
 });
 
@@ -386,6 +386,8 @@ describe('F4: comentários em folha', () => {
     createdAt: new Date(NOW - 60_000).toISOString(),
     authorName: 'Carla',
     isMine: false,
+    amenCount: 0,
+    iSaidAmen: false,
   };
 
   test('número ao lado do balão; a folha lista, envia e o número sobe', async () => {

@@ -146,6 +146,7 @@ function SheetBody({
             onMore={() =>
               setReport({ kind: 'comment', commentId: comment.commentId, authorName: comment.authorName, isMine: comment.isMine })
             }
+            onAmen={(next) => talk.toggleAmen(comment.commentId, next)}
           />
         ))}
       </View>

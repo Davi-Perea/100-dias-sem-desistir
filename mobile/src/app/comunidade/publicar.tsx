@@ -1,5 +1,5 @@
-import { router, useLocalSearchParams } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, Alert, KeyboardAvoidingView, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -9,13 +9,15 @@ import { charLength, cleanText, LIMITS } from '@/community/validation';
 import { getDay } from '@/journey/datasetSource';
 import { readingSummary } from '@/journey/readingSummary';
 import { useJourney } from '@/journey/useJourney';
+import { useSettings } from '@/settings/settingsStore';
 import { BackBar, goBackOrHome } from '@/ui/BackBar';
 import { TextField } from '@/ui/TextField';
 import { AppText, Block, Button, Screen, StateView } from '@/ui/components';
 import { LimitNote } from '@/ui/comunidade/LimitNote';
 import { MY_POSTS_ROUTE } from '@/ui/comunidade/perfil/routes';
 import { ProfileAvatar } from '@/ui/comunidade/perfil/ProfileAvatar';
-import { flowParams, parseDay, publishStep, ROUTES, sentCopy, type Sent } from '@/ui/comunidade/publicar/fluxo';
+import { takeAceiteOutcome } from '@/ui/comunidade/publicar/aceite';
+import { parseDay, publishStep, ROUTES, sentCopy, type Sent } from '@/ui/comunidade/publicar/fluxo';
 import {
   cameraConfigured,
   pickManyFromLibrary,
@@ -75,8 +77,11 @@ function readingReference(day: number): string | null {
  *   câmera; preparada no aparelho (1600 px, JPEG 0,8, sem EXIF/XMP/IPTC) e só
  *   enviada ao publicar.
  * - Embaixo: "Toda a igreja ▾ / Meu ministério" e "Publicar".
- * - Antes do formulário, o fluxo de sempre: entrar, perfil completo (nome, foto,
- *   ministério, 16+), regras e consentimento.
+ * - O formulário abre na hora (a entrada no Juntos é automática). Na PRIMEIRA
+ *   publicação, o toque em "Publicar" abre a tela única de aceite (16+, regras,
+ *   consentimento e o nome, se faltar); ao concordar, a pessoa volta para cá e o
+ *   post sai sozinho, do jeito que ela deixou. Foto de perfil e ministério não
+ *   são exigidos.
  * - Depois: "Publicado" (volta ao feed) ou "Em análise" (F5: foto que o filtro
  *   segurou ou que espera uma pessoa; só o autor vê).
  * - Sem localização, sem marcar pessoas, sem mensagem privada.
@@ -96,6 +101,7 @@ export default function PublishScreen() {
   const inset = useGutter();
   const state = useCommunityStatus();
   const journey = useJourney();
+  const settings = useSettings();
 
   const [body, setBody] = useState('');
   const [photos, setPhotos] = useState<PhotoItem[]>([]);
@@ -125,23 +131,21 @@ export default function PublishScreen() {
   const api = ready?.api ?? null;
   const profile = ready?.status.profile ?? null;
   const ministry = profile?.ministry ?? null;
-  const displayName = ready?.status.displayName ?? profile?.displayName ?? '';
+  // Antes do aceite a pessoa pode ainda não ter nome no Juntos: vale o da entrada do app.
+  const displayName = ready?.status.displayName ?? profile?.displayName ?? settings?.profile.name ?? 'Você';
   const avatarPath = profile?.avatarPath ?? null;
 
   /** Dia que "Leitura do dia" anexa: o que veio da conclusão, ou o de hoje na campanha. */
   const readingDay = paramDay ?? (journey.phase === 'before_start' ? null : journey.officialDay);
 
-  // Perfil, regras e consentimento são telas próprias; esta volta depois.
-  const redirected = useRef(false);
-  useEffect(() => {
-    if (redirected.current || (step !== 'profile' && step !== 'rules' && step !== 'consent')) return;
-    redirected.current = true;
-    const pathname = step === 'profile' ? ROUTES.perfil : step === 'rules' ? ROUTES.regras : ROUTES.consentimento;
-    router.replace({
-      pathname,
-      params: flowParams(ROUTES.publicar, paramDay),
-    } as never);
-  }, [step, paramDay]);
+  // "Publicar" antes do primeiro aceite: guarda a intenção, abre o aceite e,
+  // se a pessoa concordar, envia ao voltar. Se ela sair sem concordar, esquece.
+  const pendingSend = useRef(false);
+  useFocusEffect(
+    useCallback(() => {
+      if (takeAceiteOutcome() !== 'accepted') pendingSend.current = false;
+    }, []),
+  );
 
   // Foto de perfil (URL assinada; a própria aparece mesmo em análise).
   useEffect(() => {
@@ -320,6 +324,12 @@ export default function PublishScreen() {
 
   const send = async () => {
     if (!ready || !canSend) return;
+    if (step === 'aceite') {
+      pendingSend.current = true;
+      router.push(ROUTES.consentimento as never);
+      return;
+    }
+    pendingSend.current = false;
     const client = ready.api;
     setSending(true);
     setSendError(null);
@@ -339,8 +349,7 @@ export default function PublishScreen() {
       for (const path of uploaded) client.discardPhoto(path).catch(() => {});
       const known = toCommunityError(failure);
       if (known.code === 'needs_consent' || known.code === 'terms_outdated' || known.code === 'needs_profile') {
-        // O texto mudou, o aceite caiu ou o perfil ficou incompleto: o status novo leva de volta ao fluxo.
-        redirected.current = false;
+        // O texto mudou ou o aceite caiu: o status novo faz o próximo "Publicar" abrir o aceite de novo.
         state.reload();
       }
       setSendError(known.message);
@@ -349,17 +358,25 @@ export default function PublishScreen() {
     }
   };
 
+  // De volta do aceite com o status novo: o post que ela pediu sai agora.
+  const sendRef = useRef(send);
+  useEffect(() => {
+    sendRef.current = send;
+  });
+  useEffect(() => {
+    if (step === 'form' && pendingSend.current) void sendRef.current();
+  }, [step]);
+
   /* ------------------------------------------------------ fora do formulário */
 
-  if (!ready || step !== 'form') {
-    const gateStep = step === 'needs_join' || step === 'blocked' || step === 'cannot_publish' ? step : undefined;
-    const waiting = step === 'profile' || step === 'rules' || step === 'consent';
+  if (!ready || (step !== 'form' && step !== 'aceite')) {
+    const gateStep = step === 'needs_join' || step === 'blocked' ? step : undefined;
     return (
       <Screen>
         <View style={{ paddingHorizontal: inset - spacing.sm }}>
           <BackBar label="Voltar" />
         </View>
-        {waiting ? <StateView kind="loading" /> : <CommunityGateView state={state} step={gateStep} />}
+        <CommunityGateView state={state} step={gateStep} />
       </Screen>
     );
   }
@@ -547,7 +564,7 @@ export default function PublishScreen() {
             </AppText>
           ) : null}
           <Button
-            title="Regras da comunidade"
+            title="Regras do Juntos"
             variant="underline"
             onPress={() => router.push({ pathname: ROUTES.regras, params: { ler: '1' } })}
             style={{ alignSelf: 'flex-start' }}

@@ -30,6 +30,8 @@ const COMMUNITY_TABLES = [
   // Diário compartilhado (2026-09-22): fotos do post (F1) e atividade no app (F8).
   'community_post_photos',
   'community_activity',
+  // Amém em comentário (2026-09-23).
+  'community_comment_amens',
 ];
 
 type FnDef = { name: string; header: string; body: string };
@@ -45,7 +47,7 @@ function fn(name: string): FnDef {
 const policies = [...sql.matchAll(/create policy[\s\S]*?;/g)].map((m) => m[0]);
 
 describe('arquivos', () => {
-  test('migrations da comunidade depois da fundação (5ª perfil v2, 6ª diário compartilhado, ambas de 2026-09-22) e os pgTAP', () => {
+  test('migrations da comunidade depois da fundação (5ª perfil v2, 6ª diário compartilhado, 7ª Amém em comentário, 8ª perfil leve do Juntos) e os pgTAP', () => {
     expect(communityFiles).toEqual([
       '20260921130000_comunidade_tabelas.sql',
       '20260921130100_comunidade_funcoes.sql',
@@ -53,6 +55,8 @@ describe('arquivos', () => {
       '20260921140000_comunidade_edge_functions.sql',
       '20260922120000_comunidade_perfil_v2.sql',
       '20260922180000_comunidade_diario.sql',
+      '20260923040000_comunidade_amem_comentario.sql',
+      '20260923050000_comunidade_juntos_perfil_leve.sql',
     ]);
     const foundation = allFiles.filter((f) => !f.includes('comunidade'));
     expect(foundation.every((f) => f < communityFiles[0])).toBe(true);
@@ -216,13 +220,15 @@ describe('regras de conteúdo', () => {
     expect(body).toMatch(/v_author = v_uid/);
   });
 
-  test('marcar Amém exige consentimento vigente no servidor (não o perfil); desmarcar continua livre', () => {
+  test('marcar Amém exige consentimento, nome e 16+ no servidor; desmarcar continua livre', () => {
     const body = fn('private.set_amen').body;
     const [unmark, mark] = body.split(/return false;\s*end if;/);
     expect(unmark).toMatch(/private\.assert_member\(\)/);
     expect(unmark).not.toMatch(/perform private\.assert_(can_publish|consents)/);
-    expect(mark).toMatch(/perform private\.assert_consents\(\);/);
-    expect(mark.indexOf('perform private.assert_consents')).toBeLessThan(mark.indexOf('insert into public.community_amens'));
+    // O rostinho do Amém mostra o NOME de quem deu (private.amen_faces_for): marcar exige
+    // o mesmo que publicar (consentimento + regras + nome + 16+), como a tela única pede.
+    expect(mark).toMatch(/perform private\.assert_can_publish\(\);/);
+    expect(mark.indexOf('perform private.assert_can_publish')).toBeLessThan(mark.indexOf('insert into public.community_amens'));
     expect(fn('private.assert_consents').body).toMatch(/private\.has_current_consents\(v_uid\)/);
     // Publicar = consentimentos + perfil completo (C4).
     expect(fn('private.assert_can_publish').body).toMatch(/private\.assert_consents\(\)/);
@@ -283,6 +289,32 @@ describe('regras de conteúdo', () => {
     const suspend = fn('private.suspend_community_author').body;
     expect(suspend).toMatch(/private\.is_community_moderator\(\)/);
     expect(suspend).toMatch(/num_nonnulls\(target_post, target_comment, target_report\) <> 1/);
+  });
+});
+
+describe('Amém em comentário (2026-09-23)', () => {
+  test('mesmas regras do post: marcar pede consentimento, nome e 16+, desmarcar é livre, só comentário que eu posso ver', () => {
+    const body = fn('private.set_comment_amen').body;
+    const [unmark, mark] = body.split(/return false;\s*end if;/);
+    expect(unmark).toMatch(/private\.assert_member\(\)/);
+    expect(unmark).not.toMatch(/perform private\.assert_(can_publish|consents)/);
+    expect(mark.indexOf('perform private.assert_can_publish')).toBeGreaterThanOrEqual(0);
+    expect(mark.indexOf('perform private.assert_can_publish')).toBeLessThan(mark.indexOf('insert into public.community_comment_amens'));
+    expect(mark).toContain('private.can_amen_comment(target_comment, v_uid)');
+    const can = fn('private.can_amen_comment').body;
+    expect(can).toContain("c.status = 'published'");
+    expect(can).toContain('not private.blocked_between(viewer, c.author_id)');
+    expect(can).toContain('private.can_view_post(c.post_id, viewer)');
+  });
+
+  test('o número vem sem id de pessoa e sem quem tem bloqueio com quem lê', () => {
+    expect(fn('public.community_comment_amens').header).not.toMatch(/user_id|author_id|actor_id/);
+    expect(fn('private.community_comment_amens').body).toContain('not private.blocked_between((select auth.uid()), ca.user_id)');
+  });
+
+  test('sair, revogar e apagar a conta levam os Amém em comentário', () => {
+    const [beforeDrop] = fn('private.purge_community_member').body.split(/if drop_profile then/);
+    expect(beforeDrop).toContain('delete from public.community_comment_amens ca where ca.user_id = target');
   });
 });
 

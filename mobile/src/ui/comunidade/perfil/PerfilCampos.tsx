@@ -198,7 +198,7 @@ export function NameField({ value, onChange }: { value: string; onChange: (value
       <LineField
         value={value}
         onChangeText={onChange}
-        accessibilityLabel="Seu nome na comunidade"
+        accessibilityLabel="Seu nome no Juntos"
         placeholder="Seu nome"
         autoCapitalize="words"
         maxLength={LIMITS.displayName * 2}
@@ -219,7 +219,7 @@ export function NameField({ value, onChange }: { value: string; onChange: (value
 /* ------------------------------------------------------------ 16 anos (C1) */
 
 export const AGE_LABEL = 'Tenho 16 anos ou mais';
-export const AGE_CAPTION = 'Obrigatório para publicar. Não pedimos documento nem data de nascimento.';
+export const AGE_CAPTION = 'Obrigatório para publicar, comentar e dizer Amém. Não pedimos documento nem data de nascimento.';
 
 export function AgeCheck({ checked, onToggle }: { checked: boolean; onToggle: () => void }) {
   return <CheckRow checked={checked} onToggle={onToggle} label={AGE_LABEL} caption={AGE_CAPTION} testID="perfil-idade" />;

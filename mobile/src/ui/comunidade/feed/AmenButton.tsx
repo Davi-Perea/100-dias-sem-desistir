@@ -21,6 +21,7 @@ export function AmenButton({
   onToggle,
   size = 27,
   disabled = false,
+  label = 'Amém',
   testID,
 }: {
   checked: boolean;
@@ -28,6 +29,8 @@ export function AmenButton({
   /** 27 no cartão (C1), 22 no comentário (C6). */
   size?: number;
   disabled?: boolean;
+  /** Nome acessível. No comentário diz de quem é ("Amém, comentário de Ana"). */
+  label?: string;
   testID?: string;
 }) {
   const { colors } = useTheme();
@@ -37,7 +40,7 @@ export function AmenButton({
       onPress={() => onToggle(!checked)}
       disabled={disabled}
       accessibilityRole="togglebutton"
-      accessibilityLabel="Amém"
+      accessibilityLabel={label}
       accessibilityState={{ checked, disabled }}
       testID={testID}
       hitSlop={0}

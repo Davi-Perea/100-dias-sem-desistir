@@ -15,6 +15,7 @@ import { createCommunityApi, type CommunityApi, type CommunityClient } from '@/c
 import { AFTER_CONSENT_COMMENT } from '@/ui/comunidade/feed/CommentsScreen';
 import { AFTER_CONSENT_FEED, FeedScreen } from '@/ui/comunidade/feed/FeedScreen';
 import { postMeta, relativeTime } from '@/ui/comunidade/feed/tempo';
+import { markAceite } from '@/ui/comunidade/publicar/aceite';
 
 /* ------------------------------------------------------------------ mocks */
 
@@ -85,6 +86,16 @@ jest.mock('@/cloud/useSession', () => ({
   }),
 }));
 
+// A conta do aparelho é do Supabase Auth, fora deste teste.
+jest.mock('@/community/deviceSession', () => {
+  const actual = jest.requireActual('@/community/deviceSession');
+  return { ...actual, ensureDeviceSession: jest.fn(async () => {}) };
+});
+const mockDeviceSession = jest.requireMock('@/community/deviceSession') as { ensureDeviceSession: jest.Mock };
+jest.mock('@/settings/settingsStore', () => ({
+  useSettings: () => ({ profile: { name: 'Davi', goals: [] } }),
+}));
+
 let mockApi: CommunityApi | null = null;
 jest.mock('@/community/api', () => {
   const actual = jest.requireActual('@/community/api');
@@ -143,6 +154,8 @@ const READY_STATUS = {
   is_member: true,
   member_status: 'active',
   display_name: 'Davi',
+  // Tela única de aceite (2026-09-23): 16+ confirmado faz parte do "pronto".
+  age_confirmed: true,
   can_publish: true,
   needs_publish_consent: false,
   needs_rules: false,
@@ -230,26 +243,36 @@ describe('C1: portões honestos antes do feed', () => {
     expect(screen.queryByTestId(/^post-/)).toBeNull();
   });
 
-  test('sem conta: convida a entrar SEM e-mail e sem aviso de 18+ (C1, C2); nada vai para o servidor', async () => {
+  test('sem conta: a conta do aparelho é criada sozinha, sem e-mail, sem 18+ e sem botão de entrar (Juntos)', async () => {
     const { rpc } = setup();
     mockSignedIn = false;
     await render(<FeedScreen />);
-    expect(screen.getByTestId('gate-signed-out')).toBeTruthy();
+    await waitFor(() => expect(mockDeviceSession.ensureDeviceSession).toHaveBeenCalledTimes(1));
+    expect(screen.queryByTestId('gate-sign-in')).toBeNull();
     expect(screen.queryByText(/18 anos/)).toBeNull();
-    expect(screen.queryByText(/e-mail/)).not.toBeNull(); // "Não precisa de e-mail nem de senha."
-    await fireEvent.press(screen.getByTestId('gate-sign-in'));
-    expect(mockRouter.push).toHaveBeenCalledWith('/comunidade/entrar');
+    expect(screen.queryByText(/e-mail/)).toBeNull();
+    expect(screen.queryByText(/Entrar na comunidade/)).toBeNull();
+    expect(screen.getByTestId('feed-loading')).toBeTruthy();
     expect(rpc).not.toHaveBeenCalled();
   });
 
-  test('com conta e sem perfil: leva a criar o perfil (sem código, C3) e não pede o feed', async () => {
-    const { rpc } = setup({ my_community_status: { data: [{ ...READY_STATUS, is_member: false, member_status: null }] } });
+  test('com conta e ainda fora: entra sozinho com o nome da entrada do app e cai direto no feed (sem código)', async () => {
+    let member = false;
+    const { rpc } = setup({
+      my_community_status: () => ({
+        data: [member ? READY_STATUS : { ...READY_STATUS, is_member: false, member_status: null }],
+      }),
+      join_community: () => {
+        member = true;
+        return { data: true };
+      },
+    });
     await render(<FeedScreen />);
-    await waitFor(() => expect(screen.getByTestId('gate-not-member')).toBeTruthy());
+    await waitFor(() => expect(screen.getByTestId(`post-amen-${POST(0)}`)).toBeTruthy());
+    expect(calls(rpc, 'join_community')).toHaveLength(1);
+    expect(JSON.stringify(calls(rpc, 'join_community')[0][1])).toContain('Davi');
     expect(screen.queryByText(/código/)).toBeNull();
-    await fireEvent.press(screen.getByTestId('gate-create-profile'));
-    expect(mockRouter.push).toHaveBeenCalledWith('/comunidade/entrar');
-    expect(calls(rpc, 'community_feed')).toHaveLength(0);
+    expect(mockRouter.push).not.toHaveBeenCalled();
   });
 
   test('participação suspensa: estado próprio, sem feed', async () => {
@@ -271,11 +294,11 @@ describe('C1: portões honestos antes do feed', () => {
 /* ------------------------------------------------------------------ feed */
 
 describe('C1: feed', () => {
-  test('cabeçalho: "Comunidade", sino, pílula "Escrever" (vai para Publicar) e os filtros do grupo', async () => {
+  test('cabeçalho: "Juntos", sino, pílula "Escrever" (vai para Publicar) e os filtros do grupo', async () => {
     setup();
     await render(<FeedScreen />);
     await waitFor(() => expect(screen.getByTestId(`post-${POST(0)}`)).toBeTruthy());
-    expect(screen.getByText('Comunidade')).toBeTruthy();
+    expect(screen.getByText('Juntos')).toBeTruthy();
     expect(screen.getByTestId('feed-bell')).toBeTruthy();
     expect(screen.getByTestId('feed-scope-igreja')).toBeTruthy();
     expect(screen.getByText('Meu ministério')).toBeTruthy();
@@ -341,14 +364,14 @@ describe('C1: feed', () => {
     expect(screen.queryByText(/raw/)).toBeNull();
   });
 
-  test('antes do primeiro Amém: regras e consentimento; o Amém não é enviado', async () => {
+  test('antes do primeiro Amém: a tela única de aceite; o Amém não é enviado', async () => {
     const { rpc } = setup({
       my_community_status: { data: [{ ...READY_STATUS, needs_rules: true, needs_publish_consent: true }] },
     });
     await render(<FeedScreen />);
     await waitFor(() => expect(screen.getByTestId(`post-amen-${POST(0)}`)).toBeTruthy());
     await fireEvent.press(screen.getByTestId(`post-amen-${POST(0)}`));
-    expect(mockRouter.push).toHaveBeenCalledWith('/comunidade/regras');
+    expect(mockRouter.push).toHaveBeenCalledWith('/comunidade/consentimento');
     expect(calls(rpc, 'set_amen')).toHaveLength(0);
   });
 
@@ -360,32 +383,69 @@ describe('C1: feed', () => {
     expect(mockRouter.push).toHaveBeenCalledWith('/comunidade/consentimento');
   });
 
-  test('voltando do aceite, o feed diz que o Amém ainda não foi dado (nada é gravado sozinho)', async () => {
+  test('voltando do aceite com "Concordo e continuar", o Amém que levou até lá é gravado sozinho', async () => {
     const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility').mockImplementation(() => {});
+    const { rpc, handlers } = setup({
+      my_community_status: { data: [{ ...READY_STATUS, needs_publish_consent: true }] },
+      set_amen: (args) => ({ data: args?.amen === true }),
+    });
+    await render(<FeedScreen />);
+    await waitFor(() => expect(screen.getByTestId(`post-amen-${POST(0)}`)).toBeTruthy());
+    await fireEvent.press(screen.getByTestId(`post-amen-${POST(0)}`));
+    expect(calls(rpc, 'set_amen')).toHaveLength(0);
+
+    markAceite('accepted');
+    handlers.my_community_status = { data: [READY_STATUS] };
+    await refocus();
+    await waitFor(() => expect(calls(rpc, 'set_amen')).toHaveLength(1));
+    expect(rpc).toHaveBeenCalledWith('set_amen', { target_post: POST(0), amen: true });
+    await waitFor(() => expect(screen.getByTestId('feed-consent-notice')).toBeTruthy());
+    expect(screen.getByTestId('feed-consent-notice').props.children).toBe(AFTER_CONSENT_FEED);
+    expect(announce).toHaveBeenCalledWith(AFTER_CONSENT_FEED);
+  });
+
+  test('saiu do aceite sem concordar: o Amém é esquecido e nada é enviado', async () => {
     const { rpc, handlers } = setup({ my_community_status: { data: [{ ...READY_STATUS, needs_publish_consent: true }] } });
     await render(<FeedScreen />);
     await waitFor(() => expect(screen.getByTestId(`post-amen-${POST(0)}`)).toBeTruthy());
     await fireEvent.press(screen.getByTestId(`post-amen-${POST(0)}`));
-    expect(screen.queryByTestId('feed-consent-notice')).toBeNull();
-
+    markAceite('declined');
+    await refocus();
+    // Mesmo que outro caminho libere depois, o Amém esquecido não volta.
     handlers.my_community_status = { data: [READY_STATUS] };
     await refocus();
-    await waitFor(() => expect(screen.getByTestId('feed-consent-notice')).toBeTruthy());
-    expect(screen.getByTestId('feed-consent-notice').props.children).toBe(AFTER_CONSENT_FEED);
-    expect(announce).toHaveBeenCalledWith(AFTER_CONSENT_FEED);
+    await waitFor(() => expect(calls(rpc, 'my_community_status').length).toBeGreaterThanOrEqual(3));
     expect(calls(rpc, 'set_amen')).toHaveLength(0);
-
-    // O próximo Amém já vai, e o aviso sai.
-    await fireEvent.press(screen.getByTestId(`post-amen-${POST(0)}`));
-    await waitFor(() => expect(calls(rpc, 'set_amen')).toHaveLength(1));
     expect(screen.queryByTestId('feed-consent-notice')).toBeNull();
+  });
+
+  test('toques seguidos no Amém não se perdem: vale o último', async () => {
+    let release: (() => void) | null = null;
+    const { rpc } = setup({ set_amen: (args) => ({ data: args?.amen === true }) });
+    await render(<FeedScreen />);
+    await waitFor(() => expect(screen.getByTestId(`post-amen-${POST(0)}`)).toBeTruthy());
+    const original = rpc.getMockImplementation()!;
+    rpc.mockImplementation(async (fn: string, args?: Record<string, unknown>) => {
+      if (fn === 'set_amen' && calls(rpc, 'set_amen').length === 1) await new Promise<void>((r) => (release = r));
+      return original(fn, args);
+    });
+    await fireEvent.press(screen.getByTestId(`post-amen-${POST(0)}`)); // marca (fica no ar)
+    await fireEvent.press(screen.getByTestId(`post-amen-${POST(0)}`)); // desmarca
+    await fireEvent.press(screen.getByTestId(`post-amen-${POST(0)}`)); // marca de novo
+    expect(screen.getByTestId(`post-amen-${POST(0)}`).props.accessibilityState).toMatchObject({ checked: true });
+    await act(async () => release?.());
+    await waitFor(() =>
+      expect(screen.getByTestId(`post-amen-${POST(0)}`).props.accessibilityState).toMatchObject({ checked: true }),
+    );
+    // O primeiro pedido já dizia "marcado", e o último desejo também: nada mais a enviar.
+    expect(calls(rpc, 'set_amen').map(([, a]) => (a as { amen: boolean }).amen)).toEqual([true]);
   });
 
   test('feed com fim: menos de uma página mostra "Fim" e não oferece mais nada', async () => {
     const { rpc } = setup();
     await render(<FeedScreen />);
     await waitFor(() => expect(screen.getByTestId('feed-end')).toBeTruthy());
-    expect(screen.getByText('Você viu todas as publicações da comunidade.')).toBeTruthy();
+    expect(screen.getByText('Você viu todas as publicações da igreja.')).toBeTruthy();
     expect(screen.queryByTestId('feed-more')).toBeNull();
     expect(calls(rpc, 'community_feed')).toHaveLength(1);
   });
@@ -495,7 +555,7 @@ describe('C1: feed', () => {
     mockOnline = false;
     await render(<FeedScreen />);
     await waitFor(() => expect(screen.getByTestId('feed-offline')).toBeTruthy());
-    expect(screen.getByText('A comunidade volta quando a internet voltar.')).toBeTruthy();
+    expect(screen.getByText('O Juntos volta quando a internet voltar.')).toBeTruthy();
   });
 
   test('comentar abre a folha "Comentários" (F4) pelo id do post, sem sair do feed', async () => {
@@ -650,7 +710,7 @@ describe('C6: comentários', () => {
     await waitFor(() => expect(screen.getByTestId('comment-input')).toBeTruthy());
     await fireEvent.changeText(screen.getByTestId('comment-input'), 'Amém, irmã!');
     await fireEvent.press(screen.getByTestId('comment-send'));
-    expect(mockRouter.push).toHaveBeenCalledWith('/comunidade/regras');
+    expect(mockRouter.push).toHaveBeenCalledWith('/comunidade/consentimento');
 
     handlers.my_community_status = { data: [READY_STATUS] };
     await refocus();

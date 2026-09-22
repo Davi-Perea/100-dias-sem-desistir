@@ -1,9 +1,9 @@
 import { router, useFocusEffect } from 'expo-router';
-import { type ReactNode, useEffect, useRef, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, View } from 'react-native';
 
 import type { CommunityApi } from '@/community/api';
-import { DEMO_BADGE, isCommunityDemo } from '@/community/demoApi';
+import { DEMO_BADGE, DEMO_LABELS_ON_SCREEN, isCommunityDemo } from '@/community/demoApi';
 import type { CommunityStatus } from '@/community/types';
 import { useJourney } from '@/journey/useJourney';
 import { useOnline } from '@/net/useOnline';
@@ -14,30 +14,40 @@ import { announceNotice } from '@/ui/voce/announce';
 
 import { CommentsSheet, type CommentsTarget } from '../sheets/CommentsSheet';
 import { ReportSheet, type SheetTarget } from '../sheets/ReportSheet';
-import { AFTER_CONSENT_COMMENT } from './comentarios';
+import { AFTER_CONSENT_COMMENT, flushPendingCommentAmen, takePendingCommentAmen } from './comentarios';
 import { FeedEmpty, FeedEnd, FeedError, FeedSkeleton, GateView } from './FeedStates';
 import { PostCard } from './PostCard';
-import { ACTIVITY_ROUTE, COMMUNITY_ROUTES, consentHref, readerHref } from './rotas';
+import { takeAceiteOutcome } from '../publicar/aceite';
+import { ROUTES as PUBLISH_ROUTES } from '../publicar/fluxo';
+import { ACTIVITY_ROUTE, COMMUNITY_ROUTES, readerHref } from './rotas';
 import { needsConsent, useCommunity } from './useCommunity';
 import { useFeed } from './useFeed';
 import { type FeedScope, hasNewActivity } from './v2';
 
 /** Calha das telas de lista e feed (TELAS, convenções): 20. */
 const FEED_GUTTER = 20;
-/** Dito ao voltar das regras e do consentimento: o toque que levou até lá não foi gravado. */
-export const AFTER_CONSENT_FEED = 'Pronto. Agora você pode dizer Amém e comentar. Toque de novo no Amém que você queria.';
+/** Dito ao voltar do aceite: o Amém que levou até lá foi registrado. */
+export const AFTER_CONSENT_FEED = 'Pronto. Seu Amém foi registrado.';
+
+/** A tela única de aceite (16+, regras, consentimento e nome, se faltar). */
+const ACEITE_ROUTE = PUBLISH_ROUTES.consentimento as never;
 
 const COLUMN = { flex: 1, width: '100%', maxWidth: MAX_CONTENT_WIDTH + FEED_GUTTER * 2, alignSelf: 'center' } as const;
 
 /**
- * C1 · Comunidade como "diário compartilhado" (FEEDBACK_DAVI_2026-09-22, F1–F8):
+ * C1 · Juntos, o "diário compartilhado" (FEEDBACK_DAVI_2026-09-22, F1–F8):
  * cada pessoa conta o seu dia com a Bíblia, e a igreja acompanha.
  *
- * Topo: "Comunidade", o sino da Atividade (F8, com ponto quando há novidade),
+ * Quem abre a aba já está dentro (2026-09-22): a entrada é automática
+ * (useCommunity), sem tela de entrar, sem código, sem perfil. A primeira
+ * interação que expõe (post, comentário, Amém) abre a tela única de aceite e,
+ * ao concordar, a ação que a pessoa queria acontece.
+ *
+ * Topo: "Juntos", o sino da Atividade (F8, com ponto quando há novidade),
  * "Escrever", e os filtros "Toda a igreja · Meu ministério" (F6: sem
  * seguidores). Depois os posts do dia e o fim explícito.
  *
- * Estados: sem servidor, sem conta, sem perfil, suspensa, carregando (esqueleto
+ * Estados: sem servidor, suspensa, entrando/carregando (esqueleto
  * na forma do post), erro (F5), vazio (C2) e sem internet (o feed fica
  * indisponível, a jornada não).
  */
@@ -130,7 +140,7 @@ function FeedHeader({
         }}
       >
         <AppText variant="screenTitle" accessibilityRole="header" style={{ flex: 1, minWidth: 160 }}>
-          Comunidade
+          Juntos
         </AppText>
         {ready ? (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
@@ -169,7 +179,7 @@ function FeedHeader({
             <Pressable
               onPress={onWrite}
               accessibilityRole="button"
-              accessibilityLabel="Escrever para a comunidade"
+              accessibilityLabel="Escrever no Juntos"
               testID="feed-write"
               style={({ pressed }) => [
                 {
@@ -191,7 +201,7 @@ function FeedHeader({
           </View>
         ) : null}
       </View>
-      {isCommunityDemo() ? <DemoBadge /> : null}
+      {DEMO_LABELS_ON_SCREEN && isCommunityDemo() ? <DemoBadge /> : null}
       {ready ? (
         <View
           style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: spacing.sm, paddingHorizontal: FEED_GUTTER, paddingBottom: spacing.xs }}
@@ -240,7 +250,7 @@ function OfflineNotice() {
   return (
     <View style={{ gap: spacing.sm, paddingBottom: spacing.md }} testID="feed-offline">
       <OfflineBanner />
-      <AppText variant="bodySm">A comunidade volta quando a internet voltar.</AppText>
+      <AppText variant="bodySm">O Juntos volta quando a internet voltar.</AppText>
     </View>
   );
 }
@@ -290,19 +300,39 @@ function ReadyFeed({
   useFocusEffect(feed.onFocus);
 
   const gated = needsConsent(status);
-  // O Amém que levou às regras não é gravado sozinho (nada sai sem um toque
-  // depois do aceite). Ao voltar, a tela diz isso, para o toque não parecer perdido.
-  const askedConsent = useRef(false);
+  // O Amém que abriu o aceite fica guardado. Se a pessoa concordou ("Concordo e
+  // continuar" é o toque dela), ele é registrado assim que o status novo chega;
+  // se ela saiu sem concordar, é esquecido.
+  const pendingAmen = useRef<{ postId: string; next: boolean } | null>(null);
   const [consentNotice, setConsentNotice] = useState<string | null>(null);
+  useFocusEffect(
+    useCallback(() => {
+      const outcome = takeAceiteOutcome();
+      if (outcome !== 'accepted') pendingAmen.current = null;
+      // Saiu do aceite sem concordar: o Amém de comentário dado pela folha também é esquecido.
+      if (outcome === 'declined') takePendingCommentAmen();
+    }, []),
+  );
+  const toggleAmen = useRef(feed.toggleAmen);
   useEffect(() => {
-    if (!askedConsent.current || gated) return;
-    askedConsent.current = false;
+    toggleAmen.current = feed.toggleAmen;
+  });
+  // Amém de comentário dado pela folha (que fechou para o aceite): gravado ao
+  // voltar liberado, sem precisar reabrir a conversa.
+  useEffect(() => {
+    if (!gated) void flushPendingCommentAmen(api);
+  }, [gated, api]);
+  useEffect(() => {
+    const pending = pendingAmen.current;
+    if (gated || !pending) return;
+    pendingAmen.current = null;
+    toggleAmen.current(pending.postId, pending.next);
     setConsentNotice(AFTER_CONSENT_FEED);
     announceNotice(AFTER_CONSENT_FEED);
   }, [gated]);
-  const openConsent = () => {
-    askedConsent.current = true;
-    router.push(consentHref(status));
+  const openConsent = (amen?: { postId: string; next: boolean }) => {
+    pendingAmen.current = amen ?? null;
+    router.push(ACEITE_ROUTE);
   };
 
   const openComments = (target: CommentsTarget) => {
@@ -345,7 +375,7 @@ function ReadyFeed({
             photos={feed.photos}
             onAmen={(next) => {
               if (gated) {
-                openConsent();
+                openConsent({ postId: card.postId, next });
                 return;
               }
               setConsentNotice(null);
@@ -414,7 +444,7 @@ function ReadyFeed({
               testID="feed-my-posts"
             />
             <Button
-              title="Regras da comunidade"
+              title="Regras do Juntos"
               variant="underline"
               onPress={() => router.push(COMMUNITY_ROUTES.regras)}
               testID="feed-rules"
@@ -439,7 +469,7 @@ function ReadyFeed({
         onClose={() => setComments(null)}
         onNeedsConsent={(postId, text) => {
           draft.current = { postId, text };
-          router.push(consentHref(status));
+          openConsent();
         }}
         onCountChange={feed.bumpComments}
         onPostGone={() => feed.afterBlock(null)}

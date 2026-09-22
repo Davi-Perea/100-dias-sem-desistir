@@ -1,18 +1,12 @@
 /**
- * C6 (feedback do fundador de 2026-09-22: "a comunidade não está funcionando").
+ * Juntos na DEMONSTRAÇÃO (demoApi em memória, como no Expo Go do fundador), com
+ * as telas de verdade, do jeito de quem instala no dia 23 (pedido de
+ * 2026-09-22): nenhuma tela de entrar, nenhum código, nenhum perfil para montar.
+ * A pessoa escreve, toca em Publicar, passa UMA vez pela tela única de aceite
+ * (16+, regras, consentimento e o nome) e o post aparece no feed e em "Minhas
+ * publicações". Foto de perfil e ministério não são pedidos.
  *
- * Reproduz, na DEMONSTRAÇÃO (demoApi em memória, como no Expo Go do fundador),
- * o fluxo inteiro com as telas de verdade: entrar sem e-mail (e sem código, C3) → perfil
- * (foto, nome + 16+, ministério, bio) → Publicar → regras → consentimento →
- * Publicar → aparece no feed e em "Minhas publicações".
- *
- * O que travava antes (e este teste prende):
- *   - "Entrar com meu e-mail" em Publicar/regras/consentimento levava ao /conta,
- *     que na demonstração (sem servidor) não tem saída; regras e consentimento
- *     sem sessão eram só um aviso, sem botão;
- *   - Publicar não perguntava de novo ao voltar da entrada (continuava "Entre na
- *     comunidade" mesmo já dentro). Isso agora é `useFocusEffect` em
- *     useCommunityStatus (aqui o foco é simulado montando a tela de novo).
+ * O foco é simulado montando a tela de novo.
  */
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 
@@ -35,6 +29,10 @@ jest.mock('expo-router', () => ({
   useFocusEffect: () => {},
   Stack: { Screen: () => null },
   Link: ({ children }: { children: unknown }) => children,
+  Redirect: ({ href }: { href: unknown }) => {
+    const { View } = jest.requireActual('react-native');
+    return <View testID="redirect" accessibilityLabel={typeof href === 'string' ? href : JSON.stringify(href)} />;
+  },
 }));
 
 jest.mock('react-native-safe-area-context', () => {
@@ -114,88 +112,42 @@ afterAll(() => {
   else process.env.EXPO_PUBLIC_DEMO_MODE = ORIGINAL_DEMO;
 });
 
-async function scrollRulesToEnd() {
-  const scroll = screen.getByTestId('rules-scroll');
-  await fireEvent(scroll, 'layout', { nativeEvent: { layout: { x: 0, y: 0, width: 390, height: 800 } } });
-  await fireEvent(scroll, 'contentSizeChange', 390, 4000);
-  await fireEvent.scroll(scroll, {
-    nativeEvent: {
-      contentOffset: { x: 0, y: 3200 },
-      contentSize: { width: 390, height: 4000 },
-      layoutMeasurement: { width: 390, height: 800 },
-    },
-  });
-}
-
-test('C6: entrar → perfil → regras → consentimento → publicar → feed e "Minhas publicações"', async () => {
-  // 1. Entrar sem e-mail (C2): um toque, sem passo simulado de e-mail.
-  const entry = await render(<EntrarScreen />);
+test('Juntos na demonstração: entra sozinha → escreve → aceite único → o post sai sozinho → feed e "Minhas publicações"', async () => {
+  // 1. Publicar (vindo do dia 3) sem sessão nenhuma: a conta do aparelho e a entrada acontecem sozinhas.
   expect(getDemoSession()).toBeNull();
-  await fireEvent.press(screen.getByTestId('community-sign-in'));
-  // 2. Sem código (C3): entra direto e cai no primeiro passo do perfil.
-  await waitFor(() => expect(screen.getByTestId('entrar-foto')).toBeTruthy());
-  expect(getDemoSession()).not.toBeNull();
-  expect(screen.queryByText(/código/i)).toBeNull();
-
-  // 3. Perfil: foto, nome + 16+, "Nenhum", bio pulada.
-  await fireEvent.press(screen.getByTestId('perfil-foto-abrir'));
-  await fireEvent.press(screen.getByTestId('perfil-foto-escolher'));
-  await waitFor(() => expect(screen.getByTestId('perfil-foto-estado')).toBeTruthy());
-  await fireEvent.press(screen.getByTestId('entrar-foto-continuar'));
-  await fireEvent.changeText(screen.getByTestId('perfil-nome'), 'Davi');
-  await fireEvent.press(screen.getByTestId('perfil-idade'));
-  await fireEvent.press(screen.getByTestId('entrar-confirmar'));
-  await waitFor(() => expect(screen.getByTestId('entrar-ministerio')).toBeTruthy());
-  await fireEvent.press(screen.getByTestId('perfil-ministerio-nenhum'));
-  await fireEvent.press(screen.getByTestId('entrar-ministerio-continuar'));
-  await waitFor(() => expect(screen.getByTestId('entrar-bio')).toBeTruthy());
-  await fireEvent.press(screen.getByTestId('entrar-pular-bio'));
-  expect(screen.getByTestId('entrar-pronto')).toBeTruthy();
-  expect(screen.queryByTestId('entrar-falta')).toBeNull();
-  await entry.unmount();
-
-  // 4. Publicar (vindo do dia 3): vai para as regras, levando o caminho de volta.
   mockParams = { day: '3' };
   let view = await render(<PublishScreen />);
-  await waitFor(() =>
-    expect(mockRouter.replace).toHaveBeenCalledWith({
-      pathname: '/comunidade/regras',
-      params: { next: '/comunidade/publicar', day: '3' },
-    }),
-  );
+  await waitFor(() => expect(screen.getByTestId('publish-input')).toBeTruthy());
+  expect(getDemoSession()).not.toBeNull();
+  expect(screen.queryByText(/código|Entre na comunidade|Criar meu perfil/i)).toBeNull();
+
+  // 2. Escreve e toca em Publicar: abre a tela única de aceite; nada foi enviado.
+  await fireEvent.changeText(screen.getByTestId('publish-input'), 'Hoje a leitura me encorajou a não desistir.');
+  await fireEvent.press(screen.getByTestId('publish-send'));
+  expect(mockRouter.push).toHaveBeenCalledWith('/comunidade/consentimento');
+  const mine = await getDemoCommunityApi()!.myPosts();
+  expect(mine.some((post) => post.body === 'Hoje a leitura me encorajou a não desistir.')).toBe(false);
   await view.unmount();
 
-  // 5. Regras: rolar até o fim e aceitar (rascunho PENDENTE, mas a demonstração deixa seguir).
-  mockRouter.replace.mockClear();
-  mockParams = { next: '/comunidade/publicar', day: '3' };
-  view = await render(<RulesScreen />);
-  await waitFor(() => expect(screen.getByTestId('rules-accept')).toBeTruthy());
-  await scrollRulesToEnd();
-  await fireEvent.press(screen.getByTestId('rules-accept'));
-  await waitFor(() =>
-    expect(mockRouter.replace).toHaveBeenCalledWith({
-      pathname: '/comunidade/consentimento',
-      params: { next: '/comunidade/publicar', day: '3' },
-    }),
-  );
-  await view.unmount();
-
-  // 6. Consentimento: a frase de quem vê (C5) e "Concordo".
-  mockRouter.replace.mockClear();
+  // 3. Aceite: frase de quem vê, 16+, o nome (a entrada do app não deu nenhum) e "Concordo e continuar".
   view = await render(<ConsentScreen />);
+  await waitFor(() => expect(screen.getByTestId('consent-accept')).toBeTruthy());
   expect(
     screen.getAllByText(
       'Sua publicação aparece com seu nome para as pessoas que entraram na comunidade da Lagoinha Brasília Capital.',
     ).length,
   ).toBeGreaterThan(0);
-  await fireEvent.press(await screen.findByTestId('consent-accept'));
-  await waitFor(() =>
-    expect(mockRouter.replace).toHaveBeenCalledWith({ pathname: '/comunidade/publicar', params: { day: '3' } }),
-  );
+  expect(screen.queryByText(/foto de perfil/i)).toBeNull();
+  await fireEvent.changeText(screen.getByTestId('perfil-nome'), 'Davi');
+  await fireEvent.press(screen.getByTestId('perfil-idade'));
+  await fireEvent.press(screen.getByTestId('consent-accept'));
+  await waitFor(() => expect(mockRouter.back).toHaveBeenCalled());
+  const status = await getDemoCommunityApi()!.getStatus();
+  expect(status).toMatchObject({ needsRules: false, needsPublishConsent: false, displayName: 'Davi' });
+  expect(status.profile.ageConfirmed).toBe(true);
   await view.unmount();
 
-  // 7. Publicar de verdade.
-  mockParams = { day: '3' };
+  // 4. Publicar de novo (sem foto de perfil e sem ministério): sai.
   view = await render(<PublishScreen />);
   await waitFor(() => expect(screen.getByTestId('publish-input')).toBeTruthy());
   await fireEvent.changeText(screen.getByTestId('publish-input'), 'Hoje a leitura me encorajou a não desistir.');
@@ -203,12 +155,11 @@ test('C6: entrar → perfil → regras → consentimento → publicar → feed e
   await waitFor(() => expect(screen.getByText('Publicado')).toBeTruthy());
   await view.unmount();
 
-  // 8. Está no feed, com o nome (e sem ministério: "Nenhum"), e em "Minhas publicações".
+  // 5. Está no feed, com o nome, e em "Minhas publicações".
   const page = await getDemoCommunityApi()!.feedPage();
   expect(page.posts[0]).toMatchObject({
     body: 'Hoje a leitura me encorajou a não desistir.',
     authorName: 'Davi',
-    authorMinistry: null,
     isMine: true,
     dayNumber: 3,
   });
@@ -216,19 +167,12 @@ test('C6: entrar → perfil → regras → consentimento → publicar → feed e
   await waitFor(() => expect(screen.getByText('Hoje a leitura me encorajou a não desistir.')).toBeTruthy());
 });
 
-test('C6: sem sessão, Publicar, regras e consentimento levam à entrada (nunca ao /conta, que não tem saída na demonstração)', async () => {
-  let view = await render(<PublishScreen />);
-  await fireEvent.press(screen.getByTestId('gate-sign-in'));
-  expect(mockRouter.push).toHaveBeenLastCalledWith('/comunidade/entrar');
+test('/comunidade/entrar e o aceite das regras antigos levam ao Juntos e ao aceite único', async () => {
+  let view = await render(<EntrarScreen />);
+  expect(screen.getByTestId('redirect').props.accessibilityLabel).toBe('/juntos');
   await view.unmount();
-
   view = await render(<RulesScreen />);
-  await fireEvent.press(screen.getByTestId('rules-enter'));
-  expect(mockRouter.push).toHaveBeenLastCalledWith('/comunidade/entrar');
+  expect(screen.getByTestId('redirect').props.accessibilityLabel).toContain('/comunidade/consentimento');
   await view.unmount();
-
-  await render(<ConsentScreen />);
-  await fireEvent.press(screen.getByTestId('consent-enter'));
-  expect(mockRouter.push).toHaveBeenLastCalledWith('/comunidade/entrar');
   expect(mockRouter.push).not.toHaveBeenCalledWith('/conta?reason=comunidade');
 });

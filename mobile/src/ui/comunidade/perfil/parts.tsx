@@ -3,8 +3,7 @@ import { useEffect, useState, type PropsWithChildren, type ReactNode } from 'rea
 import { ScrollView, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { DEMO_BADGE, isCommunityDemo } from '@/community/demoApi';
-import { startDeviceSession } from '@/community/deviceSession';
+import { ensureDeviceSession } from '@/community/deviceSession';
 import { toCommunityError } from '@/community/errors';
 import { BackBar } from '@/ui/BackBar';
 import { AppText, Button, Screen, Sheet, StateView, useFace } from '@/ui/components';
@@ -67,8 +66,8 @@ export function AccountStateView({ account }: { account: Exclude<CommunityAccoun
         <StateView
           kind="empty"
           icon="community"
-          title="Comunidade indisponível"
-          message="A comunidade não está disponível nesta versão do app. Sua jornada pessoal continua funcionando por completo neste aparelho."
+          title="Juntos indisponível"
+          message="O Juntos não está disponível nesta versão do app. Sua jornada pessoal continua funcionando por completo neste aparelho."
         />
       </ProfileScreen>
     );
@@ -88,43 +87,48 @@ export function AccountStateView({ account }: { account: Exclude<CommunityAccoun
 }
 
 /**
- * Entrada SEM e-mail (C2, feedback de 2026-09-22): um toque cria a conta ligada
- * a este aparelho (sessão anônima do Supabase; na demonstração, direto). Depois
- * vêm os passos do perfil, que podem ser pulados. Sem código (C3, decisão do
- * fundador de 2026-09-22): quem cria o perfil entra.
+ * Conta SEM e-mail (C2): a conta fica ligada a este aparelho (sessão anônima do
+ * Supabase; na demonstração, direto). Desde 2026-09-22 (aba "Juntos") ela é
+ * criada SOZINHA: nenhuma tela pede "entrar". Esta frase fica para "Conta e
+ * privacidade" explicar o que é a conta.
  */
-export const DEVICE_ACCOUNT_COPY =
-  'Não precisa de e-mail nem de senha: a sua conta fica ligada a este celular. Depois você monta o seu perfil.';
+export const DEVICE_ACCOUNT_COPY = 'Sua conta no Juntos fica ligada a este celular, sem e-mail e sem senha.';
 
+/** Sem sessão: cria a do aparelho sozinha e espera. Se não der, diz e oferece tentar de novo. */
 function SignedOutIntro() {
-  const demo = isCommunityDemo();
-  const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const enter = async () => {
-    setBusy(true);
-    setError(null);
-    try {
-      await startDeviceSession();
-    } catch (failure) {
-      setError(toCommunityError(failure).message);
-    } finally {
-      setBusy(false);
-    }
-  };
+  const [attempt, setAttempt] = useState(0);
+  useEffect(() => {
+    let alive = true;
+    ensureDeviceSession().catch((failure: unknown) => {
+      if (alive) setError(toCommunityError(failure).message);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [attempt]);
   return (
     <ProfileScreen testID="community-account-signed-out">
-      <StateView
-        kind="empty"
-        icon="community"
-        title="Entrar na comunidade"
-        message={demo ? `${DEVICE_ACCOUNT_COPY} ${DEMO_BADGE}.` : DEVICE_ACCOUNT_COPY}
-        action={
-          <View style={{ gap: spacing.md, alignSelf: 'stretch' }}>
-            <ActionError message={error} testID="community-sign-in-error" />
-            <Button title="Entrar na comunidade" onPress={enter} loading={busy} testID="community-sign-in" />
-          </View>
-        }
-      />
+      {error ? (
+        <StateView
+          kind="error"
+          icon="alert"
+          title="Não deu para abrir agora"
+          message={error}
+          action={
+            <Button
+              title="Tentar de novo"
+              onPress={() => {
+                setError(null);
+                setAttempt((n) => n + 1);
+              }}
+              testID="community-sign-in"
+            />
+          }
+        />
+      ) : (
+        <StateView kind="loading" />
+      )}
     </ProfileScreen>
   );
 }

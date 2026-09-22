@@ -28,13 +28,12 @@ export const COMMUNITY_ROUTES = {
 } as const;
 
 /**
- * Antes do primeiro comentário ou Amém: regras (se faltarem) e depois o
- * consentimento destacado. Sem `next`: ao aceitar, o fluxo volta para a tela
- * que pediu (o feed ou os comentários), e a pessoa toca de novo — nada é
- * enviado sem um toque dela depois do aceite.
+ * Antes do primeiro comentário ou Amém: a tela única de aceite (16+, regras,
+ * consentimento destacado e o nome, se faltar). O status fica na assinatura
+ * para quem já chama assim.
  */
-export function consentHref(status: CommunityStatus): Href {
-  return (status.needsRules ? PUBLISH_ROUTES.regras : PUBLISH_ROUTES.consentimento) as Href;
+export function consentHref(_status?: CommunityStatus): Href {
+  return PUBLISH_ROUTES.consentimento as Href;
 }
 
 /** C6 (desta parte). */

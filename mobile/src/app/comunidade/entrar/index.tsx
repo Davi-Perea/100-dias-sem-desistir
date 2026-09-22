@@ -1,9 +1,12 @@
-import { EntradaFlow } from '@/ui/comunidade/perfil/EntradaFlow';
+import { Redirect } from 'expo-router';
+
+import { ROUTES } from '@/ui/comunidade/publicar/fluxo';
 
 /**
- * Entrada na Comunidade (sem código desde o C3; perfil em passos). A lógica mora em
- * `src/ui/comunidade/perfil/EntradaFlow.tsx`; a rota só a monta.
+ * `/comunidade/entrar` não é mais uma tela (2026-09-22, aba "Juntos"): a
+ * entrada é automática ao abrir o feed. Links antigos (perfil, conta e
+ * privacidade) caem direto no Juntos.
  */
-export default function EntrarNaComunidadeScreen() {
-  return <EntradaFlow />;
+export default function EntrarNoJuntos() {
+  return <Redirect href={ROUTES.juntos as never} />;
 }

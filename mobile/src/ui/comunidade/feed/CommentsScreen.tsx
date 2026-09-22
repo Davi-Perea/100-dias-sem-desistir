@@ -94,6 +94,7 @@ function ReadyComments({ postId, api, status }: { postId: string; api: Community
             onMore={() =>
               setSheet({ kind: 'comment', commentId: comment.commentId, authorName: comment.authorName, isMine: comment.isMine })
             }
+            onAmen={(next) => talk.toggleAmen(comment.commentId, next)}
           />
         ))}
       </View>

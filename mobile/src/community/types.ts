@@ -157,6 +157,10 @@ export type PostComment = {
   createdAt: string;
   authorName: string;
   isMine: boolean;
+  /** Amém no comentário (2026-09-23): quantas pessoas, sem bloqueio com quem lê. Só o número, sem rostinhos. */
+  amenCount: number;
+  /** Se EU disse Amém neste comentário. */
+  iSaidAmen: boolean;
 };
 
 export type MyPost = Partial<DiaryFields> & {

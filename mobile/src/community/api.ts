@@ -194,6 +194,8 @@ export function toComment(row: Row): PostComment {
     createdAt: str(row.created_at) ?? '',
     authorName: str(row.author_name) ?? '',
     isMine: bool(row.is_mine),
+    amenCount: count(row.amen_count),
+    iSaidAmen: bool(row.i_said_amen),
   };
 }
 
@@ -435,8 +437,25 @@ export function createCommunityApi(client: CommunityClient, deps: { randomUUID: 
     },
 
     async postComments(postId: string): Promise<PostComment[]> {
-      const data = await call('community_post_comments', { target_post: requireUuid(postId) });
-      return rows(data).map(toComment);
+      const target = requireUuid(postId);
+      // O Amém dos comentários vem de outra função (a primeira não muda de formato).
+      // Se ela falhar (servidor ainda sem a migration de 2026-09-23), a conversa
+      // abre do mesmo jeito, com o Amém em zero: o comentário importa mais.
+      const [data, amens] = await Promise.all([
+        call('community_post_comments', { target_post: target }),
+        call('community_comment_amens', { target_post: target }).catch(() => null),
+      ]);
+      const byId = new Map(rows(amens).map((r) => [str(r.comment_id) ?? '', r]));
+      return rows(data).map((row) => {
+        const amen = byId.get(str(row.comment_id) ?? '');
+        return toComment(amen ? { ...row, amen_count: amen.amen_count, i_said_amen: amen.i_said_amen } : row);
+      });
+    },
+
+    /** Liga/desliga o MEU Amém num comentário. Devolve só o meu novo estado. */
+    async setCommentAmen(commentId: string, amen: boolean): Promise<boolean> {
+      const data = await call('set_comment_amen', { target_comment: requireUuid(commentId), amen });
+      return data === true;
     },
 
     /** "Minhas publicações": inclusive em análise, não publicadas e removidas, com o motivo. */

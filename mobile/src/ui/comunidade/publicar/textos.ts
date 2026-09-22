@@ -260,7 +260,15 @@ export function rulesDocument(campos: Record<CampoId, string | null> = CAMPOS): 
   };
 }
 
-/** Consentimento destacado, tela C4 (rascunho §2, "Texto proposto"). */
+/**
+ * Consentimento destacado, tela C4 (rascunho §2, "Texto proposto").
+ *
+ * SUPERADO desde 2026-09-23 pelo `aceiteDocument()` da tela única, e NENHUMA
+ * tela o mostra mais. Fica só como registro do rascunho que o advogado recebeu.
+ * Não voltar a usá-lo numa tela: o item do Amém abaixo diz que "ninguém vê quem
+ * deu Amém", e isso deixou de ser verdade (os rostinhos do Amém mostram o nome,
+ * private.amen_faces_for). Quem precisa de texto de aceite usa `aceiteDocument`.
+ */
 export function consentDocument(campos: Record<CampoId, string | null> = CAMPOS): TermsDocument {
   const c = (id: CampoId) => campo(id, campos);
   return {
@@ -318,6 +326,65 @@ export function consentDocument(campos: Record<CampoId, string | null> = CAMPOS)
 }
 
 /**
+ * TELA ÚNICA DE ACEITE (pedido do fundador, 2026-09-22, aba “Juntos”): antes da
+ * primeira publicação, comentário ou Amém, UMA tela curta com 16+, regras,
+ * consentimento destacado e o nome. Este é o consentimento destacado dela
+ * (LGPD art. 11, I): o mesmo propósito e as mesmas frases do rascunho §2
+ * (`consentDocument`), só que curto, e com uma correção de fato: o Amém agora
+ * APARECE com o nome (os rostinhos do F3), então isso tem de estar escrito.
+ *
+ * O advogado revisa este texto junto com o rascunho (pedido registrado). Até lá
+ * a versão é null e, no app de verdade, ninguém aceita (`termsAvailability`).
+ */
+export function aceiteDocument(campos: Record<CampoId, string | null> = CAMPOS): TermsDocument {
+  const c = (id: CampoId) => campo(id, campos);
+  return {
+    purpose: 'community_publish',
+    version: campos.versaoConsentimento,
+    title: 'Antes de participar',
+    sections: [
+      {
+        paragraphs: [
+          'O que você escrever aqui fala da sua fé. A lei brasileira trata isso como dado sensível e pede que a ' +
+            'gente pergunte com todas as letras.',
+        ],
+      },
+      { title: 'Quem vê', paragraphs: [audienceSentence()] },
+      {
+        title: 'O que você autoriza',
+        bullets: [
+          'Mostrar o que você publicar (texto e foto), os seus comentários e o seu Amém, com o seu nome, para essas pessoas.',
+          'Uma pessoa da equipe da igreja olhar as suas fotos, e um programa conferir os seus textos.',
+          `Guardar isso num servidor no Brasil, sob a responsabilidade de ${c('razaoSocial')}.`,
+        ],
+      },
+      {
+        title: 'O que não vai junto',
+        paragraphs: ['Sua leitura, seu jejum e as suas anotações continuam só no seu aparelho.'],
+      },
+      {
+        title: 'Você pode mudar de ideia',
+        paragraphs: [
+          'Apague o que publicou quando quiser, ou deixe de participar em "Conta e privacidade".',
+        ],
+      },
+    ],
+  };
+}
+
+/**
+ * As regras, em quatro linhas, na tela única de aceite. Frases do rascunho §1
+ * (`rulesDocument`); o aceite vale para as regras COMPLETAS, que abrem pelo link
+ * logo abaixo, e é o hash delas que vai ao servidor.
+ */
+export const RULES_SUMMARY = [
+  'Escreva como escreveria para um irmão na porta do templo.',
+  'Só publique o rosto de outra pessoa se ela concordou.',
+  'Não publique foto em que dê para reconhecer uma criança ou um adolescente.',
+  'Sem ofensa, propaganda, pedido de dinheiro ou campanha política.',
+] as const;
+
+/**
  * O texto exato de um documento, na ordem em que a tela o mostra. É dele que sai
  * o sha256 enviado no aceite; o servidor guarda o hash da versão aprovada.
  */
@@ -352,7 +419,7 @@ export function termsAvailability(doc: TermsDocument, serverVersion: string | nu
 
 /** Enquanto o texto não foi aprovado: dito com honestidade, sem prometer data. */
 export const PENDING_NOTICE =
-  'A publicação na comunidade ainda não foi liberada pela igreja. Este texto é um rascunho em revisão e ainda não ' +
+  'A publicação no Juntos ainda não foi liberada pela igreja. Este texto é um rascunho em revisão e ainda não ' +
   'pode ser aceito.';
 
 export const MISMATCH_NOTICE = 'O texto foi atualizado. Atualize o app para ler a versão nova e continuar.';

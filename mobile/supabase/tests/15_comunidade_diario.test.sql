@@ -250,10 +250,10 @@ select set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-8000-0000000
 set local role authenticated;
 select public.set_amen((select id from ids where name = 'leitura'), true);
 reset role;
-select set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-8000-0000000015f1","role":"authenticated"}', true);
-set local role authenticated;
-select public.set_amen((select id from ids where name = 'leitura'), true);
-reset role;
+-- Fábio (sem nome) tem um Amém de antes da trava de nome + 16+ (20260923050000):
+-- gravado direto, para conferir que quem não tem nome conta no número sem rosto.
+insert into public.community_amens (user_id, post_id)
+values ('00000000-0000-4000-8000-0000000015f1', (select id from ids where name = 'leitura'));
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-8000-0000000015c1","role":"authenticated"}', true);
 set local role authenticated;
 select public.set_amen((select id from ids where name = 'leitura'), true);

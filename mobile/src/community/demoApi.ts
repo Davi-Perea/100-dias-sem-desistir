@@ -50,14 +50,23 @@ import {
  *   - `EXPO_PUBLIC_DEMO_MODE=true` e `EXPO_PUBLIC_COMMUNITY_ENABLED=true`;
  *   - nuvem NÃO configurada (com Supabase, o app fala com o servidor de verdade).
  *
- * Nada sai do aparelho e nada é gravado: fechar o app zera tudo. As publicações
- * de exemplo são de nomes claramente fictícios, marcados "(exemplo)", com textos
- * escritos para a demonstração (sem citação bíblica, sem texto da igreja, sem
- * foto). A tela do feed mostra o selo "Demonstração · nada é enviado".
+ * Nada sai do aparelho e nada é gravado: fechar o app zera tudo.
+ *
+ * TUDO AQUI É FICTÍCIO (marcação no código, não na tela). Pedido do fundador,
+ * 2026-09-23 (madrugada): ver "como seria se um desconhecido instalasse no dia
+ * 23", sem cara de demonstração. Por isso, desde então:
+ *   - os nomes de exemplo são primeiros nomes comuns, INVENTADOS, sem sobrenome
+ *     e nunca de pessoas da igreja; não levam mais o sufixo "(exemplo)";
+ *   - o selo "Demonstração · nada é enviado" e os avisos de rascunho (PENDENTE)
+ *     das telas de aceite não aparecem mais (`DEMO_LABELS_ON_SCREEN = false`);
+ *     as constantes continuam aqui para o código e os testes saberem o que é;
+ *   - os textos de exemplo foram escritos para a demonstração: sem citação
+ *     bíblica (só referência), sem texto da igreja, sem foto.
+ * Continua valendo: só em `__DEV__` + EXPO_PUBLIC_DEMO_MODE, nunca em release.
  *
  * Implementa a MESMA interface de `createCommunityApi` (tipo `CommunityApi`),
  * então as telas não sabem a diferença, a não ser onde perguntam
- * `isDemoCommunityApi` (selo, textos PENDENTE).
+ * `isDemoCommunityApi` (aceite do rascunho PENDENTE).
  *
  * Desde 2026-09-22 (C2) não há passo de e-mail: a entrada é direta, como a
  * conta ligada ao aparelho do app real. A foto de perfil fica só na memória
@@ -65,23 +74,39 @@ import {
  *
  * Diário compartilhado (2026-09-22, F1, F3, F5, F6, F8): as publicações de
  * exemplo têm tipos variados (leitura, oração, jejum, versículo — só a
- * REFERÊNCIA, nunca o texto bíblico — e livre), números de Amém de
- * DEMONSTRAÇÃO (DEMO_AMEN_NOTE) com rostinhos de nomes "(exemplo)", e uma delas
- * vai para "o ministério de quem está vendo" (só aparece com ministério no
- * perfil). Fotos de post aparecem na hora, como com o filtro automático
- * configurado (F5, simulado: nada sai do aparelho). Ao publicar, "Maria
- * (exemplo)" diz Amém e o sino (F8) acende.
+ * REFERÊNCIA, nunca o texto bíblico — e livre), números de Amém FICTÍCIOS
+ * (DEMO_AMEN_NOTE) com rostinhos só dos nomes de exemplo, e uma delas vai para
+ * "o ministério de quem está vendo" (só aparece com ministério no perfil). Fotos
+ * de post aparecem na hora, como com o filtro automático configurado (F5,
+ * simulado: nada sai do aparelho). Ao publicar, "Marina" (exemplo) diz Amém e o
+ * sino (F8) acende.
+ *
+ * Conteúdo por dia: no Dia 1 (23/09, EXPO_PUBLIC_DEMO_DAY=1) o feed é o da
+ * primeira manhã da campanha — poucas publicações, sobre começar Gênesis, orar e
+ * a expectativa; nenhuma da própria pessoa. Em outros dias, um feed "em
+ * andamento".
  */
 
 /** Caminho fictício da foto de perfil na demonstração (o arquivo fica no aparelho). */
 export const DEMO_AVATAR_PATH = 'demo-foto-de-perfil.jpg';
+
+/**
+ * As etiquetas de demonstração NÃO aparecem na tela (pedido do fundador,
+ * 2026-09-23: "não quero nem coisa de demonstração"). As telas que ainda as
+ * mostram devem perguntar isto antes. O modo continua marcado no código.
+ */
+export const DEMO_LABELS_ON_SCREEN = false;
+/** Só código/testes (DEMO_LABELS_ON_SCREEN = false). */
 export const DEMO_BADGE = 'Demonstração · nada é enviado';
-/** Aviso nas regras e no consentimento enquanto o texto é rascunho (PENDENTE). */
+/** Só código/testes: o texto das regras e do consentimento é rascunho (PENDENTE). */
 export const DEMO_TERMS_NOTICE =
   'Rascunho em revisão (PENDENTE). No app de verdade este texto ainda não pode ser aceito; na demonstração, dá para seguir.';
 
-/** Os números de Amém dos exemplos são fictícios. */
+/** Só código/testes: os números de Amém dos exemplos são fictícios. */
 export const DEMO_AMEN_NOTE = 'Números de Amém de demonstração';
+
+/** Nome de quem diz Amém na publicação nova da pessoa (F8). Fictício. */
+export const DEMO_FIRST_AMEN_NAME = 'Marina';
 
 const DEMO_DAY_DEFAULT = 3;
 
@@ -170,6 +195,10 @@ type DemoComment = {
   body: string;
   createdAt: string;
   status: ContentStatus;
+  /** Meu Amém neste comentário. */
+  amen: boolean;
+  /** Amém de outras pessoas (exemplo): só o número. */
+  otherAmens: number;
 };
 type DemoBlock = { blockId: string; authorKey: string; displayName: string; createdAt: string };
 
@@ -214,28 +243,33 @@ function minutesAgo(now: number, minutes: number): string {
   return new Date(now - minutes * 60_000).toISOString();
 }
 
-function seed(now = Date.now()): State {
-  const day = demoDay();
-  const d = (back: number) => Math.max(1, day - back);
-  const maria: Author = { key: 'maria', name: 'Maria (exemplo)' };
-  const joao: Author = { key: 'joao', name: 'João (exemplo)' };
-  const ana: Author = { key: 'ana', name: 'Ana (exemplo)' };
-  const pedro: Author = { key: 'pedro', name: 'Pedro (exemplo)' };
-  const lucas: Author = { key: 'lucas', name: 'Lucas (exemplo)' };
-  const carla: Author = { key: 'carla', name: 'Carla (exemplo)' };
-  const rafael: Author = { key: 'rafael', name: 'Rafael (exemplo)' };
+type SeedContent = { posts: DemoPost[]; comments: DemoComment[] };
 
-  const face = (name: string): AmenFace => ({ name, avatarPath: null, isMine: false });
+/** Pessoas de exemplo: primeiros nomes comuns, INVENTADOS, sem sobrenome; nunca da igreja. */
+const PEOPLE = {
+  marina: { key: 'marina', name: 'Marina' },
+  tiago: { key: 'tiago', name: 'Tiago' },
+  leticia: { key: 'leticia', name: 'Letícia' },
+  felipe: { key: 'felipe', name: 'Felipe' },
+  bruna: { key: 'bruna', name: 'Bruna' },
+  rodrigo: { key: 'rodrigo', name: 'Rodrigo' },
+  camila: { key: 'camila', name: 'Camila' },
+} satisfies Record<string, Author>;
+
+type Person = keyof typeof PEOPLE;
+
+function seedHelpers(now: number) {
+  const face = (who: Person): AmenFace => ({ name: PEOPLE[who].name, avatarPath: null, isMine: false });
   const post = (
     n: number,
-    author: Author,
+    who: Person,
     body: string,
     dayNumber: number | null,
     minutes: number,
     extra: Partial<DemoPost> = {},
   ): DemoPost => ({
     postId: uuid(n),
-    author,
+    author: PEOPLE[who],
     body,
     photoPaths: [],
     dayNumber,
@@ -252,73 +286,172 @@ function seed(now = Date.now()): State {
     otherFaces: [],
     ...extra,
   });
+  const comment = (n: number, postN: number, who: Person, body: string, minutes: number): DemoComment => ({
+    commentId: uuid(n),
+    postId: uuid(postN),
+    author: PEOPLE[who],
+    body,
+    createdAt: minutesAgo(now, minutes),
+    status: 'published',
+    // Amém de outras pessoas no comentário (exemplo): 1 a 3, fixo por comentário.
+    amen: false,
+    otherAmens: (n % 3) + 1,
+  });
+  return { face, post, comment };
+}
 
-  // Números de Amém de DEMONSTRAÇÃO (DEMO_AMEN_NOTE); rostinhos só de nomes "(exemplo)".
+/**
+ * Dia 1 (23/09, primeira manhã da campanha): poucas publicações, de agora há
+ * pouco, sobre começar a leitura (Gênesis), orar e a expectativa. Escritas para
+ * a demonstração: sem citação bíblica (o versículo é só REFERÊNCIA, o app mostra
+ * a tradução aberta), sem texto da igreja. Uma ainda sem Amém. Nenhuma da
+ * própria pessoa.
+ */
+function dayOneContent(now: number): SeedContent {
+  const { face, post, comment } = seedHelpers(now);
   const posts: DemoPost[] = [
-    post(101, maria, 'Hoje separei quinze minutos antes do trabalho para ler. Parece pouco, mas mudou o tom do meu dia.', d(0), 12, {
-      kind: 'leitura',
-      otherAmens: 12,
-      otherFaces: [face('Carla (exemplo)'), face('João (exemplo)'), face('Rafael (exemplo)')],
-    }),
-    post(102, joao, 'Estou orando pela minha família todos os dias desta semana. Quem quiser, ore comigo também.', d(0), 55, {
-      kind: 'oracao',
-      otherAmens: 23,
-      otherFaces: [face('Rafael (exemplo)'), face('Ana (exemplo)'), face('Maria (exemplo)')],
-    }),
-    // Versículo: só a REFERÊNCIA (Salmos 119:105). O app mostra o texto da tradução aberta do aparelho.
-    post(103, ana, 'Confesso que atrasei um dia, mas voltei. Ler junto com a igreja me ajuda a não desistir.', d(1), 60 * 20, {
-      kind: 'versiculo',
-      verse: { book: 'PSA', chapter: 119, verseStart: 105, verseEnd: null },
-      otherAmens: 7,
-      otherFaces: [face('Pedro (exemplo)'), face('Lucas (exemplo)')],
-    }),
-    post(104, pedro, 'O jejum de ontem foi mais difícil do que eu esperava. Terminei o dia grato e em paz.', d(1), 60 * 26, {
-      kind: 'jejum',
-      otherAmens: 4,
-      otherFaces: [face('Maria (exemplo)')],
-    }),
-    post(105, lucas, 'Comecei a ler com meu filho à noite. Ele faz perguntas em que eu nunca tinha pensado.', d(2), 60 * 45, {
-      otherAmens: 9,
-      otherFaces: [face('Ana (exemplo)'), face('Carla (exemplo)'), face('João (exemplo)')],
-    }),
+    post(
+      101,
+      'marina',
+      'Primeiro dia! Acordei um pouco mais cedo, passei um café e comecei Gênesis. Que bom começar junto com tanta gente.',
+      1,
+      9,
+      { kind: 'leitura', otherAmens: 14, otherFaces: [face('tiago'), face('bruna'), face('felipe')] },
+    ),
+    post(
+      102,
+      'tiago',
+      'Antes de abrir a leitura, orei pela nossa igreja e pelas famílias que começam hoje. Quem quiser, ore comigo.',
+      1,
+      26,
+      { kind: 'oracao', otherAmens: 21, otherFaces: [face('leticia'), face('marina'), face('rodrigo')] },
+    ),
+    // Versículo: só a REFERÊNCIA (Gênesis 1:1). O texto é o da tradução aberta do aparelho.
+    post(
+      103,
+      'leticia',
+      'Reler o começo de tudo logo no primeiro dia teve um peso diferente. Quero começar estes 100 dias com Deus.',
+      1,
+      47,
+      {
+        kind: 'versiculo',
+        verse: { book: 'GEN', chapter: 1, verseStart: 1, verseEnd: null },
+        otherAmens: 8,
+        otherFaces: [face('camila'), face('tiago')],
+      },
+    ),
+    post(
+      104,
+      'felipe',
+      'Nunca li a Bíblia inteira. Desta vez vou com calma, um dia de cada vez. Se eu atrasar, volto e continuo.',
+      1,
+      68,
+      { otherAmens: 11, otherFaces: [face('marina'), face('bruna'), face('camila')] },
+    ),
+    post(
+      105,
+      'rodrigo',
+      'Separei um caderno só para anotar os pedidos de oração destes 100 dias. Quero ver como ele vai estar em dezembro.',
+      1,
+      94,
+      { kind: 'oracao' },
+    ),
     // Para "o ministério de quem está vendo": só aparece com ministério no perfil (F6).
-    post(107, carla, 'Nosso ministério vai orar junto hoje às 21h, cada um da sua casa.', null, 90, {
+    post(107, 'camila', 'Pessoal do ministério: hoje à noite vamos orar juntos, cada um da sua casa, às 21h.', 1, 35, {
       kind: 'oracao',
       audience: 'ministerio',
       otherAmens: 5,
-      otherFaces: [face('Rafael (exemplo)'), face('Pedro (exemplo)')],
+      otherFaces: [face('rodrigo'), face('felipe')],
+    }),
+  ];
+  const comments: DemoComment[] = [
+    comment(201, 101, 'bruna', 'Também comecei hoje cedo. Vamos juntas até o fim!', 5),
+    comment(202, 102, 'rodrigo', 'Orando com você.', 20),
+    comment(203, 104, 'camila', 'Um dia de cada vez. Estamos juntos nessa.', 60),
+  ];
+  return { posts, comments };
+}
+
+/** Outros dias: um feed "em andamento" (o dia N e os dois anteriores). */
+function runningContent(now: number, day: number): SeedContent {
+  const { face, post, comment } = seedHelpers(now);
+  const d = (back: number) => Math.max(1, day - back);
+  const posts: DemoPost[] = [
+    post(
+      101,
+      'marina',
+      'Hoje separei quinze minutos antes do trabalho para ler. Parece pouco, mas mudou o tom do meu dia.',
+      d(0),
+      12,
+      { kind: 'leitura', otherAmens: 12, otherFaces: [face('camila'), face('tiago'), face('rodrigo')] },
+    ),
+    post(
+      102,
+      'tiago',
+      'Estou orando pela minha família todos os dias desta semana. Quem quiser, ore comigo também.',
+      d(0),
+      55,
+      { kind: 'oracao', otherAmens: 23, otherFaces: [face('rodrigo'), face('leticia'), face('marina')] },
+    ),
+    // Versículo: só a REFERÊNCIA (Salmos 119:105). O app mostra o texto da tradução aberta do aparelho.
+    post(
+      103,
+      'leticia',
+      'Confesso que atrasei um dia, mas voltei. Ler junto com a igreja me ajuda a não desistir.',
+      d(1),
+      60 * 20,
+      {
+        kind: 'versiculo',
+        verse: { book: 'PSA', chapter: 119, verseStart: 105, verseEnd: null },
+        otherAmens: 7,
+        otherFaces: [face('felipe'), face('bruna')],
+      },
+    ),
+    post(104, 'felipe', 'O jejum de ontem foi mais difícil do que eu esperava. Terminei o dia grato e em paz.', d(1), 60 * 26, {
+      kind: 'jejum',
+      otherAmens: 4,
+      otherFaces: [face('marina')],
+    }),
+    post(
+      105,
+      'bruna',
+      'Comecei a ler com meu filho à noite. Ele faz perguntas em que eu nunca tinha pensado.',
+      d(2),
+      60 * 45,
+      { otherAmens: 9, otherFaces: [face('leticia'), face('camila'), face('tiago')] },
+    ),
+    // Para "o ministério de quem está vendo": só aparece com ministério no perfil (F6).
+    post(107, 'camila', 'Nosso ministério vai orar junto hoje às 21h, cada um da sua casa.', null, 90, {
+      kind: 'oracao',
+      audience: 'ministerio',
+      otherAmens: 5,
+      otherFaces: [face('rodrigo'), face('felipe')],
     }),
   ];
   // A própria pessoa: um exemplo de publicação que ficou "em análise" (só ela vê).
   // Some no modo "pessoa nova" (EXPO_PUBLIC_DEMO_SEED=false): quem acabou de entrar não publicou nada.
   if (process.env.EXPO_PUBLIC_DEMO_SEED !== 'false') {
     posts.push(
-      post(106, { key: 'me', name: '' }, 'Exemplo de publicação em análise: é assim que aparece um texto que a equipe da igreja ainda vai olhar.', d(1), 60 * 3, {
-        publishedAt: null,
-        status: 'in_review',
-        holdReason: 'termo',
-      }),
+      post(
+        106,
+        'marina',
+        'Exemplo de publicação em análise: é assim que aparece um texto que a equipe da igreja ainda vai olhar.',
+        d(1),
+        60 * 3,
+        { author: { key: 'me', name: '' }, publishedAt: null, status: 'in_review', holdReason: 'termo' },
+      ),
     );
   }
-
   const comments: DemoComment[] = [
-    {
-      commentId: uuid(201),
-      postId: uuid(101),
-      author: carla,
-      body: 'Que bom! Vou tentar fazer o mesmo amanhã cedo.',
-      createdAt: minutesAgo(now, 8),
-      status: 'published',
-    },
-    {
-      commentId: uuid(202),
-      postId: uuid(102),
-      author: rafael,
-      body: 'Estou orando também. Força para vocês.',
-      createdAt: minutesAgo(now, 40),
-      status: 'published',
-    },
+    comment(201, 101, 'camila', 'Que bom! Vou tentar fazer o mesmo amanhã cedo.', 8),
+    comment(202, 102, 'rodrigo', 'Estou orando também. Força para vocês.', 40),
   ];
+  return { posts, comments };
+}
+
+function seed(now = Date.now()): State {
+  const day = demoDay();
+  const { posts, comments } = day === 1 ? dayOneContent(now) : runningContent(now, day);
 
   return {
     member: false,
@@ -468,10 +601,9 @@ function diaryOf(s: State, p: DemoPost): DiaryFields {
   };
 }
 
-/** "Maria (exemplo)" → "maria": o rostinho some quando a pessoa de exemplo está bloqueada. */
+/** "Letícia" → "leticia" (a chave da pessoa de exemplo): o rostinho some quando ela está bloqueada. */
 function faceKey(name: string): string {
   return name
-    .replace(/ \(exemplo\)$/, '')
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase();
@@ -649,6 +781,8 @@ function createDemoCommunityApi(): CommunityApi {
           createdAt: c.createdAt,
           authorName: authorName(s, c.author),
           isMine: isMe(c.author),
+          amenCount: c.status === 'published' ? c.otherAmens + (c.amen ? 1 : 0) : 0,
+          iSaidAmen: c.amen,
         }));
     },
 
@@ -708,12 +842,12 @@ function createDemoCommunityApi(): CommunityApi {
       if (!hold) {
         // Para mostrar o sino (F8): alguém de exemplo diz Amém no que acabou de sair.
         created.otherAmens = 1;
-        created.otherFaces = [{ name: 'Maria (exemplo)', avatarPath: null, isMine: false }];
+        created.otherFaces = [{ name: DEMO_FIRST_AMEN_NAME, avatarPath: null, isMine: false }];
         s.activity.unshift({
           activityId: newId(s),
           postId: created.postId,
           kind: 'amen',
-          actorName: 'Maria (exemplo)',
+          actorName: DEMO_FIRST_AMEN_NAME,
           at: stamp(s),
           preview: null,
           unread: true,
@@ -762,6 +896,8 @@ function createDemoCommunityApi(): CommunityApi {
         body: cleaned,
         createdAt: stamp(s),
         status: holdFor(cleaned) ? 'in_review' : 'published',
+        amen: false,
+        otherAmens: 0,
       };
       s.comments.push(comment);
       return { id: comment.commentId, status: comment.status };
@@ -787,6 +923,31 @@ function createDemoCommunityApi(): CommunityApi {
       // O número e o meu rostinho (F3) saem de diaryOf: marcar soma 1 e põe o meu rosto na frente.
       post.amen = amen;
       return post.amen;
+    },
+
+    /** Amém no comentário: as mesmas regras do servidor (marcar pede consentimento; desmarcar é livre). */
+    async setCommentAmen(commentId: string, amen: boolean) {
+      const s = current();
+      requireMember(s);
+      const comment = s.comments.find((c) => c.commentId === requireId(commentId));
+      if (!amen) {
+        if (comment) comment.amen = false;
+        return false;
+      }
+      requireConsent(s);
+      const post = comment ? s.posts.find((p) => p.postId === comment.postId) : undefined;
+      if (
+        !comment ||
+        comment.status !== 'published' ||
+        blockedKeys(s).has(comment.author.key) ||
+        !post ||
+        post.status !== 'published' ||
+        !audienceAllows(s, post)
+      ) {
+        throw communityError('invalid_input');
+      }
+      comment.amen = true;
+      return true;
     },
 
     async report(input: ReportTarget & { person?: boolean; reason: ReportReason; details?: string | null }) {
@@ -844,6 +1005,7 @@ function createDemoCommunityApi(): CommunityApi {
       s.posts = s.posts.filter((p) => !isMe(p.author));
       s.comments = s.comments.filter((c) => !isMe(c.author));
       for (const p of s.posts) p.amen = false;
+      for (const c of s.comments) c.amen = false;
       s.activity = [];
     },
 
@@ -858,6 +1020,7 @@ function createDemoCommunityApi(): CommunityApi {
       s.posts = s.posts.filter((p) => !isMe(p.author));
       s.comments = s.comments.filter((c) => !isMe(c.author));
       for (const p of s.posts) p.amen = false;
+      for (const c of s.comments) c.amen = false;
       s.activity = [];
       s.blocks = [];
     },

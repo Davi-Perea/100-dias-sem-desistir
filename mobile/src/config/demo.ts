@@ -11,6 +11,13 @@ import { isDevBuild } from '@/journey/devBuild';
  *     EXPO_PUBLIC_DEMO_MODE=true
  *     EXPO_PUBLIC_DEMO_DAY=3        # opcional; padrão 3
  *
+ * "Um desconhecido instala no dia 23" (pedido do fundador, 2026-09-23): o
+ * .env.local da prévia é DEMO_DAY=1, DEMO_SEED=false, COMMUNITY_ENABLED=true e
+ * DEMO_FRESH_RUN=dia-23-desconhecido — Dia 1, sem progresso nenhum, sem
+ * publicação própria, começando das boas-vindas. No Dia 1 não há dia anterior,
+ * então nada fica "em aberto". A tela não diz que é demonstração; o CÓDIGO diz
+ * (tudo aqui e em community/demoApi.ts só existe em __DEV__).
+ *
  * O que ele faz:
  * - o dia da campanha vira EXPO_PUBLIC_DEMO_DAY, pelo mesmo caminho do dia
  *   simulado do painel DEV (useJourney), mas SEM gravar nas preferências: ao

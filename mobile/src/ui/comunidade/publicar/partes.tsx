@@ -1,11 +1,9 @@
-import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Keyboard, Platform, Text, View } from 'react-native';
 
 import { AppText, Block, Button, StateView, useFace } from '@/ui/components';
 import { Icon } from '@/ui/icons';
 import { goBackOrHome } from '@/ui/BackBar';
-import { COMMUNITY_ENTRY_ROUTE } from '@/ui/comunidade/perfil/routes';
 import { MIN_TOUCH, type Palette, faces, spacing, useTheme } from '@/ui/theme';
 
 import { audienceSentence, type TermsDocument } from './textos';
@@ -142,34 +140,31 @@ export function useKeyboardVisible(): boolean {
 /* ------------------------------------------------- estados sem formulário */
 
 /**
- * Tudo o que não é o formulário: carregando, Comunidade desligada, sem conta,
- * erro do servidor, sem perfil, suspenso. Sempre com uma saída.
+ * Tudo o que não é o formulário: carregando (inclusive entrando sozinho no
+ * Juntos), desligado nesta build, erro do servidor, suspenso. Sempre com uma
+ * saída. Não existe mais 'entre na comunidade' nem 'crie o seu perfil': quem
+ * abre já está dentro (2026-09-22).
  */
 export function CommunityGateView({
   state,
   step,
 }: {
   state: CommunityStatusState & { reload: () => void };
-  step?: 'needs_join' | 'blocked' | 'profile' | 'cannot_publish';
+  step?: 'needs_join' | 'blocked';
 }) {
   const back = <Button title="Voltar" variant="outline" onPress={goBackOrHome} testID="gate-back" />;
-  if (state.kind === 'loading') return <StateView kind="loading" />;
+  if (state.kind === 'loading' || step === 'needs_join') return <StateView kind="loading" />;
   if (state.kind === 'unavailable') {
-    return <StateView kind="empty" icon="community" title="Comunidade" message={state.message} action={back} />;
+    return <StateView kind="empty" icon="community" title="Juntos" message={state.message} action={back} />;
   }
-  if (state.kind === 'signed_out') {
+  if (step === 'blocked' || (state.kind === 'error' && state.code === 'blocked_from_community')) {
     return (
       <StateView
         kind="empty"
-        icon="community"
-        title="Entre na comunidade"
-        message="Para escrever para a igreja, entre na comunidade. Basta criar o seu perfil; não precisa de e-mail."
-        action={
-          <View style={{ gap: spacing.sm, alignSelf: 'stretch' }}>
-            <Button title="Entrar na comunidade" onPress={() => router.push(COMMUNITY_ENTRY_ROUTE)} testID="gate-sign-in" />
-            <Button title="Agora não" variant="underline" onPress={goBackOrHome} />
-          </View>
-        }
+        icon="lock"
+        title="Participação suspensa"
+        message="Sua participação no Juntos está suspensa. Sua leitura e o seu progresso continuam funcionando."
+        action={back}
       />
     );
   }
@@ -189,42 +184,7 @@ export function CommunityGateView({
       />
     );
   }
-  if (step === 'needs_join') {
-    return (
-      <StateView
-        kind="empty"
-        icon="community"
-        title="Entre na comunidade"
-        message="Para participar, crie o seu perfil. Quem cria o perfil entra na comunidade."
-        action={
-          <View style={{ gap: spacing.sm, alignSelf: 'stretch' }}>
-            <Button title="Criar meu perfil" onPress={() => router.push(COMMUNITY_ENTRY_ROUTE)} testID="gate-join" />
-            <Button title="Agora não" variant="underline" onPress={goBackOrHome} testID="gate-back" />
-          </View>
-        }
-      />
-    );
-  }
-  if (step === 'blocked') {
-    return (
-      <StateView
-        kind="empty"
-        icon="lock"
-        title="Participação suspensa"
-        message="Sua participação na comunidade está suspensa."
-        action={back}
-      />
-    );
-  }
-  return (
-    <StateView
-      kind="empty"
-      icon="lock"
-      title="Publicação indisponível"
-      message="Antes de publicar, leia e aceite as regras e o consentimento."
-      action={back}
-    />
-  );
+  return <StateView kind="loading" />;
 }
 
 /** Faixa de aviso (texto pendente ou desatualizado): `warningSurface` + `warning` (5,00:1 / 8,91:1). */

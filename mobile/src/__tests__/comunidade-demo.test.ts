@@ -20,6 +20,7 @@ const ENV_KEYS = [
   'EXPO_PUBLIC_COMMUNITY_ENABLED',
   'EXPO_PUBLIC_SUPABASE_URL',
   'EXPO_PUBLIC_SUPABASE_ANON_KEY',
+  'EXPO_PUBLIC_DEMO_SEED',
 ] as const;
 const ORIGINAL_ENV = Object.fromEntries(ENV_KEYS.map((k) => [k, process.env[k]]));
 
@@ -39,6 +40,8 @@ function load(env: Partial<Record<(typeof ENV_KEYS)[number], string>>): { api: A
 
 const DEMO_ENV = { EXPO_PUBLIC_DEMO_MODE: 'true', EXPO_PUBLIC_COMMUNITY_ENABLED: 'true', EXPO_PUBLIC_DEMO_DAY: '3' };
 const SHA = 'ab'.repeat(32);
+/** Pessoas de exemplo: primeiros nomes inventados, sem sobrenome (demoApi.ts). */
+const EXAMPLE_NAMES = ['Marina', 'Tiago', 'Letícia', 'Felipe', 'Bruna', 'Rodrigo', 'Camila'];
 /** JPEG mínimo sem metadados (SOI, DQT curto, SOS). */
 const CLEAN_JPEG = Uint8Array.from([0xff, 0xd8, 0xff, 0xdb, 0x00, 0x04, 0x00, 0x00, 0xff, 0xda, 0x00, 0x02]);
 
@@ -145,18 +148,18 @@ describe('comunidade de demonstração em memória', () => {
     await expect(api.getStatus()).resolves.toMatchObject({ isMember: true, memberStatus: 'active', displayName: 'Davi' });
   });
 
-  it('feed com 5 publicações de exemplo, nomes fictícios marcados, sem foto; Amém de demonstração só com rostos "(exemplo)"', async () => {
+  it('feed com 5 publicações de exemplo, primeiros nomes inventados sem "(exemplo)" na tela, sem foto', async () => {
     const { api } = await join();
     const page = await api.feedPage();
     expect(page.posts).toHaveLength(5);
     expect(page.ended).toBe(true);
     expect(page.nextCursor).toBeNull();
     for (const post of page.posts) {
-      expect(post.authorName).toMatch(/ \(exemplo\)$/);
+      expect(EXAMPLE_NAMES).toContain(post.authorName);
       expect(post.photoPath).toBeNull();
       expect(post.isMine).toBe(false);
       expect(post.amenCount).toBeGreaterThan(0);
-      for (const face of post.amenFaces ?? []) expect(face.name).toMatch(/ \(exemplo\)$/);
+      for (const face of post.amenFaces ?? []) expect(EXAMPLE_NAMES).toContain(face.name);
       expect(post.audience).toBe('igreja');
     }
     // F1: tipos variados; o versículo é só a referência.
@@ -252,23 +255,23 @@ describe('comunidade de demonstração em memória', () => {
   it('F3: meu Amém soma 1 e põe o meu rosto na frente; desmarcar volta', async () => {
     const { api } = await join();
     await consent(api);
-    const maria = (await api.feedPage()).posts.find((p) => p.authorName === 'Maria (exemplo)')!;
-    await api.setAmen(maria.postId, true);
-    const after = (await api.feedPage()).posts.find((p) => p.postId === maria.postId)!;
-    expect(after.amenCount).toBe((maria.amenCount ?? 0) + 1);
+    const marina = (await api.feedPage()).posts.find((p) => p.authorName === 'Marina')!;
+    await api.setAmen(marina.postId, true);
+    const after = (await api.feedPage()).posts.find((p) => p.postId === marina.postId)!;
+    expect(after.amenCount).toBe((marina.amenCount ?? 0) + 1);
     expect(after.amenFaces?.[0]).toMatchObject({ name: 'Davi', isMine: true });
     expect(after.amenFaces).toHaveLength(3);
-    await api.setAmen(maria.postId, false);
-    expect((await api.feedPage()).posts.find((p) => p.postId === maria.postId)?.amenCount).toBe(maria.amenCount);
+    await api.setAmen(marina.postId, false);
+    expect((await api.feedPage()).posts.find((p) => p.postId === marina.postId)?.amenCount).toBe(marina.amenCount);
   });
 
   it('F3: quem eu bloqueio sai dos rostinhos e da contagem', async () => {
     const { api } = await join();
-    const before = (await api.feedPage()).posts.find((p) => p.authorName === 'Maria (exemplo)')!;
-    const joao = (await api.feedPage()).posts.find((p) => p.authorName === 'João (exemplo)')!;
-    await api.blockAuthor({ postId: joao.postId });
+    const before = (await api.feedPage()).posts.find((p) => p.authorName === 'Marina')!;
+    const tiago = (await api.feedPage()).posts.find((p) => p.authorName === 'Tiago')!;
+    await api.blockAuthor({ postId: tiago.postId });
     const after = (await api.feedPage()).posts.find((p) => p.postId === before.postId)!;
-    expect(after.amenFaces?.map((f) => f.name)).not.toContain('João (exemplo)');
+    expect(after.amenFaces?.map((f) => f.name)).not.toContain('Tiago');
     expect(after.amenCount).toBe((before.amenCount ?? 0) - 1);
   });
 
@@ -304,7 +307,7 @@ describe('comunidade de demonstração em memória', () => {
     const post = await api.createPost({ kind: 'jejum' });
     const activity = await api.myActivity();
     expect(activity).toEqual([
-      expect.objectContaining({ kind: 'amen', postId: post.id, actorName: 'Maria (exemplo)', unread: true }),
+      expect.objectContaining({ kind: 'amen', postId: post.id, actorName: 'Marina', unread: true }),
     ]);
     await expect(api.getStatus()).resolves.toMatchObject({ hasNewActivity: true });
     await api.markActivitySeen();
@@ -315,26 +318,26 @@ describe('comunidade de demonstração em memória', () => {
   it('Amém devolve só o meu estado; comentários funcionam', async () => {
     const { api } = await join();
     await consent(api);
-    const maria = (await api.feedPage()).posts.find((p) => p.authorName === 'Maria (exemplo)')!;
-    await expect(api.setAmen(maria.postId, true)).resolves.toBe(true);
-    expect((await api.feedPage()).posts.find((p) => p.postId === maria.postId)?.iSaidAmen).toBe(true);
-    const before = await api.postComments(maria.postId);
+    const marina = (await api.feedPage()).posts.find((p) => p.authorName === 'Marina')!;
+    await expect(api.setAmen(marina.postId, true)).resolves.toBe(true);
+    expect((await api.feedPage()).posts.find((p) => p.postId === marina.postId)?.iSaidAmen).toBe(true);
+    const before = await api.postComments(marina.postId);
     expect(before).toHaveLength(1);
-    const created = await api.createComment(maria.postId, 'Que bom ler isso.');
+    const created = await api.createComment(marina.postId, 'Que bom ler isso.');
     expect(created.status).toBe('published');
-    const after = await api.postComments(maria.postId);
+    const after = await api.postComments(marina.postId);
     expect(after.map((c) => c.isMine)).toEqual([false, true]);
     await api.deleteComment(created.id);
-    await expect(api.postComments(maria.postId)).resolves.toHaveLength(1);
+    await expect(api.postComments(marina.postId)).resolves.toHaveLength(1);
   });
 
   it('bloquear esconde tudo de quem escreveu; desbloquear devolve', async () => {
     const { api } = await join();
-    const joao = (await api.feedPage()).posts.find((p) => p.authorName === 'João (exemplo)')!;
-    await api.blockAuthor({ postId: joao.postId });
+    const tiago = (await api.feedPage()).posts.find((p) => p.authorName === 'Tiago')!;
+    await api.blockAuthor({ postId: tiago.postId });
     expect((await api.feedPage()).posts).toHaveLength(4);
     const blocks = await api.myBlocks();
-    expect(blocks).toEqual([expect.objectContaining({ displayName: 'João (exemplo)' })]);
+    expect(blocks).toEqual([expect.objectContaining({ displayName: 'Tiago' })]);
     await api.unblock(blocks[0].blockId);
     expect((await api.feedPage()).posts).toHaveLength(5);
   });
@@ -358,5 +361,70 @@ describe('comunidade de demonstração em memória', () => {
     await expect(api.myPosts()).rejects.toMatchObject({ code: 'needs_join' });
     demo.demoSignOut();
     expect(demo.getDemoSession()).toBeNull();
+  });
+});
+
+describe('prévia "um desconhecido instala no dia 23" (EXPO_PUBLIC_DEMO_DAY=1)', () => {
+  function dayOne(env: Record<string, string> = {}) {
+    g.__DEV__ = true;
+    const { demo } = load({ ...DEMO_ENV, EXPO_PUBLIC_DEMO_DAY: '1', ...env });
+    demo._resetDemoForTests(Date.parse('2026-09-23T10:30:00Z'));
+    const api = demo.getDemoCommunityApi()!;
+    demo.demoSignIn();
+    return { api, demo };
+  }
+
+  it('poucas publicações do Dia 1, recentes, sobre começar; sem nada da própria pessoa', async () => {
+    const { api } = dayOne();
+    await api.joinCommunity({ displayName: 'Davi' });
+    const page = await api.feedPage();
+    expect(page.posts).toHaveLength(5);
+    const now = Date.parse('2026-09-23T10:30:00Z');
+    for (const post of page.posts) {
+      expect(post.dayNumber).toBe(1);
+      expect(EXAMPLE_NAMES).toContain(post.authorName);
+      expect(post.authorName).not.toMatch(/exemplo|\s/i);
+      expect(post.isMine).toBe(false);
+      expect(post.photoPath).toBeNull();
+      // Da última hora e meia: a primeira manhã da campanha.
+      expect(now - Date.parse(post.publishedAt)).toBeLessThanOrEqual(2 * 60 * 60_000);
+      // Nada de dias anteriores nem de "atraso" no primeiro dia.
+      expect(post.body ?? '').not.toMatch(/ontem|atrasei|semana passada/i);
+    }
+    expect(page.posts.some((p) => /Gênesis/.test(p.body ?? ''))).toBe(true);
+    // Versículo: só a referência, do começo de Gênesis.
+    expect(page.posts.find((p) => p.kind === 'versiculo')?.verse).toEqual({
+      book: 'GEN',
+      chapter: 1,
+      verseStart: 1,
+      verseEnd: null,
+    });
+    // Alguns com Amém; um ainda sem.
+    expect(page.posts.filter((p) => (p.amenCount ?? 0) > 0).length).toBeGreaterThanOrEqual(3);
+    expect(page.posts.some((p) => (p.amenCount ?? 0) === 0)).toBe(true);
+    // Alguns com comentário.
+    const withComments = page.posts.filter((p) => (p.commentCount ?? 0) > 0);
+    expect(withComments.length).toBeGreaterThanOrEqual(2);
+    for (const c of await api.postComments(withComments[0].postId)) expect(EXAMPLE_NAMES).toContain(c.authorName);
+    await expect(api.myPosts()).resolves.toEqual([]);
+  });
+
+  it('mesmo sem EXPO_PUBLIC_DEMO_SEED=false, o Dia 1 não traz publicação própria', async () => {
+    const { api } = dayOne({ EXPO_PUBLIC_DEMO_SEED: 'true' });
+    await api.joinCommunity({ displayName: 'Davi' });
+    await expect(api.myPosts()).resolves.toEqual([]);
+  });
+
+  it('nenhuma etiqueta de demonstração vai para a tela (só o código sabe)', () => {
+    const { demo } = dayOne();
+    expect(demo.DEMO_LABELS_ON_SCREEN).toBe(false);
+    expect(demo.DEMO_FIRST_AMEN_NAME).not.toMatch(/exemplo/i);
+    expect(EXAMPLE_NAMES).toContain(demo.DEMO_FIRST_AMEN_NAME);
+  });
+
+  it('continua só em desenvolvimento: em release o Dia 1 de exemplo não existe', () => {
+    g.__DEV__ = false;
+    const { demo } = load({ ...DEMO_ENV, EXPO_PUBLIC_DEMO_DAY: '1' });
+    expect(demo.getDemoCommunityApi()).toBeNull();
   });
 });

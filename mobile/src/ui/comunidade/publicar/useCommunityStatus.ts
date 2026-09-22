@@ -5,20 +5,20 @@ import Constants from 'expo-constants';
 import { getCommunityApi, type CommunityApi } from '@/community/api';
 import { communityError, toCommunityError } from '@/community/errors';
 import type { CommunityStatus } from '@/community/types';
-import { useCommunitySession } from '@/community/useCommunitySession';
+import { useAutoEnter, useCommunitySession } from '@/community/useCommunitySession';
 
 /**
  * Estado da Comunidade para as telas de publicar, regras e consentimento.
  *
- * Nunca inventa dado: sem a Comunidade ligada nesta build, sem nuvem, sem conta
- * ou sem resposta do servidor, a tela recebe um estado honesto para mostrar.
+ * Nunca inventa dado: sem a Comunidade ligada nesta build, sem nuvem ou sem
+ * resposta do servidor, a tela recebe um estado honesto para mostrar. Sem conta
+ * ou sem ser membro, entra sozinha (`useAutoEnter`, aba "Juntos") e espera em
+ * "carregando".
  */
 export type CommunityStatusState =
   /** COMMUNITY_ENABLED desligado ou nuvem não configurada: o cliente não existe. */
   | { kind: 'unavailable'; message: string }
   | { kind: 'loading' }
-  /** Sem sessão (nem a conta ligada ao aparelho): a tela oferece "Entrar na comunidade". */
-  | { kind: 'signed_out' }
   | { kind: 'error'; message: string; code: string }
   | { kind: 'ready'; status: CommunityStatus; api: CommunityApi };
 
@@ -63,9 +63,23 @@ export function useCommunityStatus(): CommunityStatusState & { reload: () => voi
     };
   }, [api, userId, key, silent]);
 
+  const current = result && result.key === key && 'status' in result ? result.status : null;
+  const entry = useAutoEnter({
+    api,
+    session,
+    needsJoin: current !== null && !current.isMember && current.memberStatus === null,
+    isMember: current?.isMember === true,
+    onJoined: reload,
+  });
+  const retryEntry = entry.retry;
+  const retry = useCallback(() => {
+    retryEntry();
+    reload();
+  }, [retryEntry, reload]);
+
   if (!api) return { kind: 'unavailable', message: communityError('feature_disabled').message, reload };
-  if (session.loading) return { kind: 'loading', reload };
-  if (!session.signedIn) return { kind: 'signed_out', reload };
+  if (entry.error) return { kind: 'error', message: entry.error.message, code: entry.error.code, reload: retry };
+  if (session.loading || !session.signedIn) return { kind: 'loading', reload };
   if (!result || result.key !== key) return { kind: 'loading', reload };
   if ('error' in result) return { kind: 'error', ...result.error, reload };
   return { kind: 'ready', status: result.status, api, reload };

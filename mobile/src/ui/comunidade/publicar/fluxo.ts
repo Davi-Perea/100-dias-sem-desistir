@@ -1,32 +1,36 @@
 import type { CommunityStatus, ContentStatus } from '@/community/types';
+import { cleanText } from '@/community/validation';
 
 /**
- * Ordem das telas antes da primeira publicação ou comentário: perfil completo
- * (foto, nome, ministério e 16+, feedback de 2026-09-22 C1/C4) → regras (rolar
- * até o fim + "Li e aceito", rascunho legal §1) → consentimento destacado (§2)
- * → a ação. O Amém não passa pelo perfil (ninguém vê quem deu Amém). Puro, para
- * testar sem tela.
+ * Antes da primeira publicação, comentário ou Amém (pedido do fundador de
+ * 2026-09-22, aba “Juntos”): UMA tela só, com a confirmação de 16+ (ECA
+ * Digital), o aceite das regras (Google Play), o consentimento destacado (LGPD
+ * art. 11) e o nome, se a pessoa ainda não deu um. Foto de perfil e ministério
+ * NÃO são mais exigidos. Ler não passa por aqui.
  */
+export function needsAceite(status: CommunityStatus): boolean {
+  return (
+    status.needsRules ||
+    status.needsPublishConsent ||
+    !status.profile.ageConfirmed ||
+    !cleanText(status.displayName ?? status.profile.displayName)
+  );
+}
+
+/** Onde a tela de publicar está. Puro, para testar sem tela. */
 export type PublishStep =
-  /** Ainda não entrou na comunidade (não criou o perfil; sem código desde o C3). */
+  /** Ainda não entrou (a entrada é automática; a tela espera). */
   | 'needs_join'
   /** Participação suspensa ou removida. */
   | 'blocked'
-  /** Falta foto, nome, ministério ou a confirmação de 16+ (o servidor recusa com CM007). */
-  | 'profile'
-  | 'rules'
-  | 'consent'
-  | 'form'
-  /** Membro ativo, textos aceitos, e ainda assim o servidor diz que não pode publicar. */
-  | 'cannot_publish';
+  /** Falta a tela única de aceite (16+, regras, consentimento, nome). */
+  | 'aceite'
+  | 'form';
 
 export function publishStep(status: CommunityStatus): PublishStep {
-  if (!status.isMember) return 'needs_join';
+  if (!status.isMember) return status.memberStatus ? 'blocked' : 'needs_join';
   if (status.memberStatus !== 'active') return 'blocked';
-  if (!status.profileComplete) return 'profile';
-  if (status.needsRules) return 'rules';
-  if (status.needsPublishConsent) return 'consent';
-  if (!status.canPublish) return 'cannot_publish';
+  if (needsAceite(status)) return 'aceite';
   return 'form';
 }
 
@@ -34,8 +38,10 @@ export const ROUTES = {
   publicar: '/comunidade/publicar',
   consentimento: '/comunidade/consentimento',
   regras: '/comunidade/regras',
-  /** Perfil da comunidade (foto, nome, ministério, bio, 16+ e e-mail opcional). */
+  /** Perfil da comunidade (nome, bio, foto e ministério opcionais, e-mail opcional). */
   perfil: '/comunidade/perfil',
+  /** A aba Juntos (o feed). */
+  juntos: '/juntos',
 } as const;
 
 /**
@@ -87,7 +93,7 @@ export type Sent = { status: ContentStatus; hadPhoto: boolean };
 /** O que a pessoa lê depois de enviar. "Em análise" só o autor vê. */
 export function sentCopy(sent: Sent): { title: string; message: string } {
   if (sent.status === 'published') {
-    return { title: 'Publicado', message: 'Sua publicação já aparece na comunidade.' };
+    return { title: 'Publicado', message: 'Sua publicação já aparece no Juntos.' };
   }
   if (sent.hadPhoto) {
     return {

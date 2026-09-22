@@ -47,9 +47,9 @@ export default function CommunityProfileScreen() {
         <StateView
           kind="empty"
           icon="community"
-          title="Entre na comunidade primeiro"
-          message="Crie o seu perfil para entrar na comunidade. Não precisa de e-mail nem de código."
-          action={<Button title="Entrar na comunidade" onPress={() => router.replace(COMMUNITY_ENTRY_ROUTE)} />}
+          title="Abra o Juntos primeiro"
+          message="Ao abrir o Juntos você já está dentro. Não precisa de e-mail nem de código."
+          action={<Button title="Abrir o Juntos" onPress={() => router.replace(COMMUNITY_ENTRY_ROUTE)} />}
         />
       </ProfileScreen>
     );

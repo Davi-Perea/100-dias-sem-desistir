@@ -4,7 +4,6 @@ import { View } from 'react-native';
 import { Dove } from '@/ui/brand';
 import {
   AppText,
-  Block,
   Button,
   IconCircle,
   LoadingCaption,
@@ -83,7 +82,7 @@ export function FeedEmpty({ day, firstDay, ministry = false }: { day: number; fi
  * de parada). Não há rolagem infinita: a página seguinte só vem por toque.
  */
 export function FeedEnd({ ministry = false }: { ministry?: boolean } = {}) {
-  const where = ministry ? 'do seu ministério' : 'da comunidade';
+  const where = ministry ? 'do seu ministério' : 'da igreja';
   return (
     <View
       testID="feed-end"
@@ -103,9 +102,10 @@ export function FeedEnd({ ministry = false }: { ministry?: boolean } = {}) {
 }
 
 /**
- * Tudo o que vem antes do feed: sem servidor, sem conta, sem perfil, suspensa
- * ou erro ao perguntar o estado. Cada um diz o que é e dá uma saída; nenhum
- * mostra feed falso nem código técnico.
+ * Tudo o que não é o feed: sem servidor, suspensa ou erro ao entrar ou ao
+ * perguntar o estado. Cada um diz o que é e dá uma saída; nenhum mostra feed
+ * falso nem código técnico. Não há "entrar" nem "criar perfil": a entrada no
+ * Juntos é automática (2026-09-22) e, enquanto acontece, a tela é o esqueleto.
  */
 export function GateView({ gate, onRetry }: { gate: Exclude<CommunityGate, { kind: 'ready' | 'loading' }>; onRetry: () => void }) {
   switch (gate.kind) {
@@ -116,40 +116,11 @@ export function GateView({ gate, onRetry }: { gate: Exclude<CommunityGate, { kin
           inset="vertical"
           testID="gate-no-server"
           glyph={<IconCircle name="community" />}
-          title="A comunidade não está ligada nesta versão"
-          message="Esta versão do app não está conectada ao servidor da comunidade. Sua leitura, seu progresso e as suas reflexões continuam funcionando."
+          title="O Juntos não está ligado nesta versão"
+          message="Esta versão do app não está conectada ao servidor do Juntos. Sua leitura, seu progresso e as suas reflexões continuam funcionando."
         >
           <Button title="Ir para a Jornada" variant="outline" onPress={() => router.navigate(COMMUNITY_ROUTES.jornada)} style={{ alignSelf: 'stretch' }} />
         </StateLayout>
-      );
-    case 'signed_out':
-      return (
-        <Block tone="warm" testID="gate-signed-out">
-          <View style={{ gap: spacing.md }}>
-            <AppText variant="blockTitle" accessibilityRole="header">
-              Leia junto com a igreja
-            </AppText>
-            <AppText variant="bodySm">
-              Para entrar, basta criar o seu perfil. Não precisa de e-mail nem de senha. Sua leitura, seu progresso e
-              as suas reflexões continuam funcionando sem isso.
-            </AppText>
-            <Button title="Entrar na comunidade" onPress={() => router.push(COMMUNITY_ROUTES.entrar)} testID="gate-sign-in" />
-          </View>
-        </Block>
-      );
-    case 'not_member':
-      return (
-        <Block tone="warm" testID="gate-not-member">
-          <View style={{ gap: spacing.md }}>
-            <AppText variant="blockTitle" accessibilityRole="header">
-              Crie o seu perfil para entrar
-            </AppText>
-            <AppText variant="bodySm">
-              Quem cria o perfil entra na comunidade e vê as publicações. Sem ele, a sua jornada continua igual.
-            </AppText>
-            <Button title="Criar meu perfil" onPress={() => router.push(COMMUNITY_ROUTES.entrar)} testID="gate-create-profile" />
-          </View>
-        </Block>
       );
     case 'suspended':
       return (
@@ -159,7 +130,7 @@ export function GateView({ gate, onRetry }: { gate: Exclude<CommunityGate, { kin
           testID="gate-suspended"
           glyph={<IconCircle name="lock" />}
           title="Sua participação está suspensa"
-          message="Você não pode ler nem escrever na comunidade por enquanto. Sua leitura, seu progresso e as suas reflexões continuam funcionando."
+          message="Você não pode ler nem escrever no Juntos por enquanto. Sua leitura, seu progresso e as suas reflexões continuam funcionando."
         >
           <Button title="Ir para a Jornada" variant="outline" onPress={() => router.navigate(COMMUNITY_ROUTES.jornada)} style={{ alignSelf: 'stretch' }} />
         </StateLayout>
@@ -169,7 +140,7 @@ export function GateView({ gate, onRetry }: { gate: Exclude<CommunityGate, { kin
   }
 }
 
-/** F5 dentro da comunidade: uma saída sempre, nenhum código técnico. */
+/** F5 dentro do Juntos: uma saída sempre, nenhum código técnico. */
 export function FeedError({ message, onRetry, testID = 'feed-error' }: { message: string; onRetry: () => void; testID?: string }) {
   return (
     <StateLayout

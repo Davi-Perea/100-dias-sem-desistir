@@ -1,95 +1,81 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
 import { useState } from 'react';
-import { ScrollView, View } from 'react-native';
+import { KeyboardAvoidingView, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { DEMO_TERMS_NOTICE } from '@/community/demoApi';
+import { DEMO_LABELS_ON_SCREEN, DEMO_TERMS_NOTICE } from '@/community/demoApi';
+import { useSettings } from '@/settings/settingsStore';
 import { BackBar, goBackOrHome } from '@/ui/BackBar';
-import { AppText, Button, LoadingCaption, Screen } from '@/ui/components';
-import { availabilityNotice, continueFlow, useTermsAcceptance } from '@/ui/comunidade/publicar/aceite';
-import { COMMUNITY_ENTRY_ROUTE } from '@/ui/comunidade/perfil/routes';
-import { flowParams, parseDay, ROUTES, safeNext } from '@/ui/comunidade/publicar/fluxo';
-import { NoticeBand, TermsBody } from '@/ui/comunidade/publicar/partes';
-import { consentDocument } from '@/ui/comunidade/publicar/textos';
+import { AppText, Block, Button, LoadingCaption, Screen } from '@/ui/components';
+import {
+  aceiteNeeds,
+  availabilityNotice,
+  continueAfterAceite,
+  markAceite,
+  nameOk,
+  useAceite,
+} from '@/ui/comunidade/publicar/aceite';
+import { AgeCheck, NameField } from '@/ui/comunidade/perfil/PerfilCampos';
+import { parseDay, ROUTES, safeNext } from '@/ui/comunidade/publicar/fluxo';
+import { CommunityGateView, NoticeBand, RichText, TermsBody } from '@/ui/comunidade/publicar/partes';
+import { aceiteDocument, RULES_SUMMARY, rulesDocument } from '@/ui/comunidade/publicar/textos';
 import { useCommunityStatus } from '@/ui/comunidade/publicar/useCommunityStatus';
-import { BRAND_YELLOW, MAX_CONTENT_WIDTH, fixedPalette, spacing, useGutter } from '@/ui/theme';
+import { MAX_CONTENT_WIDTH, spacing, useGutter, useTheme } from '@/ui/theme';
 
 /**
- * C4 · Consentimento destacado, antes da primeira publicação.
+ * Tela ÚNICA de aceite do Juntos (pedido do fundador, 2026-09-22). Aparece só
+ * na primeira interação que expõe a pessoa (primeira publicação, primeiro
+ * comentário ou primeiro Amém), nunca para ler. Nela, e só nela:
  *
- * Superfície FIXA em tinta (TOKENS §2): as cores não mudam com o tema, e por
- * isso vêm de `fixedPalette('ink')` (texto branco 18,88:1, secundário 10,84:1,
- * marcador amarelo 12,92:1). Texto do rascunho legal §2, com a frase única de
- * quem vê (§3). Nada começa marcado: sem tocar no botão, nada é aceito.
+ *   - o consentimento destacado (LGPD art. 11, I), num bloco próprio, com a
+ *     frase exata de quem vê;
+ *   - as regras em quatro linhas, com o link para ler as completas (Google Play,
+ *     conteúdo gerado por usuários);
+ *   - "Tenho 16 anos ou mais" (ECA Digital), sem nada marcado de antemão;
+ *   - o nome, só se ela ainda não deu um (o da entrada do app vem preenchido).
  *
- * O aceite envia a versão do servidor e o sha256 do texto exato mostrado. Se a
- * versão ainda for PENDENTE, a tela diz que a publicação não foi liberada pela
- * igreja e não oferece o botão. Pede de novo quando o texto muda (o servidor
- * devolve `needs_publish_consent` para a versão nova), por isso não existe "uma
- * vez na vida".
+ * Um botão só: "Concordo e continuar". Depois, a pessoa volta exatamente para a
+ * ação que queria (o Amém é registrado, o comentário e o post continuam onde
+ * estavam). "Agora não" volta sem nada enviado. Foto de perfil e ministério não
+ * são pedidos.
  *
- * "Guardar só para mim" → B5 do dia (nada é enviado); sem dia, volta.
+ * Parâmetros: `next` (rota do Juntos para onde seguir) e `day` (repassado).
  */
-export default function ConsentScreen() {
+export default function AceiteScreen() {
   const params = useLocalSearchParams<{ next?: string; day?: string }>();
   const next = safeNext(params.next);
   const day = parseDay(params.day);
-  const colors = fixedPalette('ink');
+  const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const inset = useGutter();
+  const settings = useSettings();
   const state = useCommunityStatus();
-  const [doc] = useState(() => consentDocument());
-  const { availability, accept, busy, error, demo } = useTermsAcceptance(doc, state);
+  const [docs] = useState(() => ({ rules: rulesDocument(), consent: aceiteDocument() }));
+  const { availability, accept, busy, error, demo } = useAceite(docs, state);
+  const [age, setAge] = useState(false);
+  const [typedName, setTypedName] = useState<string | null>(null);
 
-  const keepForMe = () => {
-    if (day !== null) router.replace({ pathname: '/reflexao/[day]', params: { day: String(day) } });
-    else goBackOrHome();
+  const ready = state.kind === 'ready' ? state : null;
+  const needs = ready ? aceiteNeeds(ready.status) : null;
+  // O nome da entrada do app já vem escrito; a pessoa pode trocar.
+  const name = typedName ?? settings?.profile.name ?? '';
+  const notice = availability ? availabilityNotice(availability) : null;
+
+  const leave = () => {
+    markAceite('declined');
+    goBackOrHome();
   };
 
   const onAccept = async () => {
-    if (await accept()) continueFlow({ after: 'consent', needsPublishConsent: false, next, day });
+    if (await accept({ name })) continueAfterAceite({ next, day });
   };
 
-  const notice = availability ? availabilityNotice(availability) : null;
-  const rulesPending = state.kind === 'ready' && state.status.needsRules;
+  const canAccept =
+    needs !== null && (!needs.age || age) && (!needs.name || nameOk(name)) && availability === 'ready' && !busy;
 
   const action = (() => {
-    if (state.kind === 'loading') return <LoadingCaption />;
-    if (state.kind === 'unavailable') return <NoticeBand text={state.message} colors={colors} testID="consent-notice" />;
-    if (state.kind === 'signed_out') {
-      // C6: antes era só um aviso, sem saída. Agora leva à entrada (sem e-mail).
-      return (
-        <Button
-          title="Entrar na comunidade"
-          variant="yellow"
-          tone="ink"
-          onPress={() => router.push(COMMUNITY_ENTRY_ROUTE)}
-          testID="consent-enter"
-        />
-      );
-    }
-    if (state.kind === 'error') {
-      return (
-        <View style={{ gap: spacing.sm }}>
-          <NoticeBand text={state.message} colors={colors} testID="consent-notice" />
-          <Button title="Tentar de novo" variant="outline" tone="ink" onPress={state.reload} />
-        </View>
-      );
-    }
+    if (state.kind !== 'ready') return <CommunityGateView state={state} />;
     if (notice) return <NoticeBand text={notice} colors={colors} testID="consent-notice" />;
-    if (rulesPending) {
-      // As regras vêm antes (rascunho §1). Chegar aqui sem elas é link direto.
-      return (
-        <Button
-          title="Ler as regras primeiro"
-          variant="yellow"
-          tone="ink"
-          onPress={() => router.replace({ pathname: ROUTES.regras, params: flowParams(next, day) })}
-          testID="consent-rules-first"
-        />
-      );
-    }
     return (
       <View style={{ gap: spacing.sm }}>
         {error ? (
@@ -104,11 +90,11 @@ export default function ConsentScreen() {
           </AppText>
         ) : null}
         <Button
-          title="Concordo e quero publicar"
-          variant="yellow"
-          tone="ink"
+          title="Concordo e continuar"
           onPress={onAccept}
           loading={busy}
+          disabled={!canAccept}
+          accessibilityHint={canAccept || busy ? undefined : hintFor(needs, age, name)}
           testID="consent-accept"
         />
       </View>
@@ -116,57 +102,86 @@ export default function ConsentScreen() {
   })();
 
   return (
-    <Screen tone="ink">
-      <StatusBar style="light" />
-      <View style={{ paddingHorizontal: inset - spacing.sm }}>
-        <BackBar label="Voltar" tone="ink" />
-      </View>
-      <ScrollView
-        testID="consent-scroll"
-        style={{ flex: 1 }}
-        contentContainerStyle={{
-          paddingHorizontal: inset,
-          paddingTop: spacing.md,
-          paddingBottom: insets.bottom + spacing.xxl,
-          gap: spacing.xl,
-          width: '100%',
-          maxWidth: MAX_CONTENT_WIDTH + inset * 2,
-          alignSelf: 'center',
-        }}
-      >
-        <AppText
-          variant="display"
-          accessibilityRole="header"
-          // C4: Schibsted 800 36/40 −1,4 em branco.
-          style={{ fontSize: 36, lineHeight: 40, letterSpacing: -1.4, color: colors.text }}
-          testID="consent-title"
-        >
-          {doc.title}
-        </AppText>
-        {notice && state.kind === 'ready' ? (
-          <NoticeBand text={notice} colors={colors} testID="consent-top-notice" />
-        ) : null}
-        {demo ? <NoticeBand text={DEMO_TERMS_NOTICE} colors={colors} testID="consent-demo-notice" /> : null}
-        <TermsBody doc={doc} colors={colors} marker={BRAND_YELLOW} />
-        <Button
-          title="Regras da comunidade"
-          variant="underline"
-          tone="ink"
-          onPress={() => router.push({ pathname: ROUTES.regras, params: { ler: '1' } })}
-          testID="consent-read-rules"
-        />
-        <View style={{ gap: spacing.md, paddingTop: spacing.md }}>
-          {action}
-          <Button
-            title="Guardar só para mim"
-            variant="underline"
-            tone="ink"
-            onPress={keepForMe}
-            accessibilityHint="Nada é enviado."
-            testID="consent-keep"
-          />
+    <Screen>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding" keyboardVerticalOffset={insets.top}>
+        <View style={{ paddingHorizontal: inset - spacing.sm }}>
+          <BackBar label="Voltar" onBack={leave} />
         </View>
-      </ScrollView>
+        <ScrollView
+          testID="consent-scroll"
+          style={{ flex: 1 }}
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={{
+            paddingHorizontal: inset,
+            paddingTop: spacing.md,
+            paddingBottom: insets.bottom + spacing.xxl,
+            gap: spacing.xl,
+            width: '100%',
+            maxWidth: MAX_CONTENT_WIDTH + inset * 2,
+            alignSelf: 'center',
+          }}
+        >
+          <AppText variant="display" accessibilityRole="header" testID="consent-title">
+            {docs.consent.title}
+          </AppText>
+          {demo && DEMO_LABELS_ON_SCREEN ? (
+            <NoticeBand text={DEMO_TERMS_NOTICE} colors={colors} testID="consent-demo-notice" />
+          ) : null}
+
+          {/* O consentimento destacado, num bloco só dele (LGPD art. 11, I). */}
+          <Block tone="warm" testID="consent-block">
+            <TermsBody doc={docs.consent} colors={colors} marker={colors.text} />
+          </Block>
+
+          <View style={{ gap: spacing.md }} testID="consent-rules">
+            <AppText variant="readingRef" accessibilityRole="header">
+              Regras do Juntos
+            </AppText>
+            {RULES_SUMMARY.map((line, index) => (
+              <View key={index} style={{ flexDirection: 'row', gap: spacing.md, alignItems: 'flex-start' }}>
+                <View
+                  aria-hidden
+                  style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: colors.text, marginTop: 9 }}
+                />
+                <View style={{ flex: 1 }}>
+                  <RichText text={line} color={colors.text} variant="item" serif={false} />
+                </View>
+              </View>
+            ))}
+            <Button
+              title="Ler as regras completas"
+              variant="underline"
+              onPress={() => router.push({ pathname: ROUTES.regras, params: { ler: '1' } })}
+              style={{ alignSelf: 'flex-start' }}
+              testID="consent-read-rules"
+            />
+          </View>
+
+          {needs?.name ? (
+            <View style={{ gap: spacing.sm }} testID="consent-name">
+              <AppText variant="readingRef" accessibilityRole="header">
+                Seu nome
+              </AppText>
+              <AppText variant="bodySm">É como a igreja vai te ver. Não precisa ser o nome completo.</AppText>
+              <NameField value={name} onChange={setTypedName} />
+            </View>
+          ) : null}
+
+          {needs?.age ? <AgeCheck checked={age} onToggle={() => setAge((value) => !value)} /> : null}
+
+          <View style={{ gap: spacing.md }}>
+            {state.kind === 'loading' ? <LoadingCaption /> : action}
+            <Button title="Agora não" variant="underline" onPress={leave} testID="consent-not-now" />
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </Screen>
   );
+}
+
+function hintFor(needs: ReturnType<typeof aceiteNeeds> | null, age: boolean, name: string): string | undefined {
+  if (!needs) return undefined;
+  if (needs.age && !age) return 'Marque "Tenho 16 anos ou mais" para continuar.';
+  if (needs.name && !nameOk(name)) return 'Escreva o seu nome para continuar.';
+  return undefined;
 }

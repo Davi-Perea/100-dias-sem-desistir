@@ -22,13 +22,14 @@ export const EMPTY_PROFILE: CommunityProfile = {
   newsOptIn: false,
 };
 
+/**
+ * Juntos (2026-09-23): para participar bastam nome e 16+. Foto de perfil e
+ * ministério ficam opcionais (o tipo ainda os conhece para a tela de perfil).
+ */
 export function profileGaps(profile: CommunityProfile): ProfileGap[] {
   const gaps: ProfileGap[] = [];
-  const photoOk = profile.avatarPath !== null && (profile.avatarStatus === 'in_review' || profile.avatarStatus === 'approved');
-  if (!photoOk) gaps.push('foto');
   if (!cleanText(profile.displayName)) gaps.push('nome');
   if (!profile.ageConfirmed) gaps.push('idade');
-  if (!profile.ministryAnswered) gaps.push('ministerio');
   return gaps;
 }
 
@@ -48,7 +49,7 @@ export function gapsSentence(gaps: ProfileGap[]): string | null {
   if (gaps.length === 0) return null;
   const labels = gaps.map((gap) => GAP_LABEL[gap]);
   const list = labels.length === 1 ? labels[0] : `${labels.slice(0, -1).join(', ')} e ${labels[labels.length - 1]}`;
-  return `Para publicar, falta: ${list}.`;
+  return `Para participar, falta: ${list}.`;
 }
 
 /**

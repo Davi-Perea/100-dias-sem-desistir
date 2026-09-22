@@ -163,16 +163,18 @@ describe('flag por variável de ambiente', () => {
 });
 
 describe('barra de abas', () => {
-  test('desligada: igual à V1 (Jornada · Bíblia · Você), sem Comunidade', async () => {
+  test('desligada: igual à V1 (Jornada · Bíblia · Você), sem Juntos', async () => {
     await render(<TabsLayout />);
     expect(tabLabels()).toEqual(['Jornada', 'Bíblia', 'Você']);
-    expect(screen.queryByLabelText('Comunidade')).toBeNull();
+    expect(screen.queryByLabelText('Juntos')).toBeNull();
   });
 
-  test('ligada: a Comunidade entra entre Bíblia e Você', async () => {
+  test('ligada: o Juntos (não "Comunidade") entra entre Bíblia e Você, com o mesmo nome para o leitor de tela', async () => {
     mockEnabled = true;
     await render(<TabsLayout />);
-    expect(tabLabels()).toEqual(['Jornada', 'Bíblia', 'Comunidade', 'Você']);
+    expect(tabLabels()).toEqual(['Jornada', 'Bíblia', 'Juntos', 'Você']);
+    expect(screen.getByLabelText('Juntos')).toBeTruthy();
+    expect(screen.queryByText('Comunidade')).toBeNull();
   });
 });
 
