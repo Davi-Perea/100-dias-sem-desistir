@@ -54,13 +54,30 @@ type Props = {
 };
 
 /**
- * Amém: Phosphor `hand`, a mão aberta levantada (`bold` = desmarcado, `fill` =
- * marcado), de @phosphor-icons/core 2.1.1 (assets/bold/hand-bold.svg e
- * assets/fill/hand-fill.svg), lidos em 2026-09-23 em
- * https://cdn.jsdelivr.net/npm/@phosphor-icons/core@2.1.1/. Troca de
- * `hands-praying` a pedido do fundador (2026-09-23): no tamanho do cartão as mãos
- * em oração "não parecem uma mão"; a mão levantada é o gesto de louvor e se lê
- * como mão de relance.
+ * Amém: Phosphor `hands-praying`, as DUAS MÃOS em oração, de
+ * @phosphor-icons/core 2.1.1 (assets/bold/hands-praying-bold.svg e
+ * assets/fill/hands-praying-fill.svg), lidos em
+ * https://cdn.jsdelivr.net/npm/@phosphor-icons/core@2.1.1/.
+ *
+ * Volta a ser a mão de oração a pedido do fundador (2026-09-22): a mão aberta que
+ * estava aqui não foi reconhecida, e "duas mãos / oração" é o gesto conhecido.
+ *
+ * Qual dos dois desenhos usar a 24 px (a caixa é 256, então 1 px de tela = 10,67
+ * unidades):
+ *   - `bold` é o CONTORNO: cada mão é um contorno fechado com o vinco interno e a
+ *     faixa do punho. A parede mais fina do contorno mede ~20 unidades = 1,9 px a
+ *     24 — o mesmo peso do traço de 2 px do resto do conjunto — e o vão entre as
+ *     duas mãos fica em ~10 unidades = 0,94 px, que é o que faz "duas mãos" ainda
+ *     se lerem como duas, e não como uma folha.
+ *   - `fill` é o MESMO desenho cheio: as duas mãos viram uma silhueta só, separadas
+ *     apenas pelo V central. Perde a contagem das mãos, mas ganha peso — é o que
+ *     se quer de um estado marcado, e é a mesma forma, então marcado e desmarcado
+ *     não trocam de desenho, só de peso.
+ *   - `regular` (parede de ~16 unidades = 1,5 px) ficaria mais fino que todos os
+ *     outros ícones da tela e some ao lado do balão de comentário.
+ * Por isso: desmarcado = `bold` (contorno), marcado = `fill` (cheio). O estado
+ * também vai em `accessibilityState.checked`, nunca só na forma ou na cor.
+ *
  * É vetor: segue a cor do token nos dois temas (o PNG antigo só invertia por filtro).
  *
  * MIT License. Copyright (c) 2023 Phosphor Icons.
@@ -80,9 +97,9 @@ type Props = {
  * THE SOFTWARE.
  */
 const AMEN_BOLD =
-  'M188,44a32,32,0,0,0-8,1V44a32,32,0,0,0-60.79-14A32,32,0,0,0,76,60v50.83a32,32,0,0,0-52,36.7C55.82,214.6,75.35,244,128,244a92.1,92.1,0,0,0,92-92V76A32,32,0,0,0,188,44Zm8,108a68.08,68.08,0,0,1-68,68c-35.83,0-49.71-14-82.48-83.14-.14-.29-.29-.58-.45-.86a8,8,0,0,1,13.85-8l.21.35,18.68,30A12,12,0,0,0,100,152V60a8,8,0,0,1,16,0v60a12,12,0,0,0,24,0V44a8,8,0,0,1,16,0v76a12,12,0,0,0,24,0V76a8,8,0,0,1,16,0Z';
+  'M238.15,177.18l-35.53-35.53L166.45,22.3A25.75,25.75,0,0,0,128,8,25.75,25.75,0,0,0,89.55,22.3L53.38,141.65,17.85,177.18a20,20,0,0,0,0,28.28l32.69,32.69a20,20,0,0,0,28.28,0l48.29-48.28c.31-.31.6-.62.89-.94.29.32.58.63.89.94l48.29,48.28a20,20,0,0,0,28.28,0l32.69-32.69A20,20,0,0,0,238.15,177.18ZM64.68,218.35l-27-27,11-11,27,27ZM116,158.75a19.85,19.85,0,0,1-5.86,14.14L92.68,190.35l-27-27,6.83-6.83a11.94,11.94,0,0,0,3-5l37-122.23a1.78,1.78,0,0,1,3.48.52Zm47.5,31.78-17.64-17.64A19.85,19.85,0,0,1,140,158.75v-129a1.78,1.78,0,0,1,3.48-.52l37,122.23a11.94,11.94,0,0,0,3,5l7.6,7.6Zm27.82,27.82-10.85-10.84,27.63-26.44,10.25,10.25Z';
 const AMEN_FILL =
-  'M216,64v90.93c0,46.2-36.85,84.55-83,85.06A83.71,83.71,0,0,1,72.6,215.4C50.79,192.33,26.15,136,26.15,136a16,16,0,0,1,6.53-22.23c7.66-4,17.1-.84,21.4,6.62l21,36.44a6.09,6.09,0,0,0,6,3.09l.12,0A8.19,8.19,0,0,0,88,151.74V48a16,16,0,0,1,16.77-16c8.61.4,15.23,7.82,15.23,16.43V112a8,8,0,0,0,8.53,8,8.17,8.17,0,0,0,7.47-8.25V32a16,16,0,0,1,16.77-16c8.61.4,15.23,7.82,15.23,16.43V120a8,8,0,0,0,8.53,8,8.17,8.17,0,0,0,7.47-8.25V64.45c0-8.61,6.62-16,15.23-16.43A16,16,0,0,1,216,64Z';
+  'M235.32,180l-36.24-36.25L162.62,23.46A21.76,21.76,0,0,0,128,12.93,21.76,21.76,0,0,0,93.38,23.46L56.92,143.76,20.68,180a16,16,0,0,0,0,22.62l32.69,32.69a16,16,0,0,0,22.63,0L124.28,187a40.68,40.68,0,0,0,3.72-4.29,40.68,40.68,0,0,0,3.72,4.29L180,235.32a16,16,0,0,0,22.63,0l32.69-32.69A16,16,0,0,0,235.32,180ZM120,158.75a23.85,23.85,0,0,1-7,17L88.68,200,56,167.32l13.65-13.66a8,8,0,0,0,2-3.34l37-122.22A5.78,5.78,0,0,1,120,29.78Zm47.44,41.38L143,175.72a23.85,23.85,0,0,1-7-17v-129a5.78,5.78,0,0,1,11.31-1.68l37,122.22a8,8,0,0,0,2,3.34l14.49,14.49Z';
 
 // Traço de 2px (TOKENS §5, "Ícones"); 2,5 no cadeado.
 export function Icon({ name, size = 22, color, strokeWidth = 2, cutout = 'transparent' }: Props) {

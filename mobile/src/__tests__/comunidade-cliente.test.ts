@@ -492,7 +492,9 @@ describe('diário compartilhado (F1, F3, F5, F6, F8 — 2026-09-22)', () => {
     return { name: 'FunctionsHttpError', context: { status, json: async () => body } };
   }
 
-  test('F1: tipo, dia, versículo (só a referência) e público vão para a RPC', async () => {
+  // 2026-09-22: acabou o público por ministério. O que a tela pedir é ignorado e
+  // o post vai para a igreja inteira (o servidor recusa o resto com 22023).
+  test('F1: tipo, dia e versículo (só a referência) vão para a RPC, sempre para a igreja inteira', async () => {
     const { community, rpc } = api({ create_community_post: { data: [{ post_id: POST, status: 'published' }] } });
     await community.createPost({
       body: ' Deus falou comigo ',
@@ -510,7 +512,7 @@ describe('diário compartilhado (F1, F3, F5, F6, F8 — 2026-09-22)', () => {
       post_verse_chapter: 3,
       post_verse_start: 16,
       post_verse_end: 17,
-      post_audience: 'ministerio',
+      post_audience: 'igreja',
     });
   });
 
@@ -584,12 +586,15 @@ describe('diário compartilhado (F1, F3, F5, F6, F8 — 2026-09-22)', () => {
     await expectCode(expired.community.createPost({ photoPaths: [PHOTO_A] }), 'session_expired');
   });
 
-  test('F6: escopo "ministério" do feed', async () => {
+  test('um feed só: a RPC nunca recebe feed_scope, nem quando a tela antiga pede escopo', async () => {
     const { community, rpc } = api({ community_feed: { data: [] } });
     await community.feedPage(null, { scope: 'ministerio' });
-    expect(rpc).toHaveBeenCalledWith('community_feed', { feed_scope: 'ministerio' });
-    await community.feedPage(null, { scope: 'igreja' });
-    expect(rpc).toHaveBeenLastCalledWith('community_feed', {});
+    expect(rpc).toHaveBeenCalledWith('community_feed', {});
+    await community.feedPage({ beforePublishedAt: '2026-09-23T10:00:00Z', beforePost: POST });
+    expect(rpc).toHaveBeenLastCalledWith('community_feed', {
+      before_published_at: '2026-09-23T10:00:00Z',
+      before_post: POST,
+    });
   });
 
   test('F1/F3/F6: campos novos do feed, lidos com segurança', async () => {

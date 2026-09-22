@@ -140,7 +140,11 @@ function count(value: unknown): number {
   return typeof value === 'number' && Number.isFinite(value) && value > 0 ? Math.floor(value) : 0;
 }
 
-/** Campos do diário compartilhado (F1, F3, F6). 'livre' vira kind null. */
+/**
+ * Campos do diário compartilhado (F1, F3). 'livre' vira kind null.
+ * `audience` é sempre 'igreja' no que foi publicado depois de 2026-09-22; só
+ * linha antiga ainda volta como 'ministerio'.
+ */
 function toDiary(row: Row): DiaryFields {
   const audience: FeedScope = row.audience === 'ministerio' ? 'ministerio' : 'igreja';
   const amenFaces = toFaces(row.amen_faces);
@@ -275,6 +279,7 @@ export const SUBMIT_POST_FUNCTION = 'submit-post';
 /**
  * Argumentos de create_community_post (e do corpo de submit-post), validados no
  * aparelho com as mesmas regras do servidor (que confere tudo de novo).
+ * `post_audience` é sempre 'igreja' (2026-09-22): o servidor recusa o resto.
  */
 export function postArgs(input: NewPost): Record<string, unknown> {
   const post = normalizeNewPost(input, isPhotoPath);
@@ -412,15 +417,18 @@ export function createCommunityApi(client: CommunityClient, deps: { randomUUID: 
     },
 
     /**
-     * Primeira página sem cursor; as seguintes com o nextCursor da anterior.
-     * scope 'igreja' (padrão) = tudo o que eu posso ver; 'ministerio' = só o que
-     * foi publicado para o meu ministério (F6).
+     * O feed da igreja inteira. Primeira página sem cursor; as seguintes com o
+     * nextCursor da anterior.
+     *
+     * Desde 2026-09-22 existe um feed só: o escopo por ministério acabou e a RPC
+     * não tem mais `feed_scope`. O segundo argumento continua sendo ACEITO e
+     * IGNORADO só para a tela que ainda tem o seletor compilar enquanto ele não
+     * sai (ver "pedidos"); some junto com ele.
      */
-    async feedPage(cursor?: FeedCursor | null, options: { scope?: FeedScope } = {}): Promise<FeedPage> {
+    async feedPage(cursor?: FeedCursor | null, _legacyOptions?: { scope?: FeedScope }): Promise<FeedPage> {
       const args: Record<string, unknown> = cursor
         ? { before_published_at: cursor.beforePublishedAt, before_post: cursor.beforePost }
         : {};
-      if (options.scope === 'ministerio') args.feed_scope = 'ministerio';
       return toFeedPage(await call('community_feed', args));
     },
 
@@ -464,8 +472,8 @@ export function createCommunityApi(client: CommunityClient, deps: { randomUUID: 
     },
 
     /**
-     * Publica o post do dia (F1): tipo, texto, até 4 fotos (já enviadas com
-     * uploadPhoto), dia da campanha, versículo (só a referência) e público (F6).
+     * Publica o post do dia (F1) para a igreja inteira: tipo, texto, até 4 fotos
+     * (já enviadas com uploadPhoto), dia da campanha e versículo (só a referência).
      *
      * Sem foto: RPC direta; texto limpo volta 'published'. Com foto: submit-post,
      * que passa as fotos pelo filtro automático (F5) e devolve 'published' se tudo

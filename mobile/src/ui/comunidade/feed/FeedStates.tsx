@@ -52,8 +52,8 @@ export function FeedSkeleton({ gutter }: { gutter: number }) {
  * quer dizer alguma coisa". Isso depende da ponte B4 existir nesta build; a
  * frase aqui só convida, sem prometer o que outra tela faz.
  */
-export function FeedEmpty({ day, firstDay, ministry = false }: { day: number; firstDay: boolean; ministry?: boolean }) {
-  const title = ministry ? 'Ninguém do seu ministério escreveu ainda.' : firstDay ? 'Hoje começa.' : 'Ninguém escreveu ainda.';
+export function FeedEmpty({ day, firstDay }: { day: number; firstDay: boolean }) {
+  const title = firstDay ? 'Hoje começa.' : 'Ninguém escreveu ainda.';
   return (
     <StateLayout
       kind="empty"
@@ -62,7 +62,7 @@ export function FeedEmpty({ day, firstDay, ministry = false }: { day: number; fi
       glyph={<Dove width={84} />}
       title={title}
       message={
-        firstDay && !ministry
+        firstDay
           ? 'Ninguém escreveu nada ainda — o primeiro dia é assim. Quando terminar a leitura de hoje, conte aqui o que ficou com você. Pode ser a sua a primeira.'
           : 'Quando terminar a leitura de hoje, conte aqui o que ficou com você. Pode ser a sua a primeira.'
       }
@@ -81,8 +81,8 @@ export function FeedEmpty({ day, firstDay, ministry = false }: { day: number; fi
  * Fim do feed, explícito (ECA Digital / Decreto 12.880: não esconder o ponto
  * de parada). Não há rolagem infinita: a página seguinte só vem por toque.
  */
-export function FeedEnd({ ministry = false }: { ministry?: boolean } = {}) {
-  const where = ministry ? 'do seu ministério' : 'da igreja';
+export function FeedEnd() {
+  const where = 'da igreja';
   return (
     <View
       testID="feed-end"

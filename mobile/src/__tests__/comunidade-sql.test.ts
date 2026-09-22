@@ -47,7 +47,7 @@ function fn(name: string): FnDef {
 const policies = [...sql.matchAll(/create policy[\s\S]*?;/g)].map((m) => m[0]);
 
 describe('arquivos', () => {
-  test('migrations da comunidade depois da fundação (5ª perfil v2, 6ª diário compartilhado, 7ª Amém em comentário, 8ª perfil leve do Juntos) e os pgTAP', () => {
+  test('migrations da comunidade depois da fundação (5ª perfil v2, 6ª diário compartilhado, 7ª Amém em comentário, 8ª perfil leve do Juntos, 9ª igreja inteira) e os pgTAP', () => {
     expect(communityFiles).toEqual([
       '20260921130000_comunidade_tabelas.sql',
       '20260921130100_comunidade_funcoes.sql',
@@ -57,6 +57,7 @@ describe('arquivos', () => {
       '20260922180000_comunidade_diario.sql',
       '20260923040000_comunidade_amem_comentario.sql',
       '20260923050000_comunidade_juntos_perfil_leve.sql',
+      '20260923060000_comunidade_igreja_inteira.sql',
     ]);
     const foundation = allFiles.filter((f) => !f.includes('comunidade'));
     expect(foundation.every((f) => f < communityFiles[0])).toBe(true);
@@ -372,13 +373,24 @@ describe('diário compartilhado (F1, F5, F6, F8 — 2026-09-22)', () => {
     }
   });
 
-  test('F6: a regra de visibilidade confere o público do post (toda a igreja ou o ministério de quem lê)', () => {
+  // F6 SUPERADO em 2026-09-22: acabou o público por ministério.
+  test('igreja inteira: publicar recusa qualquer público que não seja "igreja" e grava sempre "igreja"', () => {
+    const body = fn('private.create_community_post').body;
+    expect(body).toMatch(/if v_audience <> 'igreja' then/);
+    expect(body).toMatch(/using errcode = '22023'/);
+    expect(body).not.toMatch(/into v_ministry/);
+    // A coluna continua na tabela, e a linha ANTIGA de ministério continua restrita.
     expect(fn('private.can_view_post').body).toMatch(
       /private\.audience_allows\(p\.audience, p\.audience_ministry, p\.author_id, viewer\)/,
     );
-    expect(fn('private.create_community_post').body).toMatch(
-      /select cp\.ministry into v_ministry from public\.community_profiles cp where cp\.user_id = v_uid/,
-    );
+    expect(sql).not.toMatch(/drop column audience/);
+  });
+
+  test('igreja inteira: o feed é um só (sem feed_scope)', () => {
+    expect(fn('public.community_feed').header).not.toMatch(/feed_scope/);
+    expect(fn('private.community_feed').body).not.toMatch(/feed_scope/);
+    expect(sql).toContain('drop function public.community_feed(timestamptz, uuid, text);');
+    expect(sql).toMatch(/grant execute on function public\.community_feed\(timestamptz, uuid\) to authenticated;/);
   });
 
   test('F8: a atividade não devolve id de pessoa e respeita o bloqueio; sem push', () => {

@@ -254,11 +254,48 @@ describe('textos', () => {
     expect(termsAvailability(consentDocument(), '2.0')).toBe('mismatch');
   });
 
-  test('o texto que vira hash é estável e muda quando o texto muda', () => {
+  test('o texto que vira hash é estável, e as regras curtas não têm campo em aberto', () => {
     const a = termsDocumentText(rulesDocument());
     expect(termsDocumentText(rulesDocument())).toBe(a);
+    // As regras encurtadas (2026-09-22) não citam mais razão social, CNPJ, prazos
+    // nem endereços: o texto é o mesmo com os campos vazios ou preenchidos.
+    expect(hasOpenFields(a)).toBe(false);
     fillCampos('1.0');
-    expect(termsDocumentText(rulesDocument())).not.toBe(a);
+    expect(termsDocumentText(rulesDocument())).toBe(a);
+    // O portão nunca dependeu dos campos: depende da VERSÃO, e ela continua mandando.
+    expect(termsAvailability(rulesDocument(), '1.0')).toBe('ready');
+    expect(termsAvailability(rulesDocument({ ...CAMPOS, versaoRegras: null }), '1.0')).toBe('pending');
+  });
+
+  test('as regras curtas têm só o que o fundador pediu, e nada do que ele mandou tirar', () => {
+    const doc = rulesDocument();
+    const titles = doc.sections.map((section) => section.title);
+    expect(titles).toEqual([
+      'Um lugar para a igreja ler junto.',
+      'O que pode',
+      'O que não pode',
+      'O que é tirado do ar',
+      'O que você pode fazer',
+      'Em momentos difíceis',
+    ]);
+    // Sem versão e data no título.
+    expect(doc.title).toBe('Regras do Juntos');
+    const text = termsDocumentText(doc);
+    for (const gone of [
+      'Fotos de outras pessoas',
+      'Fotos de crianças e adolescentes',
+      'Como funciona o cuidado com o que é publicado',
+      'Se tirarem o que você publicou',
+      'Quem cuida desta comunidade',
+      'Pedir revisão',
+      'CNPJ',
+    ]) {
+      expect(text).not.toContain(gone);
+    }
+    // As FUNÇÕES continuam escritas: denunciar, bloquear e apagar o meu.
+    expect(text).toContain('Denunciar');
+    expect(text).toContain('bloquear');
+    expect(text).toContain('apagar');
   });
 
   test('negrito do rascunho', () => {
@@ -504,7 +541,7 @@ describe('C3 · Publicar', () => {
     expect(screen.getByTestId('publish-counter-sentence').props.accessibilityLiveRegion).toBe('polite');
   });
 
-  test('foto: aviso de rosto e criança ANTES da galeria; sobe só ao publicar; fica "Em análise"', async () => {
+  test('foto: aviso ANTES da galeria; sobe só ao publicar; "Em análise" só se o filtro segurar', async () => {
     const { rpc, upload } = useFakeApi({
       my_community_status: { data: [statusRow()] },
       create_community_post: { data: [{ post_id: POST, status: 'in_review' }] },
@@ -513,16 +550,25 @@ describe('C3 · Publicar', () => {
     await render(<PublishScreen />);
     await fireEvent.press(await screen.findByTestId('attach-galeria'));
     expect(screen.getByTestId('photo-warning')).toBeTruthy();
-    expect(screen.getByText(/Só publique o rosto de outra pessoa se ela concordou/)).toBeTruthy();
-    expect(screen.getByText(/reconhecer uma criança ou um adolescente/)).toBeTruthy();
+    expect(screen.getByText(/Não exponha outra pessoa/)).toBeTruthy();
+    // REVISÃO FINAL 2026-09-22: o aviso não pode PROMETER que a foto aparece na
+    // hora. Sem MODERATION_PROVIDER o servidor devolve in_review para toda foto,
+    // e a promessa seria desmentida na tela seguinte ("Em análise"). O que ele diz
+    // é verdade nos dois casos, e a localização continua dita em separado.
+    expect(screen.getByText(/passa por uma conferência antes de aparecer para a igreja/)).toBeTruthy();
+    expect(screen.queryByText(/aparece para a igreja assim que você publica/)).toBeNull();
+    expect(screen.getByText(/A localização da foto é apagada no seu celular/)).toBeTruthy();
     expect(mockLaunch).not.toHaveBeenCalled();
 
     await fireEvent.press(screen.getByTestId('photo-pick'));
     await screen.findByTestId('photo-thumb-0');
     // F2: até 4 fotos por post, na ordem da escolha.
+    // `quality` PRECISA ser < 1: em 1 o expo-image-picker devolve o arquivo original
+    // sem decodificar (HEIC com nome .jpeg), e o manipulador não abre — a foto "não carrega".
     expect(mockLaunch).toHaveBeenCalledWith(
       expect.objectContaining({ exif: false, mediaTypes: ['images'], allowsMultipleSelection: true, selectionLimit: 4 }),
     );
+    expect(mockLaunch.mock.calls[0][0].quality).toBeLessThan(1);
     expect(upload).not.toHaveBeenCalled(); // nada sobe na escolha
 
     expect(screen.getByTestId('publish-send').props.accessibilityState.disabled).toBe(false); // só foto basta
@@ -699,7 +745,9 @@ describe('Regras', () => {
   test('só leitura (link "Regras da comunidade"): sem aceite, funciona até sem Comunidade ligada', async () => {
     mockParams = { ler: '1' };
     await render(<RulesScreen />);
-    expect(screen.getByText('Fotos de crianças e adolescentes')).toBeTruthy();
+    expect(screen.getByTestId('rules-title').props.children).toBe('Regras do Juntos');
+    expect(screen.getByText('O que não pode')).toBeTruthy();
+    expect(screen.queryByText('Fotos de crianças e adolescentes')).toBeNull();
     expect(screen.queryByTestId('rules-accept')).toBeNull();
     expect(screen.getByTestId('rules-back')).toBeTruthy();
   });

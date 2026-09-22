@@ -9,9 +9,20 @@ import { MIN_TOUCH, MOTION_MS, spacing, useReducedMotion, useTheme } from '@/ui/
 import { type AmenFace, amenSpoken, MAX_FACES } from './v2';
 
 /**
- * Amém (REGRAS 19 e 33, F3): mão de oração que marca e desmarca, alternando
- * contorno (`bold`) e cheio (`fill`). "Amém" é o nome acessível; o estado vai em
- * `checked`, então a forma e o leitor de tela dizem a mesma coisa, sem cor.
+ * Amém (REGRAS 19 e 33, F3): as DUAS MÃOS em oração, que marcam e desmarcam,
+ * alternando contorno (`bold`) e cheio (`fill`). "Amém" é o nome acessível; o
+ * estado vai em `checked`, então a forma e o leitor de tela dizem a mesma coisa,
+ * sem depender de cor.
+ *
+ * Cor do marcado: `blue`, a cor de marca do Juntos (a mesma do botão "Escrever",
+ * da linha de atividade do cartão e do aviso de quem vê).
+ * CORREÇÃO TÉCNICA sobre "cheio na cor de marca" (pedido de 2026-09-22): o
+ * amarelo da marca mede 1,46:1 sobre o fundo claro do feed — abaixo dos 3:1 que a
+ * WCAG 2.1 (1.4.11) pede para objeto gráfico, e muito abaixo dos 4,5:1 pedidos
+ * aqui: a mão marcada sumiria no tema claro. O azul mede 8,48:1 no claro
+ * (#2A4C86 sobre branco) e 10,47:1 no escuro (#A9C2E8 sobre #111111). O amarelo
+ * continua sendo preenchimento de superfície (`markSurface`/`onMark`), nunca
+ * tinta sobre claro.
  *
  * Movimento: ao marcar, a mão cheia entra com um zoom curto. Com "Reduzir
  * movimento", troca na hora.
@@ -54,7 +65,7 @@ export function AmenButton({
         key={checked ? 'on' : 'off'}
         entering={checked && !reduced ? ZoomIn.duration(MOTION_MS) : undefined}
       >
-        <Icon name={checked ? 'amen-filled' : 'amen'} size={size} color={colors.text} />
+        <Icon name={checked ? 'amen-filled' : 'amen'} size={size} color={checked ? colors.blue : colors.text} />
       </Animated.View>
     </Pressable>
   );

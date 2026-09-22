@@ -69,17 +69,27 @@ export const AVATAR_NOTE: Record<AvatarStatus, string | null> = {
   rejected: 'A foto anterior não foi aprovada. Escolha outra.',
 };
 
+/** Título do passo da foto. É um convite, nunca uma exigência (2026-09-22). */
+export const AVATAR_STEP_TITLE = 'Coloque uma foto';
+export const AVATAR_OPTIONAL_NOTE =
+  'Opcional. Sem foto, aparecem as iniciais do seu nome. Publicar nunca depende dela.';
+
 /** O que vale para a foto de perfil (a mesma regra de toda foto da comunidade). */
 export const AVATAR_RULES = [
   'Use uma foto sua, em que dê para ver o seu rosto.',
   'Sem crianças e sem outras pessoas na foto.',
-  'Antes de aparecer para os outros, uma pessoa da equipe da igreja olha. A localização da foto é apagada no celular, antes de enviar.',
+  'A localização da foto é apagada no celular, antes de enviar.',
 ] as const;
 
 /**
- * Foto de perfil: escolher na galeria, preparar no aparelho (1600 px, JPEG,
- * sem EXIF/XMP/IPTC; `preparePhoto` recusa se sobrar metadado) e enviar. Volta
- * sempre "em análise": só depois da moderação a foto aparece para os outros.
+ * Foto de perfil, OPCIONAL (pedido do fundador, 2026-09-22): um passo "Coloque
+ * uma foto", nunca um portão. Quem não põe aparece com as iniciais, e publicar,
+ * comentar e dizer Amém continuam funcionando igual (`profileGaps` em
+ * community/profile.ts já não conta a foto como falta).
+ *
+ * Escolher na galeria, preparar no aparelho (1600 px, JPEG, sem EXIF/XMP/IPTC;
+ * `preparePhoto` recusa se sobrar metadado) e enviar. O estado que o servidor
+ * devolve é dito como veio (`AVATAR_NOTE`); a tela não promete nada no lugar dele.
  */
 export function AvatarField({
   api,
@@ -133,7 +143,9 @@ export function AvatarField({
               {note}
             </AppText>
           ) : (
-            <AppText variant="bodySm">Sem foto ainda.</AppText>
+            <AppText variant="bodySm" testID="perfil-foto-opcional">
+              {AVATAR_OPTIONAL_NOTE}
+            </AppText>
           )}
         </View>
       </View>
@@ -141,7 +153,7 @@ export function AvatarField({
         <Block tone="warm" testID="perfil-foto-regras">
           <View style={{ gap: spacing.md }}>
             <AppText variant="rowLabel" accessibilityRole="header">
-              Antes de escolher a foto
+              {AVATAR_STEP_TITLE}
             </AppText>
             {AVATAR_RULES.map((line) => (
               <View key={line} style={{ flexDirection: 'row', gap: spacing.md, alignItems: 'flex-start' }}>
@@ -160,7 +172,7 @@ export function AvatarField({
         </Block>
       ) : (
         <Button
-          title={hasPhoto ? 'Trocar a foto' : 'Escolher uma foto'}
+          title={hasPhoto ? 'Trocar a foto' : AVATAR_STEP_TITLE}
           variant="outline"
           onPress={() => setStage('rules')}
           loading={stage === 'working'}

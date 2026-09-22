@@ -6,6 +6,7 @@ import { readingSummary } from '@/journey/readingSummary';
 import { useJourney } from '@/journey/useJourney';
 import { COMMUNITY_ENABLED } from '@/config/features';
 import { isDayCompleted } from '@/progress/completionsStore';
+import { useSettings } from '@/settings/settingsStore';
 import { goBackOrHome } from '@/ui/BackBar';
 import { AppText, Block, Button, Rule, Screen, ScreenScroll } from '@/ui/components';
 import { parseDay, ROUTES } from '@/ui/comunidade/publicar/fluxo';
@@ -31,6 +32,7 @@ export default function AfterReadingScreen() {
   const params = useLocalSearchParams<{ day?: string }>();
   const day = parseDay(params.day);
   const journey = useJourney();
+  const settings = useSettings();
   const { colors } = useTheme();
 
   if (!COMMUNITY_ENABLED || day === null) return <Redirect href="/" />;
@@ -41,6 +43,15 @@ export default function AfterReadingScreen() {
 
   const summary = readingSummary(getDay(day) ?? null);
   const onBlueSoft = { color: colors.onBlueSoft };
+  // Onde a pessoa leu (B3, modo de leitura): quem escolheu a própria Bíblia
+  // conclui pela tela enxuta, e dizer "lido aqui no app" seria mentira sobre o
+  // que ela acabou de fazer. Sem preferência lida ainda, só a referência.
+  const whereRead =
+    settings == null
+      ? null
+      : (settings.lastUsedReadingMode ?? settings.readingMode) === 'own_bible'
+        ? 'lido na sua Bíblia'
+        : 'lido aqui no app';
 
   return (
     <Screen>
@@ -66,7 +77,9 @@ export default function AfterReadingScreen() {
               <AppText variant="action" accessibilityRole="header" style={{ fontSize: 19, lineHeight: 24 }}>
                 {`Dia ${day} concluído`}
               </AppText>
-              {summary ? <AppText variant="caption">{`${summary.label} · lido aqui no app`}</AppText> : null}
+              {summary ? (
+                <AppText variant="caption">{whereRead ? `${summary.label} · ${whereRead}` : summary.label}</AppText>
+              ) : null}
             </View>
           </View>
         </Block>

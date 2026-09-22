@@ -1,5 +1,4 @@
 import type { CommunityApi } from '@/community/api';
-import { ministryLabel } from '@/community/profile';
 import {
   type ActivityItem,
   type AmenFace,
@@ -59,12 +58,6 @@ export function activityLine(
 ): string | null {
   const parts = [kindLabel(kind), verseLabel(verse), dayNumber ? `Dia ${dayNumber}` : null].filter(Boolean);
   return parts.length ? parts.join(' · ') : null;
-}
-
-/** Rótulo do grupo no topo do cartão: "Toda a igreja" ou "Ministério X". */
-export function groupLabel(audience: FeedScope, ministry: string | null): string {
-  if (audience === 'ministerio') return ministryLabel(ministry) ?? 'Meu ministério';
-  return 'Toda a igreja';
 }
 
 function count(value: unknown): number {

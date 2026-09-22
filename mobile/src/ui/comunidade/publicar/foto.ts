@@ -2,6 +2,7 @@ import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import Constants from 'expo-constants';
 import * as ImagePicker from 'expo-image-picker';
 
+import { CommunityError, communityError } from '@/community/errors';
 import { assertPhotoSafeToUpload, PHOTO_JPEG_QUALITY, PHOTO_MAX_DIMENSION } from '@/community/photos';
 
 /**
@@ -20,7 +21,44 @@ import { assertPhotoSafeToUpload, PHOTO_JPEG_QUALITY, PHOTO_MAX_DIMENSION } from
  * pessoa toca em "Câmera", e só se a build declarou o texto de finalidade
  * (`cameraConfigured`). A foto da câmera passa pela MESMA preparação (1600 px,
  * JPEG 0,8, sem EXIF/XMP/IPTC) antes de qualquer envio.
+ *
+ * ---------------------------------------------------------------------------
+ * POR QUE `PICKER_QUALITY` NÃO É 1 ("a foto não carrega", 2026-09-22)
+ *
+ * EVIDÊNCIA (lido no código do pacote instalado, expo-image-picker 57.0.19,
+ * android/src/main/java/expo/modules/imagepicker/MediaHandler.kt, `handleImage`):
+ *
+ *     val exporter = if (options.quality == MAXIMUM_QUALITY) RawImageExporter()
+ *                    else CompressionImageExporter(...)
+ *     val outputFile = createOutputFile(cacheDirectory, mimeType.toImageFileExtension())
+ *
+ * Com `quality: 1` (o valor de `MAXIMUM_QUALITY`) o seletor NÃO decodifica nada:
+ * o `RawImageExporter` copia o arquivo ORIGINAL byte a byte para o cache. E
+ * `String.toImageFileExtension` (ImagePickerUtils.kt) só preserva png/gif/bmp/webp
+ * — todo o resto, `image/heic` e `image/heif` incluídos, vira ".jpeg". Ou seja: o
+ * app recebia um arquivo HEIC com nome .jpeg (foto de iPhone, e de Android com
+ * "economia de espaço"), ainda com o EXIF e o GPS do original, e entregava isso ao
+ * expo-image-manipulator. O decodificador de HEIC depende de versão de sistema e
+ * não existe no Expo Go de muitos aparelhos: `renderAsync` falha, a prévia nunca
+ * aparece e a publicação fica sem foto — "não carrega".
+ *
+ * Sem `quality: 1`, o seletor usa o `CompressionImageExporter`, que decodifica com
+ * o carregador de imagens dele (esse sim abre HEIC) e grava um bitmap comprimido
+ * de verdade. `PICKER_QUALITY` é alto de propósito: quem redimensiona e comprime
+ * para valer é o `preparePhoto`, logo depois; esta etapa só precisa entregar um
+ * arquivo que o manipulador consiga abrir.
+ *
+ * O `CompressionImageExporter` faz `copyExifData(source, output, ...)` — ele
+ * COPIA o EXIF de volta para o arquivo dele. Por isso a barreira de metadados não
+ * muda de lugar: quem garante "sem localização" continua sendo o reencode do
+ * `preparePhoto` mais a inspeção de bytes de `assertPhotoSafeToUpload`.
  */
+
+/**
+ * Qualidade pedida ao seletor. Precisa ser < 1: em 1 o expo-image-picker devolve
+ * o arquivo original sem decodificar (ver o bloco acima).
+ */
+export const PICKER_QUALITY = 0.95;
 
 export type PickedAsset = { uri: string; width: number; height: number };
 
@@ -79,9 +117,22 @@ export type PhotoEncoder = (
   plan: (size: { width: number; height: number }) => { width: number } | { height: number } | null,
 ) => Promise<{ uri: string; width: number; height: number; base64: string }>;
 
-/** Implementação real com a API de contexto do expo-image-manipulator. */
+/**
+ * Implementação real com a API de contexto do expo-image-manipulator.
+ *
+ * Qualquer falha de decodificação vira `photo_not_jpeg` ("Não foi possível
+ * preparar esta foto. Tente outra."): a pessoa precisa de uma saída, não de uma
+ * mensagem do sistema. Antes, um erro nativo cru subia como erro desconhecido e a
+ * tela ficava sem dizer o que fazer.
+ */
 export const encodeWithManipulator: PhotoEncoder = async (uri, plan) => {
-  const context = ImageManipulator.manipulate(uri);
+  let context: ReturnType<typeof ImageManipulator.manipulate>;
+  try {
+    // Pode lançar já aqui quando o arquivo não abre (o caso do HEIC no Expo Go).
+    context = ImageManipulator.manipulate(uri);
+  } catch {
+    throw communityError('photo_not_jpeg');
+  }
   const refs: { release: () => void }[] = [];
   try {
     // Primeiro a imagem como está, para saber o tamanho REAL (já com a rotação
@@ -94,8 +145,11 @@ export const encodeWithManipulator: PhotoEncoder = async (uri, plan) => {
       refs.push(image);
     }
     const saved = await image.saveAsync({ compress: PHOTO_JPEG_QUALITY, format: SaveFormat.JPEG, base64: true });
-    if (!saved.base64) throw new Error('sem bytes');
+    if (!saved.base64) throw communityError('photo_not_jpeg');
     return { uri: saved.uri, width: saved.width, height: saved.height, base64: saved.base64 };
+  } catch (failure) {
+    if (failure instanceof CommunityError) throw failure;
+    throw communityError('photo_not_jpeg');
   } finally {
     for (const ref of refs) ref.release();
     context.release();
@@ -122,7 +176,7 @@ export async function pickFromLibrary(): Promise<PickedAsset | null> {
     // Sem EXIF e sem base64 do original: o que vale é o reencodado.
     exif: false,
     base64: false,
-    quality: 1,
+    quality: PICKER_QUALITY,
   });
   if (result.canceled) return null;
   const asset = result.assets?.[0];
@@ -141,10 +195,11 @@ export async function pickManyFromLibrary(limit: number): Promise<PickedAsset[]>
     allowsEditing: false,
     allowsMultipleSelection: limit > 1,
     selectionLimit: limit,
-    orderedSelection: true,
+    // Só faz sentido com seleção múltipla; com uma foto o iOS ignora.
+    orderedSelection: limit > 1,
     exif: false,
     base64: false,
-    quality: 1,
+    quality: PICKER_QUALITY,
   });
   if (result.canceled) return [];
   return (result.assets ?? [])
@@ -180,7 +235,7 @@ export async function takePhoto(): Promise<CameraResult> {
     allowsEditing: false,
     exif: false,
     base64: false,
-    quality: 1,
+    quality: PICKER_QUALITY,
   });
   if (result.canceled) return { kind: 'canceled' };
   const asset = result.assets?.[0];

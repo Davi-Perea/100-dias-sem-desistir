@@ -294,14 +294,15 @@ describe('C1: portões honestos antes do feed', () => {
 /* ------------------------------------------------------------------ feed */
 
 describe('C1: feed', () => {
-  test('cabeçalho: "Juntos", sino, pílula "Escrever" (vai para Publicar) e os filtros do grupo', async () => {
+  test('cabeçalho: "Juntos", sino e pílula "Escrever" (vai para Publicar); SEM filtro de grupo', async () => {
     setup();
     await render(<FeedScreen />);
     await waitFor(() => expect(screen.getByTestId(`post-${POST(0)}`)).toBeTruthy());
     expect(screen.getByText('Juntos')).toBeTruthy();
     expect(screen.getByTestId('feed-bell')).toBeTruthy();
-    expect(screen.getByTestId('feed-scope-igreja')).toBeTruthy();
-    expect(screen.getByText('Meu ministério')).toBeTruthy();
+    // 2026-09-22: só a igreja toda — o filtro saiu do topo.
+    expect(screen.queryByTestId('feed-scope')).toBeNull();
+    expect(screen.queryByText('Meu ministério')).toBeNull();
     await fireEvent.press(screen.getByTestId('feed-write'));
     expect(mockRouter.push).toHaveBeenCalledWith('/comunidade/publicar');
   });
@@ -319,7 +320,7 @@ describe('C1: feed', () => {
     expect(screen.queryByText(/^\d+$/)).toBeNull();
   });
 
-  test('F1: grupo no topo ("Toda a igreja") e a foto de perfil assinada', async () => {
+  test('F1: sem rótulo de grupo no cartão, e a foto de perfil assinada', async () => {
     const avatar = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee.jpg';
     const { createSignedUrls } = setup({
       community_feed: {
@@ -329,7 +330,7 @@ describe('C1: feed', () => {
     await render(<FeedScreen />);
     await waitFor(() => expect(screen.getByTestId(`post-${POST(0)}`)).toBeTruthy());
     expect(screen.getByTestId(`post-author-${POST(0)}`).props.children).toBe('Ana · há 1 h');
-    expect(screen.getByTestId(`post-group-${POST(0)}`, { includeHiddenElements: true }).props.children).toBe('Toda a igreja');
+    expect(screen.queryByTestId(`post-group-${POST(0)}`, { includeHiddenElements: true })).toBeNull();
     await waitFor(() => expect(createSignedUrls).toHaveBeenCalledWith([avatar], expect.any(Number)));
   });
 

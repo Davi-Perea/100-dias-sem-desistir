@@ -72,11 +72,11 @@ import {
  * conta ligada ao aparelho do app real. A foto de perfil fica só na memória
  * (o arquivo preparado no aparelho), em análise, como no real.
  *
- * Diário compartilhado (2026-09-22, F1, F3, F5, F6, F8): as publicações de
+ * Diário compartilhado (2026-09-22, F1, F3, F5, F8): as publicações de
  * exemplo têm tipos variados (leitura, oração, jejum, versículo — só a
- * REFERÊNCIA, nunca o texto bíblico — e livre), números de Amém FICTÍCIOS
- * (DEMO_AMEN_NOTE) com rostinhos só dos nomes de exemplo, e uma delas vai para
- * "o ministério de quem está vendo" (só aparece com ministério no perfil). Fotos
+ * REFERÊNCIA, nunca o texto bíblico — e livre) e números de Amém FICTÍCIOS
+ * (DEMO_AMEN_NOTE) com rostinhos só dos nomes de exemplo. Desde 2026-09-22 não
+ * há público por ministério: TODA publicação vai para a igreja inteira. Fotos
  * de post aparecem na hora, como com o filtro automático configurado (F5,
  * simulado: nada sai do aparelho). Ao publicar, "Marina" (exemplo) diz Amém e o
  * sino (F8) acende.
@@ -356,10 +356,9 @@ function dayOneContent(now: number): SeedContent {
       94,
       { kind: 'oracao' },
     ),
-    // Para "o ministério de quem está vendo": só aparece com ministério no perfil (F6).
-    post(107, 'camila', 'Pessoal do ministério: hoje à noite vamos orar juntos, cada um da sua casa, às 21h.', 1, 35, {
+    // Desde 2026-09-22 não há público por ministério: tudo vai para a igreja inteira.
+    post(107, 'camila', 'Hoje à noite vamos orar juntos, cada um da sua casa, às 21h. Quem quiser, entra.', 1, 35, {
       kind: 'oracao',
-      audience: 'ministerio',
       otherAmens: 5,
       otherFaces: [face('rodrigo'), face('felipe')],
     }),
@@ -420,10 +419,9 @@ function runningContent(now: number, day: number): SeedContent {
       60 * 45,
       { otherAmens: 9, otherFaces: [face('leticia'), face('camila'), face('tiago')] },
     ),
-    // Para "o ministério de quem está vendo": só aparece com ministério no perfil (F6).
-    post(107, 'camila', 'Nosso ministério vai orar junto hoje às 21h, cada um da sua casa.', null, 90, {
+    // Desde 2026-09-22 não há público por ministério: tudo vai para a igreja inteira.
+    post(107, 'camila', 'Vamos orar juntos hoje às 21h, cada um da sua casa.', null, 90, {
       kind: 'oracao',
-      audience: 'ministerio',
       otherAmens: 5,
       otherFaces: [face('rodrigo'), face('felipe')],
     }),
@@ -563,16 +561,16 @@ function toStatus(s: State): CommunityStatus {
   };
 }
 
-/** Público do post (F6): toda a igreja, o meu próprio, ou o ministério de quem vê. */
+/**
+ * Público do post. Desde 2026-09-22 todo post vai para a igreja inteira: nada
+ * de exemplo é restrito. A função continua existindo (e devolvendo true) para o
+ * caminho da demonstração ser o mesmo do real, onde uma linha ANTIGA de
+ * ministério ainda pode ser restrita.
+ */
 function audienceAllows(s: State, p: DemoPost): boolean {
   if (p.audience === 'igreja' || isMe(p.author)) return true;
   const mine = s.profile.ministry;
   return mine !== null && (p.audienceMinistry === null || p.audienceMinistry === mine);
-}
-
-function audienceMinistryOf(s: State, p: DemoPost): string | null {
-  if (p.audience !== 'ministerio') return null;
-  return p.audienceMinistry ?? s.profile.ministry;
 }
 
 function myFace(s: State): AmenFace {
@@ -583,7 +581,7 @@ function myFace(s: State): AmenFace {
   };
 }
 
-/** Os campos do diário (F1, F3, F6) como o servidor devolve para quem está vendo. */
+/** Os campos do diário (F1, F3) como o servidor devolve para quem está vendo. */
 function diaryOf(s: State, p: DemoPost): DiaryFields {
   const blocked = blockedKeys(s);
   const others = p.otherFaces.filter((f) => !blocked.has(faceKey(f.name)));
@@ -593,7 +591,7 @@ function diaryOf(s: State, p: DemoPost): DiaryFields {
     verse: p.verse,
     photoPaths: [...p.photoPaths],
     audience: p.audience,
-    audienceMinistry: audienceMinistryOf(s, p),
+    audienceMinistry: p.audience === 'ministerio' ? p.audienceMinistry : null,
     amenCount: Math.max(p.otherAmens - (p.otherFaces.length - others.length), 0) + (p.amen ? 1 : 0),
     amenFaces: faces,
     commentCount: s.comments.filter((c) => c.postId === p.postId && c.status === 'published' && !blocked.has(c.author.key))
@@ -722,14 +720,14 @@ function createDemoCommunityApi(): CommunityApi {
       s.profile.newsOptIn = input.wantsNews;
     },
 
-    async feedPage(cursor?: FeedCursor | null, options: { scope?: FeedScope } = {}): Promise<FeedPage> {
+    /** Um feed só, da igreja inteira (2026-09-22). O segundo argumento é ignorado. */
+    async feedPage(cursor?: FeedCursor | null, _legacyOptions?: { scope?: FeedScope }): Promise<FeedPage> {
       const s = current();
       requireMember(s);
       const blocked = blockedKeys(s);
       const visible = s.posts
         .filter((p) => p.status === 'published' && p.publishedAt && !blocked.has(p.author.key))
         .filter((p) => audienceAllows(s, p))
-        .filter((p) => options.scope !== 'ministerio' || (p.audience === 'ministerio' && s.profile.ministry !== null))
         .sort((a, b) => (b.publishedAt ?? '').localeCompare(a.publishedAt ?? '') || b.postId.localeCompare(a.postId));
       const start = cursor
         ? visible.findIndex(
@@ -814,8 +812,6 @@ function createDemoCommunityApi(): CommunityApi {
       requireProfile(s);
       const post = normalizeNewPost(input, (path) => demoPhotos.has(path));
       if (!post) throw communityError('invalid_input');
-      // "Meu ministério" é o ministério do perfil (F6), como no servidor.
-      if (post.audience === 'ministerio' && !s.profile.ministry) throw communityError('invalid_input');
       // Como no servidor com o filtro automático configurado (F5, aqui SIMULADO):
       // foto aparece na hora; texto que o filtro de texto segura vai para análise.
       const hold: HoldReason | null = holdFor(post.body);
@@ -828,8 +824,9 @@ function createDemoCommunityApi(): CommunityApi {
         dayNumber: post.day,
         kind: post.kind,
         verse: post.verse,
+        // Igreja inteira, sempre (normalizeNewPost já força 'igreja').
         audience: post.audience,
-        audienceMinistry: post.audience === 'ministerio' ? s.profile.ministry : null,
+        audienceMinistry: null,
         createdAt: now,
         publishedAt: hold ? null : now,
         status: hold ? 'in_review' : 'published',

@@ -148,10 +148,10 @@ describe('comunidade de demonstração em memória', () => {
     await expect(api.getStatus()).resolves.toMatchObject({ isMember: true, memberStatus: 'active', displayName: 'Davi' });
   });
 
-  it('feed com 5 publicações de exemplo, primeiros nomes inventados sem "(exemplo)" na tela, sem foto', async () => {
+  it('feed com 6 publicações de exemplo, primeiros nomes inventados sem "(exemplo)" na tela, sem foto', async () => {
     const { api } = await join();
     const page = await api.feedPage();
-    expect(page.posts).toHaveLength(5);
+    expect(page.posts).toHaveLength(6);
     expect(page.ended).toBe(true);
     expect(page.nextCursor).toBeNull();
     for (const post of page.posts) {
@@ -163,11 +163,11 @@ describe('comunidade de demonstração em memória', () => {
       expect(post.audience).toBe('igreja');
     }
     // F1: tipos variados; o versículo é só a referência.
-    expect(page.posts.map((p) => p.kind)).toEqual(['leitura', 'oracao', 'versiculo', 'jejum', null]);
-    expect(page.posts[2].verse).toEqual({ book: 'PSA', chapter: 119, verseStart: 105, verseEnd: null });
+    expect(page.posts.map((p) => p.kind)).toEqual(['leitura', 'oracao', 'oracao', 'versiculo', 'jejum', null]);
+    expect(page.posts[3].verse).toEqual({ book: 'PSA', chapter: 119, verseStart: 105, verseEnd: null });
     // Ordem: mais recente primeiro; dias relativos ao dia simulado (3).
     expect(page.posts[0].dayNumber).toBe(3);
-    expect(page.posts[4].dayNumber).toBe(1);
+    expect(page.posts[5].dayNumber).toBe(1);
   });
 
   it('"Minhas publicações" começa com uma "Em análise", que também aparece no topo do feed pelo useFeed', async () => {
@@ -275,29 +275,26 @@ describe('comunidade de demonstração em memória', () => {
     expect(after.amenCount).toBe((before.amenCount ?? 0) - 1);
   });
 
-  it('F6: o post do ministério só aparece com ministério no perfil; o escopo "ministério" filtra', async () => {
+  // 2026-09-22: acabou o público por ministério. Um feed só, para a igreja inteira.
+  it('igreja inteira: nada de exemplo é restrito e o feed é um só, com ou sem ministério no perfil', async () => {
     const { api } = await join();
-    expect((await api.feedPage()).posts.some((p) => p.audience === 'ministerio')).toBe(false);
-    await expect(api.feedPage(null, { scope: 'ministerio' })).resolves.toMatchObject({ posts: [] });
+    const semMinisterio = await api.feedPage();
+    expect(semMinisterio.posts.some((p) => p.audience === 'ministerio')).toBe(false);
+    expect(semMinisterio.posts).toHaveLength(6);
     await api.updateProfile({ ministry: 'Comunicação' });
-    const all = await api.feedPage();
-    expect(all.posts).toHaveLength(6);
-    const ministry = await api.feedPage(null, { scope: 'ministerio' });
-    expect(ministry.posts).toHaveLength(1);
-    expect(ministry.posts[0]).toMatchObject({ audience: 'ministerio', audienceMinistry: 'Comunicação', kind: 'oracao' });
+    const comMinisterio = await api.feedPage();
+    expect(comMinisterio.posts.map((p) => p.postId)).toEqual(semMinisterio.posts.map((p) => p.postId));
   });
 
-  it('F6: publicar para "Meu ministério" exige ministério no perfil', async () => {
+  it('igreja inteira: o público pedido pela tela é ignorado; o post sai para a igreja', async () => {
     const { api } = await join();
     await api.setAvatar({ bytes: CLEAN_JPEG, uri: 'file:///cache/eu.jpg' });
-    await api.updateProfile({ confirms16: true, noMinistry: true });
+    await api.updateProfile({ confirms16: true, ministry: 'Comunicação' });
     await api.acceptTerms({ purpose: 'community_rules', version: 'PENDENTE', sha256: SHA, appVersion: 't' });
     await api.acceptTerms({ purpose: 'community_publish', version: 'PENDENTE', sha256: SHA, appVersion: 't' });
-    await expect(api.createPost({ body: 'Oi', audience: 'ministerio' })).rejects.toMatchObject({ code: 'invalid_input' });
-    await api.updateProfile({ ministry: 'Comunicação' });
-    const post = await api.createPost({ body: 'Oi, ministério', audience: 'ministerio' });
+    const post = await api.createPost({ body: 'Oi, igreja', audience: 'ministerio' });
     const mine = (await api.myPosts()).find((p) => p.postId === post.id);
-    expect(mine).toMatchObject({ audience: 'ministerio', audienceMinistry: 'Comunicação' });
+    expect(mine).toMatchObject({ audience: 'igreja', audienceMinistry: null });
   });
 
   it('F8: ao publicar, alguém de exemplo diz Amém e o sino acende; ver apaga', async () => {
@@ -335,11 +332,11 @@ describe('comunidade de demonstração em memória', () => {
     const { api } = await join();
     const tiago = (await api.feedPage()).posts.find((p) => p.authorName === 'Tiago')!;
     await api.blockAuthor({ postId: tiago.postId });
-    expect((await api.feedPage()).posts).toHaveLength(4);
+    expect((await api.feedPage()).posts).toHaveLength(5);
     const blocks = await api.myBlocks();
     expect(blocks).toEqual([expect.objectContaining({ displayName: 'Tiago' })]);
     await api.unblock(blocks[0].blockId);
-    expect((await api.feedPage()).posts).toHaveLength(5);
+    expect((await api.feedPage()).posts).toHaveLength(6);
   });
 
   it('denúncia devolve recibo; urgente tira do ar', async () => {
@@ -347,7 +344,7 @@ describe('comunidade de demonstração em memória', () => {
     const [first, second] = (await api.feedPage()).posts;
     const receipt = await api.report({ postId: first.postId, reason: 'spam' });
     expect(receipt).toMatch(/^[0-9a-f-]{36}$/);
-    expect((await api.feedPage()).posts).toHaveLength(5);
+    expect((await api.feedPage()).posts).toHaveLength(6);
     await api.report({ postId: second.postId, reason: 'crianca_exposta' });
     expect((await api.feedPage()).posts.some((p) => p.postId === second.postId)).toBe(false);
   });
@@ -378,7 +375,7 @@ describe('prévia "um desconhecido instala no dia 23" (EXPO_PUBLIC_DEMO_DAY=1)',
     const { api } = dayOne();
     await api.joinCommunity({ displayName: 'Davi' });
     const page = await api.feedPage();
-    expect(page.posts).toHaveLength(5);
+    expect(page.posts).toHaveLength(6);
     const now = Date.parse('2026-09-23T10:30:00Z');
     for (const post of page.posts) {
       expect(post.dayNumber).toBe(1);

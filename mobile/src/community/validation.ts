@@ -70,23 +70,32 @@ export function isValidVerse(verse: VerseAttachment): boolean {
   return true;
 }
 
-/** Post pronto para enviar (F1, F6), depois das mesmas regras do servidor. */
+/** Post pronto para enviar (F1), depois das mesmas regras do servidor. */
 export type NormalizedPost = {
   body: string | null;
   photoPaths: string[];
   day: number | null;
   kind: PostKind | null;
   verse: VerseAttachment | null;
+  /**
+   * Sempre 'igreja' desde 2026-09-22: todo post vai para a igreja inteira. O
+   * campo continua no tipo porque o servidor ainda guarda a coluna `audience`
+   * (linhas antigas de ministério continuam restritas).
+   */
   audience: FeedScope;
 };
 
 /**
  * Confere a entrada de createPost com as regras do servidor
  * (private.create_community_post): até 4 fotos sem repetir, texto até 2000,
- * dia 1–100, tipo da lista, "Versículo" com referência válida, público
- * 'igreja' ou 'ministerio', e nada totalmente vazio. `isPhoto` diz que caminho
- * de foto é aceito (o real exige '<uuid>.jpg'; a demonstração tem os seus).
- * Devolve null quando a entrada não pode sair do aparelho.
+ * dia 1–100, tipo da lista, "Versículo" com referência válida e nada totalmente
+ * vazio. `isPhoto` diz que caminho de foto é aceito (o real exige '<uuid>.jpg';
+ * a demonstração tem os seus). Devolve null quando a entrada não pode sair do
+ * aparelho.
+ *
+ * O público (`input.audience`) é IGNORADO desde 2026-09-22: todo post vai para a
+ * igreja inteira e o servidor recusa qualquer outro valor (22023). A tela que
+ * ainda oferece a escolha precisa perdê-la (ver "pedidos").
  */
 export function normalizeNewPost(input: NewPost, isPhoto: (path: string) => boolean): NormalizedPost | null {
   const body = cleanText(input.body);
@@ -104,8 +113,6 @@ export function normalizeNewPost(input: NewPost, isPhoto: (path: string) => bool
   const verse = input.verse ?? null;
   if (verse !== null && !isValidVerse(verse)) return null;
   if (kind === 'versiculo' && !verse) return null;
-  const audience = input.audience ?? 'igreja';
-  if (audience !== 'igreja' && audience !== 'ministerio') return null;
   if (!body && photoPaths.length === 0 && day === null && !verse && kind === null) return null;
-  return { body, photoPaths, day, kind, verse, audience };
+  return { body, photoPaths, day, kind, verse, audience: 'igreja' };
 }

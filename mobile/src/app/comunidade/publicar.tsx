@@ -28,7 +28,6 @@ import {
 } from '@/ui/comunidade/publicar/foto';
 import { AudienceNotice, CommunityGateView, RichText } from '@/ui/comunidade/publicar/partes';
 import { AttachBar, AttachChips, PhotoStrip, type AttachButton } from '@/ui/comunidade/publicar/pecas';
-import { AudienceButton, PublicoSheet } from '@/ui/comunidade/publicar/PublicoSheet';
 import {
   buildNewPost,
   hasAttachment,
@@ -38,7 +37,6 @@ import {
   removeAttachment,
   upsertAttachment,
   type Attachment,
-  type Audience,
   type VerseChip,
 } from '@/ui/comunidade/publicar/rascunho';
 import { PHOTO_WARNING } from '@/ui/comunidade/publicar/textos';
@@ -76,7 +74,8 @@ function readingReference(day: number): string | null {
  * - Foto: aviso de rosto de outras pessoas e de crianças ANTES da galeria ou da
  *   câmera; preparada no aparelho (1600 px, JPEG 0,8, sem EXIF/XMP/IPTC) e só
  *   enviada ao publicar.
- * - Embaixo: "Toda a igreja ▾ / Meu ministério" e "Publicar".
+ * - Embaixo: só "Publicar". A escolha de público SAIU (2026-09-22): todo post vai
+ *   para a igreja inteira.
  * - O formulário abre na hora (a entrada no Juntos é automática). Na PRIMEIRA
  *   publicação, o toque em "Publicar" abre a tela única de aceite (16+, regras,
  *   consentimento e o nome, se faltar); ao concordar, a pessoa volta para cá e o
@@ -118,8 +117,7 @@ export default function PublishScreen() {
         ]
       : [],
   );
-  const [audience, setAudience] = useState<Audience>('igreja');
-  const [sheet, setSheet] = useState<'verse' | 'audience' | null>(null);
+  const [sheet, setSheet] = useState<'verse' | null>(null);
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
   const [sent, setSent] = useState<Sent | null>(null);
@@ -189,8 +187,6 @@ export default function PublishScreen() {
   const dirty = isDirty(draft, paramDay);
   const canSend = hasContent(draft) && !overLimit && !sending && photoStage !== 'preparing';
   const photosLeft = MAX_POST_PHOTOS - photos.length;
-  // Sem ministério no perfil ("Nenhum"), o post vai para a igreja inteira.
-  const effectiveAudience: Audience = ministry ? audience : 'igreja';
 
   const cancel = () => {
     if (!dirty || sent) {
@@ -340,7 +336,8 @@ export default function PublishScreen() {
         body: cleaned,
         photoPaths: uploaded,
         attachments,
-        audience: effectiveAudience,
+        // Um feed só (2026-09-22): todo post vai para a igreja inteira.
+        audience: 'igreja',
       });
       const result = await client.createPost(input);
       setSent({ status: result.status, hadPhoto: uploaded.length > 0 });
@@ -572,7 +569,8 @@ export default function PublishScreen() {
           />
         </ScrollView>
 
-        {/* Rodapé: público e Publicar. Quebra em duas linhas com fonte grande. */}
+        {/* Rodapé: só Publicar. A escolha de público saiu (2026-09-22): todo post
+            vai para a igreja inteira. */}
         <View
           testID="publish-footer"
           style={{
@@ -584,12 +582,11 @@ export default function PublishScreen() {
             flexDirection: 'row',
             flexWrap: 'wrap',
             alignItems: 'center',
-            justifyContent: 'space-between',
+            justifyContent: 'flex-end',
             columnGap: spacing.lg,
             rowGap: spacing.xs,
           }}
         >
-          <AudienceButton audience={effectiveAudience} ministry={ministry} onPress={() => setSheet('audience')} />
           <Button
             title="Publicar"
             variant="blue"
@@ -613,16 +610,6 @@ export default function PublishScreen() {
         initial={verseAttached}
         onAttach={(attachment) => {
           setAttachments((current) => upsertAttachment(current, attachment));
-          setSheet(null);
-        }}
-      />
-      <PublicoSheet
-        visible={sheet === 'audience'}
-        onClose={() => setSheet(null)}
-        audience={effectiveAudience}
-        ministry={ministry}
-        onChoose={(next) => {
-          setAudience(next);
           setSheet(null);
         }}
       />

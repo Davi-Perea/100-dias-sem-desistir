@@ -1,5 +1,4 @@
 import { getBook } from '@/bible/books';
-import { ministryLabel } from '@/community/profile';
 import { MAX_POST_PHOTOS, type FeedScope, type NewPost, type PostKind } from '@/community/types';
 import type { VerseRef } from '@/marks/marksStore';
 
@@ -183,10 +182,8 @@ export function buildNewPost(input: {
   };
 }
 
-/* ------------------------------------------------------------------ público */
+/* ------------------------------------------------------------------ público
 
-/** "Toda a igreja" / "Ministério Louvor". */
-export function audienceLabel(audience: Audience, ministry: string | null): string {
-  const label = audience === 'ministerio' ? ministryLabel(ministry) : null;
-  return label ?? 'Toda a igreja';
-}
+   Não há mais escolha de público (2026-09-22): todo post vai para a igreja
+   inteira, e `buildNewPost` recebe sempre 'igreja'. O tipo `Audience` continua
+   porque é o contrato de `NewPost`, que o servidor ainda conhece. */

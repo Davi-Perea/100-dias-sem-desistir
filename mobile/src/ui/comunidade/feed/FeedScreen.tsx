@@ -7,7 +7,7 @@ import { DEMO_BADGE, DEMO_LABELS_ON_SCREEN, isCommunityDemo } from '@/community/
 import type { CommunityStatus } from '@/community/types';
 import { useJourney } from '@/journey/useJourney';
 import { useOnline } from '@/net/useOnline';
-import { AppText, Button, DevContentBanner, OfflineBanner, Pill, Rule, SaveErrorNotice, Screen } from '@/ui/components';
+import { AppText, Button, DevContentBanner, OfflineBanner, Rule, SaveErrorNotice, Screen } from '@/ui/components';
 import { Icon } from '@/ui/icons';
 import { MAX_CONTENT_WIDTH, MIN_TOUCH, spacing, useTheme } from '@/ui/theme';
 import { announceNotice } from '@/ui/voce/announce';
@@ -15,6 +15,8 @@ import { announceNotice } from '@/ui/voce/announce';
 import { CommentsSheet, type CommentsTarget } from '../sheets/CommentsSheet';
 import { ReportSheet, type SheetTarget } from '../sheets/ReportSheet';
 import { AFTER_CONSENT_COMMENT, flushPendingCommentAmen, takePendingCommentAmen } from './comentarios';
+import { useJuntosIntro } from './conheca';
+import { ConhecaOJuntos } from './ConhecaOJuntos';
 import { FeedEmpty, FeedEnd, FeedError, FeedSkeleton, GateView } from './FeedStates';
 import { PostCard } from './PostCard';
 import { takeAceiteOutcome } from '../publicar/aceite';
@@ -22,7 +24,7 @@ import { ROUTES as PUBLISH_ROUTES } from '../publicar/fluxo';
 import { ACTIVITY_ROUTE, COMMUNITY_ROUTES, readerHref } from './rotas';
 import { needsConsent, useCommunity } from './useCommunity';
 import { useFeed } from './useFeed';
-import { type FeedScope, hasNewActivity } from './v2';
+import { hasNewActivity } from './v2';
 
 /** Calha das telas de lista e feed (TELAS, convenções): 20. */
 const FEED_GUTTER = 20;
@@ -43,9 +45,15 @@ const COLUMN = { flex: 1, width: '100%', maxWidth: MAX_CONTENT_WIDTH + FEED_GUTT
  * interação que expõe (post, comentário, Amém) abre a tela única de aceite e,
  * ao concordar, a ação que a pessoa queria acontece.
  *
- * Topo: "Juntos", o sino da Atividade (F8, com ponto quando há novidade),
- * "Escrever", e os filtros "Toda a igreja · Meu ministério" (F6: sem
- * seguidores). Depois os posts do dia e o fim explícito.
+ * Topo: "Juntos", o sino da Atividade (F8, com ponto quando há novidade) e
+ * "Escrever". Depois os posts do dia e o fim explícito.
+ *
+ * SÓ A IGREJA TODA (pedido do fundador, 2026-09-22): saíram o filtro "Meu
+ * ministério" do topo e a escolha de público ao publicar. Um feed só, para todo
+ * mundo; o ministério continua no perfil, mas não divide mais o que se lê.
+ *
+ * Na PRIMEIRA vez que a aba abre, "Conheça o Juntos" aparece por cima (mesmo
+ * padrão do aviso do versículo do dia) e não volta depois de fechado.
  *
  * Estados: sem servidor, suspensa, entrando/carregando (esqueleto
  * na forma do post), erro (F5), vazio (C2) e sem internet (o feed fica
@@ -55,18 +63,21 @@ export function FeedScreen() {
   const { gate, reload } = useCommunity();
   const journey = useJourney();
   const online = useOnline();
-  const [scope, setScope] = useState<FeedScope>('igreja');
+  const intro = useJuntosIntro();
 
   const ready = gate.kind === 'ready';
   const header = (
     <FeedHeader
       ready={ready}
       unread={ready ? hasNewActivity(gate.status) : false}
-      scope={scope}
-      onScope={setScope}
       onWrite={() => ready && router.push(COMMUNITY_ROUTES.publicar)}
     />
   );
+  // Espera a leitura da dispensa: piscar o aviso e sumir seria pior que esperar.
+  // Só quando a aba abre de verdade (`ready`): a apresentação vale uma vez na
+  // vida do aparelho, e gastá-la por cima de "Juntos indisponível" ou de um erro
+  // de rede faria a pessoa nunca mais ver o que este lugar é.
+  const introOverlay = <ConhecaOJuntos visible={ready && intro.loaded && !intro.dismissed} onClose={intro.dismiss} />;
 
   if (gate.kind === 'ready') {
     return (
@@ -78,9 +89,9 @@ export function FeedScreen() {
             status={gate.status}
             online={online}
             day={Math.max(1, journey.officialDay)}
-            scope={scope}
           />
         </View>
+        {introOverlay}
       </Screen>
     );
   }
@@ -108,23 +119,12 @@ export function FeedScreen() {
           {content}
         </ScrollView>
       </View>
+      {introOverlay}
     </Screen>
   );
 }
 
-function FeedHeader({
-  ready,
-  unread,
-  scope,
-  onScope,
-  onWrite,
-}: {
-  ready: boolean;
-  unread: boolean;
-  scope: FeedScope;
-  onScope: (scope: FeedScope) => void;
-  onWrite: () => void;
-}) {
+function FeedHeader({ ready, unread, onWrite }: { ready: boolean; unread: boolean; onWrite: () => void }) {
   const { colors } = useTheme();
   return (
     <View>
@@ -202,20 +202,6 @@ function FeedHeader({
         ) : null}
       </View>
       {DEMO_LABELS_ON_SCREEN && isCommunityDemo() ? <DemoBadge /> : null}
-      {ready ? (
-        <View
-          style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: spacing.sm, paddingHorizontal: FEED_GUTTER, paddingBottom: spacing.xs }}
-          testID="feed-scope"
-        >
-          <Pill label="Toda a igreja" active={scope === 'igreja'} onPress={() => onScope('igreja')} testID="feed-scope-igreja" />
-          <Pill
-            label="Meu ministério"
-            active={scope === 'ministerio'}
-            onPress={() => onScope('ministerio')}
-            testID="feed-scope-ministerio"
-          />
-        </View>
-      ) : null}
       <Rule />
     </View>
   );
@@ -255,21 +241,6 @@ function OfflineNotice() {
   );
 }
 
-/** "Meu ministério" sem ministério no perfil: diz isso e leva ao perfil. */
-function NoMinistry() {
-  return (
-    <View style={{ paddingHorizontal: FEED_GUTTER, paddingVertical: spacing.xl, gap: spacing.md }} testID="feed-no-ministry">
-      <AppText variant="action" style={{ textAlign: 'center' }}>
-        Você ainda não escolheu um ministério
-      </AppText>
-      <AppText variant="bodySm" style={{ textAlign: 'center' }}>
-        Escolha o seu no perfil para ver aqui o que as pessoas dele estão compartilhando.
-      </AppText>
-      <Button title="Escolher no perfil" variant="outline" onPress={() => router.push(COMMUNITY_ROUTES.perfil)} testID="feed-no-ministry-profile" />
-    </View>
-  );
-}
-
 type CommentsOpen = { target: CommentsTarget; text: string; notice: string | null };
 
 function ReadyFeed({
@@ -278,19 +249,17 @@ function ReadyFeed({
   status,
   online,
   day,
-  scope,
 }: {
   header: ReactNode;
   api: CommunityApi;
   status: CommunityStatus;
   online: boolean;
   day: number;
-  scope: FeedScope;
 }) {
   const journey = useJourney();
-  const ministry = status.profile.ministry;
-  const noMinistry = scope === 'ministerio' && !ministry;
-  const feed = useFeed(api, status.displayName ?? 'Você', ministry, status.profile.avatarPath, noMinistry ? 'igreja' : scope);
+  // Um feed só: toda a igreja. O ministério ainda vem no perfil (o cartão mostra
+  // "Nome · Ministério"), mas não escolhe mais o que se lê nem para onde se publica.
+  const feed = useFeed(api, status.displayName ?? 'Você', status.profile.ministry, status.profile.avatarPath);
   const [sheet, setSheet] = useState<SheetTarget | null>(null);
   const [comments, setComments] = useState<CommentsOpen | null>(null);
   // Rascunho de comentário guardado quando a folha fechou para o aceite.
@@ -347,9 +316,7 @@ function ReadyFeed({
 
   const state = feed.state;
   let list: ReactNode;
-  if (noMinistry) {
-    list = <NoMinistry />;
-  } else if (state.phase === 'loading') {
+  if (state.phase === 'loading') {
     list = <FeedSkeleton gutter={FEED_GUTTER} />;
   } else if (state.phase === 'error') {
     list = (
@@ -360,7 +327,7 @@ function ReadyFeed({
   } else if (state.posts.length === 0 && state.inReview.length === 0) {
     list = (
       <View style={{ paddingHorizontal: FEED_GUTTER }}>
-        <FeedEmpty day={day} firstDay={day <= 1} ministry={scope === 'ministerio'} />
+        <FeedEmpty day={day} firstDay={day <= 1} />
       </View>
     );
   } else {
@@ -396,7 +363,7 @@ function ReadyFeed({
         ))}
         <View style={{ paddingHorizontal: FEED_GUTTER }}>
           {state.ended ? (
-            <FeedEnd ministry={scope === 'ministerio'} />
+            <FeedEnd />
           ) : (
             <View style={{ gap: spacing.sm, paddingVertical: spacing.lg }}>
               <Button
@@ -435,7 +402,7 @@ function ReadyFeed({
           ) : null}
         </View>
         {list}
-        {state.phase === 'ready' || noMinistry ? (
+        {state.phase === 'ready' ? (
           <View style={{ paddingHorizontal: FEED_GUTTER, gap: spacing.xs }}>
             <Button
               title="Minhas publicações"

@@ -13,7 +13,7 @@ import type { CommunityApi } from '@/community/api';
 import type { CommunityStatus, FeedPage, FeedPost, PostComment } from '@/community/types';
 import { AFTER_CONSENT_COMMENT } from '@/ui/comunidade/feed/comentarios';
 import { FeedScreen } from '@/ui/comunidade/feed/FeedScreen';
-import { activityLine, amenSpoken, feedExtras, groupLabel, type ActivityItem, type FeedPostExtras } from '@/ui/comunidade/feed/v2';
+import { activityLine, amenSpoken, feedExtras, type ActivityItem, type FeedPostExtras } from '@/ui/comunidade/feed/v2';
 
 /* ------------------------------------------------------------------ mocks */
 
@@ -210,7 +210,7 @@ async function renderFeed() {
 /* ------------------------------------------------------------ puros (v2) */
 
 describe('regras puras do cartão', () => {
-  test('linha do tipo e do dia, e o grupo', () => {
+  test('linha do tipo e do dia', () => {
     expect(activityLine('leitura', 3)).toBe('Leitura do dia · Dia 3');
     expect(activityLine('oracao', null)).toBe('Oração');
     expect(activityLine(null, 7)).toBe('Dia 7');
@@ -218,8 +218,6 @@ describe('regras puras do cartão', () => {
     // Versículo: só a referência (nunca o texto bíblico).
     expect(activityLine('versiculo', null, { book: 'JHN', chapter: 3, verseStart: 16, verseEnd: null })).toBe('Versículo · João 3:16');
     expect(activityLine('versiculo', 2, { book: 'PSA', chapter: 23, verseStart: 1, verseEnd: 3 })).toBe('Versículo · Salmos 23:1-3 · Dia 2');
-    expect(groupLabel('igreja', 'Louvor')).toBe('Toda a igreja');
-    expect(groupLabel('ministerio', 'Louvor')).toBe('Ministério Louvor');
   });
 
   test('campos novos ausentes caem no que já existia: uma foto, igreja toda, sem número', () => {
@@ -260,15 +258,14 @@ describe('regras puras do cartão', () => {
 /* ------------------------------------------------------------- F1: cartão */
 
 describe('F1: o post do dia', () => {
-  test('grupo no topo, "Nome · há 4 h", "Leitura do dia · Dia 3" e "Ver leitura" abre o leitor no dia', async () => {
-    fakeApi({ posts: [post(0, { kind: 'leitura', audience: 'ministerio', audienceMinistry: 'Louvor' }), post(1)] });
+  test('"Nome · há 4 h", "Leitura do dia · Dia 3" e "Ver leitura" abre o leitor no dia; SEM rótulo de grupo', async () => {
+    fakeApi({ posts: [post(0, { kind: 'leitura' }), post(1)] });
     await renderFeed();
-    expect(screen.getByTestId(`post-group-${POST(0)}`, { includeHiddenElements: true }).props.children).toBe('Ministério Louvor');
-    expect(screen.getByTestId(`post-group-${POST(1)}`, { includeHiddenElements: true }).props.children).toBe('Toda a igreja');
+    // 2026-09-22: só a igreja toda, então o cartão não tem mais etiqueta de grupo.
+    expect(screen.queryByTestId(`post-group-${POST(0)}`, { includeHiddenElements: true })).toBeNull();
     expect(screen.getByText('Ana · há 4 h')).toBeTruthy();
     expect(screen.getByText('Leitura do dia · Dia 3')).toBeTruthy();
-    // O grupo e o tipo vão juntos no rótulo do autor, sem "·".
-    expect(screen.getByLabelText('Ministério Louvor, Ana, há 4 horas, Leitura do dia, Dia 3')).toBeTruthy();
+    expect(screen.getByLabelText('Ana, há 4 horas, Leitura do dia, Dia 3')).toBeTruthy();
     await fireEvent.press(screen.getByTestId(`post-reading-${POST(0)}`));
     expect(mockRouter.push).toHaveBeenCalledWith({ pathname: '/reader/[day]', params: { day: '3' } });
   });
@@ -430,27 +427,24 @@ describe('F4: comentários em folha', () => {
   });
 });
 
-/* ----------------------------------------------- F6: toda a igreja / ministério */
+/* ------------------------------------------------ só a igreja toda (2026-09-22) */
 
-describe('F6: toda a igreja e meu ministério (sem seguidores)', () => {
-  test('o filtro pede o feed do ministério ao servidor', async () => {
+describe('só a igreja toda', () => {
+  test('o feed só pede o escopo da igreja, e não há filtro para tocar', async () => {
     const { api } = fakeApi();
     await renderFeed();
     expect(api.feedPage).toHaveBeenLastCalledWith(null, { scope: 'igreja' });
-    await fireEvent.press(screen.getByTestId('feed-scope-ministerio'));
-    await waitFor(() => expect(api.feedPage).toHaveBeenLastCalledWith(null, { scope: 'ministerio' }));
-    expect(screen.getByTestId('feed-scope-ministerio').props.accessibilityState).toMatchObject({ selected: true });
+    expect(screen.queryByTestId('feed-scope')).toBeNull();
+    expect(screen.queryByTestId('feed-scope-ministerio')).toBeNull();
+    expect(screen.queryByText('Meu ministério')).toBeNull();
   });
 
-  test('sem ministério no perfil: diz isso, leva ao perfil e não pede feed de ministério', async () => {
+  test('sem ministério no perfil nada muda: o mesmo feed, sem caminho para o ministério', async () => {
     const base = status();
     const { api } = fakeApi({ current: status({ profile: { ...base.profile, ministry: null } }) });
     await renderFeed();
-    await fireEvent.press(screen.getByTestId('feed-scope-ministerio'));
-    expect(screen.getByTestId('feed-no-ministry')).toBeTruthy();
+    expect(screen.queryByTestId('feed-no-ministry')).toBeNull();
     expect(api.feedPage).not.toHaveBeenCalledWith(null, { scope: 'ministerio' });
-    await fireEvent.press(screen.getByTestId('feed-no-ministry-profile'));
-    expect(mockRouter.push).toHaveBeenCalledWith('/comunidade/perfil');
   });
 });
 

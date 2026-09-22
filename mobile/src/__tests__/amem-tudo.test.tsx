@@ -86,14 +86,14 @@ function status(extra: Partial<CommunityStatus> = {}): CommunityStatus {
 /* ------------------------------------------------------------------ ícone */
 
 describe('o desenho do Amém', () => {
-  test('mão levantada do Phosphor (hand): bold desmarcado, fill marcado, viewBox 256', async () => {
+  test('mãos em oração do Phosphor (hands-praying): bold desmarcado, fill marcado, viewBox 256', async () => {
     await render(<Icon name="amen" size={27} color="#000" />);
-    // Início exato dos paths oficiais (@phosphor-icons/core 2.1.1, hand-bold/fill).
+    // Início exato dos paths oficiais (@phosphor-icons/core 2.1.1, hands-praying-bold/fill).
     const off = JSON.stringify(screen.toJSON());
-    expect(off).toContain('M188,44a32,32,0,0,0-8,1V44a32,32,0,0,0-60.79-14A32,32,0,0,0,76,60v50.83');
+    expect(off).toContain('M238.15,177.18l-35.53-35.53L166.45,22.3');
     expect(off).toContain('"vbWidth":256');
     await render(<Icon name="amen-filled" size={27} color="#000" />);
-    expect(JSON.stringify(screen.toJSON())).toContain('M216,64v90.93c0,46.2-36.85,84.55-83,85.06A83.71,83.71,0,0,1,72.6,215.4');
+    expect(JSON.stringify(screen.toJSON())).toContain('M235.32,180l-36.24-36.25L162.62,23.46');
   });
 });
 

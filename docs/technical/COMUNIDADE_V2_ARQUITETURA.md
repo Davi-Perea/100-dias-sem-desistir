@@ -304,3 +304,53 @@ consentimento e sem as regras aceitas, CM002). Resultado com ele: 257/257.
 - Quando o conteúdo denunciado sai (a pessoa revoga ou apaga), a denúncia continua `open`, com `post_id` e
   `comment_id` nulos. Ela some da fila, mas continua em `community_open_reports`, e a moderação fecha à mão.
 - `private.campaign_day()` devolve 1 antes de 23/09. Quem postar antes do início pode marcar "dia 1".
+
+## 13. Decisões do fundador em 2026-09-22 (prévia do Dia 23)
+
+### 13.1 A igreja inteira — FEITO
+
+`20260923060000_comunidade_igreja_inteira.sql`. **Todo post vai para a igreja inteira.** O público por ministério
+acabou:
+
+- `create_community_post` recusa qualquer `post_audience` que não seja `'igreja'` com `22023` (o cliente traduz para
+  `invalid_input`) e grava sempre `audience = 'igreja'`, `audience_ministry = null`.
+- `community_feed` perdeu o parâmetro `feed_scope`: existe **um feed só** (assinatura de 2 argumentos).
+- A coluna `audience` **continua** na tabela, e `private.audience_allows` continua valendo: uma linha ANTIGA publicada
+  para um ministério continua restrita a quem é daquele ministério. Decisão nova não torna público o que já foi
+  publicado como restrito.
+- No cliente, `normalizeNewPost` força `'igreja'` e `feedPage` não manda mais escopo. O segundo argumento de
+  `feedPage` e o campo `NewPost.audience` continuam ACEITOS e IGNORADOS só enquanto a tela ainda tiver o seletor.
+
+Coberto por `supabase/tests/18_igreja_inteira.test.sql` (12 asserções) e pelo que sobrou de F6 em
+`15_comunidade_diario.test.sql`.
+
+### 13.2 Foto sem filtro e foto de perfil sem conferência — NÃO FEITO, decisão pendente
+
+As outras duas decisões de 2026-09-22 — **publicar a foto do post mesmo SEM filtro automático configurado** e
+**mostrar a foto de perfil sem ninguém conferir antes** — **não foram implementadas**. As duas retiram a última
+barreira que existe hoje entre uma imagem enviada por um usuário e a tela de todo mundo, e a tentativa de escrevê-las
+foi barrada pelo controle de segurança do ambiente de desenvolvimento. Vão para decisão do fundador com o risco à
+vista, em vez de entrar caladas.
+
+**Como está hoje** (inalterado): o post com foto nasce `in_review` com `hold_reason = 'foto'`; a Edge Function
+`submit-post` manda cada foto ao filtro automático e `service_record_photo_checks` publica na hora quando tudo volta
+limpo. **Sem** `MODERATION_PROVIDER` configurado, a foto espera uma pessoa. A foto de perfil vira `approved` só depois
+de `moderate_community_avatar`.
+
+**O risco de mudar** (é o mesmo nos dois casos, e é de loja, não de gosto): a **App Store Review Guideline 1.2**
+(conteúdo gerado por usuário) exige um **método de filtrar conteúdo censurável** antes de ele ser publicado, além de
+denúncia, bloqueio e resposta em 24 h. A Google Play pede o equivalente na política de UGC. Publicar foto **sem filtro
+nenhum e sem pessoa** não atende a isso: é caminho conhecido de rejeição, e o dano de uma única imagem errada num app
+de igreja com ~3.000 pessoas não se desfaz com um pedido de desculpas.
+
+**Recomendação (Claude):** ligar o filtro automático primeiro (segredos `MODERATION_PROVIDER=aws-rekognition` +
+chaves IAM, com a checagem de região da `image-moderation.ts`) e **só então** tirar a espera humana. Com o filtro
+ligado, a foto limpa já aparece em segundos hoje — que é o que o fundador quer — sem abrir o buraco. Se ele quiser
+mesmo publicar sem filtro para a prévia interna do Dia 23, que seja **explícito, por escrito e só em build de
+desenvolvimento**, nunca no que for para a loja.
+
+**Se a decisão for mantida**, o que falta escrever está desenhado e é pequeno:
+`private.service_release_photo_post(uuid)` (só `service_role`), um estado `'sem_filtro'` em
+`community_post_photos.auto_check` para o dado não mentir dizendo `'limpa'`, o ramo sem `moderator` de
+`handleSubmitPost` (e do `sweep`) chamando essa função, e `set_community_avatar` devolvendo `'approved'` com a fila de
+moderação virando fila de **conferência depois** (`avatar_ticket` não nulo).

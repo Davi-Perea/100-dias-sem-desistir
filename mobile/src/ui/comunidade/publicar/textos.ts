@@ -138,108 +138,76 @@ export type TermsDocument = {
   sections: TermsSection[];
 };
 
-/** Regras da comunidade (rascunho §1). */
+/**
+ * Regras do Juntos (rascunho §1), ENCURTADAS a pedido do fundador (2026-09-22).
+ *
+ * Ficou só o que ele pediu: (a) o que é o Juntos, (b) o que não pode, (c) o que
+ * pode e (d) o que é tirado do ar — mais as FUNÇÕES (denunciar, bloquear, apagar
+ * o meu), que continuam existindo e precisam estar escritas para a pessoa achar.
+ *
+ * SAÍRAM, por decisão dele: a linha de versão e data no título, as seções "Fotos
+ * de outras pessoas" e "Fotos de crianças e adolescentes" (o que importa delas
+ * virou uma linha de "O que não pode"), "Como funciona o cuidado com o que é
+ * publicado", "Se tirarem o que você publicou" e "Quem cuida desta comunidade".
+ *
+ * A linha do CVV (188) FICOU: ela não estava na lista de cortes e tirar uma rede
+ * de segurança por conta própria seria decisão de produto, não de engenharia.
+ *
+ * O texto continua sendo rascunho para o advogado, e o portão continua fechado do
+ * mesmo jeito: `version` sai de `campos.versaoRegras`, que é null, então
+ * `termsAvailability` devolve 'pending' e ninguém aceita nem publica no app real.
+ * Só o título perdeu os campos `[VERSÃO]`/`[DATA]`; o portão nunca dependeu deles.
+ */
 export function rulesDocument(campos: Record<CampoId, string | null> = CAMPOS): TermsDocument {
-  const c = (id: CampoId) => campo(id, campos);
   return {
     purpose: 'community_rules',
     version: campos.versaoRegras,
-    title: `Regras da comunidade — versão ${c('versaoRegras')}, de ${c('dataRegras')}`,
+    title: 'Regras do Juntos',
     sections: [
       {
         title: 'Um lugar para a igreja ler junto.',
         paragraphs: [
-          'Aqui a gente conta o que Deus falou durante a leitura, ora uns pelos outros e se anima a não desistir. ' +
+          'Aqui a gente conta o que Deus falou durante a leitura, o que achou dela, pede oração e agradece. ' +
             `${AUDIENCE_SENTENCE} Escreva como escreveria para um irmão na porta do templo.`,
         ],
       },
       {
-        title: 'O que cabe aqui',
+        title: 'O que pode',
         bullets: [
-          'O que você aprendeu na leitura do dia.',
+          'O que você aprendeu na leitura do dia, e o que achou dela.',
           'Pedidos de oração e agradecimentos.',
           'Palavras de ânimo para quem está lendo junto.',
-          'Fotos suas, da sua Bíblia, do seu caderno, de um lugar. Com cuidado com quem aparece nelas (veja abaixo).',
+          'Foto da sua Bíblia, das suas anotações, do seu caderno.',
         ],
       },
       {
-        title: 'Fotos de outras pessoas',
+        title: 'O que não pode',
         bullets: [
-          'Só publique o rosto de outra pessoa se ela concordou. Quem aparece numa foto da igreja tem a fé revelada ' +
-            'para todos que veem, e ela pode não querer isso.',
-          'Na dúvida, não publique, ou escolha uma foto sem rostos.',
-        ],
-      },
-      {
-        title: 'Fotos de crianças e adolescentes',
-        bullets: [
-          '**Não publique foto em que dê para reconhecer uma criança ou um adolescente**, nem se for seu filho ou ' +
-            'sua filha.',
-          'Também não escreva nome, escola, endereço ou rotina de uma criança.',
+          'Ofender, humilhar, debochar, ameaçar ou perseguir qualquer pessoa.',
+          'Violência e nudez.',
+          'Expor outra pessoa: foto, nome, endereço, telefone ou situação dela sem que ela queira.',
         ],
       },
       {
         title: 'O que é tirado do ar',
         bullets: [
-          'Ofensa, humilhação, deboche, ameaça ou perseguição a qualquer pessoa, inclusive de outra igreja ou outra fé.',
+          'Tudo o que está em "O que não pode".',
           'Discriminação por raça, cor, origem, sexo, deficiência, idade ou qualquer outra condição.',
-          'Conteúdo sexual, nudez ou violência.',
-          'Qualquer coisa que exponha, ameace ou prejudique uma criança ou um adolescente.',
-          'Foto com rosto de alguém que não autorizou, quando essa pessoa pedir.',
-          'Dados pessoais de outras pessoas (telefone, endereço, documentos, situação de saúde) sem autorização delas.',
-          'Propaganda, venda, pedido de dinheiro, doação, rifa ou corrente.',
-          'Campanha política ou partidária.',
+          'Propaganda, venda, pedido de dinheiro, doação, rifa, corrente ou campanha política.',
           'Notícia falsa, golpe ou link suspeito.',
-          'Texto, foto ou música de outra pessoa ou empresa sem permissão (inclusive textos de traduções da Bíblia ' +
-            'protegidas por direitos autorais).',
+          'Texto, foto ou música de outra pessoa ou empresa sem permissão (inclusive textos de traduções da ' +
+            'Bíblia protegidas por direitos autorais).',
           'Qualquer coisa que seja crime.',
         ],
       },
       {
-        title: 'Como funciona o cuidado com o que é publicado',
-        bullets: [
-          '**Fotos:** antes de aparecer, uma pessoa da equipe da igreja olha. Enquanto isso, a sua publicação fica ' +
-            '"em análise" e só você a vê.',
-          '**Textos e comentários:** um programa confere palavras ofensivas antes de aparecer. Se ele segurar o seu ' +
-            'texto, uma pessoa da equipe olha em seguida.',
-          'A equipe é formada por voluntários da igreja, treinados e com compromisso de sigilo.',
-        ],
-      },
-      {
-        title: 'Se você vir algo errado',
+        title: 'O que você pode fazer',
         bullets: [
           'Toque em "···" na publicação ou no comentário e escolha **Denunciar**. Diga o motivo.',
-          'Se for sobre **uma criança** ou se **você aparece numa foto sem ter autorizado**, escolha esse motivo: a ' +
-            'publicação sai do ar na hora e depois alguém analisa.',
           'Você também pode **bloquear** uma pessoa. Você não vê mais o que ela publica, e ela não vê o que você ' +
             'publica.',
-          `Quem não tem o app pode pedir a retirada pela página ${c('paginaRetirarConteudo')} ou pelo e-mail ` +
-            `${c('emailPublicado')}.`,
-          `A equipe responde às denúncias em até ${c('prazoDenuncia')}.`,
-          'Denunciar para prejudicar alguém de propósito também é contra as regras.',
-        ],
-      },
-      {
-        title: 'Se tirarem o que você publicou',
-        bullets: [
-          'Você recebe um aviso no app dizendo o motivo, se foi uma pessoa ou o programa que decidiu, e como pedir ' +
-            'revisão.',
-          `Se achar que foi um engano, toque em **Pedir revisão** em até ${c('prazoPedirRevisao')}. Outra pessoa da ` +
-            `equipe, diferente de quem decidiu, olha de novo e responde em até ${c('prazoRespostaRevisao')}.`,
-          'Quem quebra as regras várias vezes, ou de forma grave, pode ter a participação na comunidade suspensa. ' +
-            'Você é avisado e também pode pedir revisão.',
-        ],
-      },
-      {
-        title: 'O que é seu continua seu',
-        bullets: [
-          'Você pode apagar qualquer publicação ou comentário seu, quando quiser.',
-          'Você pode desistir de participar da comunidade em "Conta e privacidade". Aí tudo o que você publicou sai ' +
-            'do ar.',
-          `Você pode apagar a sua conta inteira pelo app ou pela página ${c('paginaExclusao')}.`,
-          'Sua leitura, seu jejum e a sua reflexão privada ficam no seu aparelho e nunca viram publicação.',
-          `A comunidade fica aberta para publicar até ${c('dataFimPublicacao')}, depois fica só para leitura e é ` +
-            `apagada em ${c('dataApagamento')}.`,
+          'Você pode **apagar** qualquer publicação ou comentário seu, quando quiser, e pode deixar de participar ' +
+            'em "Conta e privacidade". Aí tudo o que você publicou sai do ar.',
         ],
       },
       {
@@ -247,13 +215,6 @@ export function rulesDocument(campos: Record<CampoId, string | null> = CAMPOS): 
         paragraphs: [
           'Se você ou alguém está pensando em se machucar, procure ajuda agora: ligue **188** (CVV, gratuito, 24 ' +
             'horas). A equipe da comunidade não substitui atendimento de emergência.',
-        ],
-      },
-      {
-        title: 'Quem cuida desta comunidade',
-        paragraphs: [
-          `${c('razaoSocial')}, CNPJ ${c('cnpj')}. Contato: ${c('emailPublicado')}. Encarregado de dados: ` +
-            `${c('encarregado')}. Estas regras seguem os Termos de Uso e a Política de Privacidade: ${c('links')}.`,
         ],
       },
     ],
@@ -354,7 +315,13 @@ export function aceiteDocument(campos: Record<CampoId, string | null> = CAMPOS):
         title: 'O que você autoriza',
         bullets: [
           'Mostrar o que você publicar (texto e foto), os seus comentários e o seu Amém, com o seu nome, para essas pessoas.',
-          'Uma pessoa da equipe da igreja olhar as suas fotos, e um programa conferir os seus textos.',
+          // REVISÃO FINAL 2026-09-22: este é o texto de CONSENTIMENTO (LGPD), então ele
+          // tem de cobrir o tratamento que de fato acontece. Dizer que a equipe só olha
+          // "o que for denunciado" descreveria MENOS do que o servidor faz hoje: sem
+          // filtro automático configurado, uma pessoa da equipe olha TODA foto antes de
+          // ela aparecer (F5, caminho seguro). A frase abaixo vale nos dois casos.
+          'Um programa conferir o que você publica e, quando for preciso, uma pessoa da equipe da igreja olhar — ' +
+            'inclusive o que for denunciado.',
           `Guardar isso num servidor no Brasil, sob a responsabilidade de ${c('razaoSocial')}.`,
         ],
       },
@@ -378,10 +345,10 @@ export function aceiteDocument(campos: Record<CampoId, string | null> = CAMPOS):
  * logo abaixo, e é o hash delas que vai ao servidor.
  */
 export const RULES_SUMMARY = [
-  'Escreva como escreveria para um irmão na porta do templo.',
-  'Só publique o rosto de outra pessoa se ela concordou.',
-  'Não publique foto em que dê para reconhecer uma criança ou um adolescente.',
-  'Sem ofensa, propaganda, pedido de dinheiro ou campanha política.',
+  'Aqui você conta o que Deus falou na leitura, pede oração e agradece.',
+  'Pode: sua reflexão, um versículo, foto da sua Bíblia ou das suas anotações.',
+  'Não pode: ofensa, violência, nudez ou expor outra pessoa.',
+  'O que quebra as regras é tirado do ar. Dá para denunciar, bloquear e apagar o seu.',
 ] as const;
 
 /**
@@ -425,19 +392,30 @@ export const PENDING_NOTICE =
 export const MISMATCH_NOTICE = 'O texto foi atualizado. Atualize o app para ler a versão nova e continuar.';
 
 /**
- * Aviso no momento de escolher a foto (C3). Frases das regras (rascunho §1,
- * "Fotos de outras pessoas", "Fotos de crianças e adolescentes" e "Como funciona
- * o cuidado"), sem texto novo.
+ * Aviso no momento de escolher a foto (C3). Frases das regras curtas ("O que
+ * pode" e "O que não pode"), sem texto novo.
+ *
+ * A FOTO PUBLICA DIRETO é o desenho do fundador (2026-09-22) — mas o F5 dele
+ * mesmo guarda o caminho seguro: "sem filtro configurado, cai para aprovação
+ * humana". REVISÃO FINAL 2026-09-22: a frase "a foto aparece para a igreja assim
+ * que você publica" era uma promessa que o app NÃO cumpre hoje. Sem
+ * `MODERATION_PROVIDER`, `submit-post` devolve `in_review` para toda foto: quem
+ * publicasse na prévia do Dia 23 leria aqui uma promessa e, na tela seguinte,
+ * "Em análise". A frase abaixo é verdadeira nos dois casos e continua verdadeira
+ * quando o filtro for ligado — aí a foto limpa passa em segundos.
+ *
+ * O que não depende de nada disso, e por isso é dito em separado: a localização,
+ * que o app apaga de fato (`preparePhoto` reencoda e `assertPhotoSafeToUpload`
+ * confere os bytes).
  */
 export const PHOTO_WARNING = {
   title: 'Antes de escolher a foto',
   bullets: [
-    'Só publique o rosto de outra pessoa se ela concordou.',
-    '**Não publique foto em que dê para reconhecer uma criança ou um adolescente**, nem se for seu filho ou sua filha.',
-    'Na dúvida, não publique, ou escolha uma foto sem rostos.',
-    // F5 (2026-09-22): foto aparece na hora quando o filtro automático não desconfia; sem filtro configurado,
-    // toda foto espera uma pessoa. A frase vale para os dois casos.
-    'Toda foto passa por uma conferência antes de aparecer para todos. Se precisar do olhar de uma pessoa da equipe ' +
-      'da igreja, a sua publicação fica "em análise" e só você a vê até lá.',
+    'Escolha uma foto da sua Bíblia, das suas anotações, do seu caderno.',
+    '**Não exponha outra pessoa**: não publique foto de alguém que não quer aparecer.',
+    'Na dúvida, escolha uma foto sem rostos.',
+    'A foto passa por uma conferência antes de aparecer para a igreja. Se ela ficar "em análise", só você a vê ' +
+      'até lá.',
+    'A localização da foto é apagada no seu celular, antes de enviar.',
   ],
 } as const;

@@ -9,17 +9,19 @@ import { AmenButton, AmenSummary } from './AmenButton';
 import { PhotoCarousel } from './PhotoCarousel';
 import { relativeTime } from './tempo';
 import type { CardModel } from './useFeed';
-import { activityLine, groupLabel } from './v2';
+import { activityLine } from './v2';
 
 /**
  * Cartão do post do dia (F1, "diário compartilhado"):
  *
- *   Toda a igreja                         ← grupo (F6)
  *   (avatar) Ana · há 4 h            ···  ← denunciar, bloquear, apagar o meu
  *            Leitura do dia · Dia 3       ← tipo da atividade
  *   texto
  *   [fotos em carrossel, 1–4]
  *   Amém (rostinhos) 12   Comentar 3        Ver leitura ›
+ *
+ * SAIU o rótulo do grupo no topo (2026-09-22): todo post vai para a igreja
+ * inteira, e uma etiqueta "Toda a igreja" repetida em cada cartão só ocupa linha.
  *
  * O número e os rostinhos de Amém são decisão do fundador (F3). "Em análise" só
  * existe no cartão do próprio autor (o servidor nunca manda para mais ninguém),
@@ -52,22 +54,12 @@ export function PostCard({
   const { colors } = useTheme();
   const when = relativeTime(card.at, now);
   const who = card.isMine ? 'sua publicação' : `publicação de ${card.authorName}`;
-  const group = groupLabel(card.audience, card.audienceMinistry);
   const activity = activityLine(card.kind, card.dayNumber, card.verse);
   const nameLine = when.short ? `${card.authorName} · ${when.short}` : card.authorName;
-  const spoken = [group, card.authorName, when.spoken, activity?.replace(/ · /g, ', ')].filter(Boolean).join(', ');
+  const spoken = [card.authorName, when.spoken, activity?.replace(/ · /g, ', ')].filter(Boolean).join(', ');
 
   const header = (
     <View style={{ gap: spacing.xs }}>
-      <View
-        style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs, paddingHorizontal: gutter }}
-        aria-hidden
-      >
-        <Icon name={card.audience === 'ministerio' ? 'users' : 'community'} size={15} color={colors.textMuted} />
-        <AppText variant="caption" testID={`post-group-${card.postId}`} style={{ flexShrink: 1 }}>
-          {group}
-        </AppText>
-      </View>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingLeft: gutter, paddingRight: gutter - 12 }}>
         <ProfileAvatar
           name={card.authorName}

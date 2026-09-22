@@ -90,7 +90,19 @@ export function fitsWithoutScroll(viewport: number, contentHeight: number): bool
 
 export type Sent = { status: ContentStatus; hadPhoto: boolean };
 
-/** O que a pessoa lê depois de enviar. "Em análise" só o autor vê. */
+/**
+ * O que a pessoa lê depois de enviar. "Em análise" só o autor vê.
+ *
+ * FOTO: o desenho é publicar direto (decisão do fundador, 2026-09-22). Mas o F5
+ * do próprio feedback mantém o caminho seguro: "sem filtro configurado, cai para
+ * aprovação humana". Hoje o servidor está EXATAMENTE assim — sem
+ * `MODERATION_PROVIDER`, `submit-post` devolve `in_review` para toda foto —, e
+ * então dizer "o filtro automático segurou a SUA foto" seria contar um exame que
+ * não houve. A frase abaixo é verdadeira nos dois casos (filtro desconfiou ×
+ * ainda não há filtro) e não muda de sentido quando o filtro for ligado.
+ * REVISÃO FINAL 2026-09-22: corrigido aqui; a decisão de ligar o filtro (ou de
+ * publicar sem ele) continua sendo do fundador e não depende deste texto.
+ */
 export function sentCopy(sent: Sent): { title: string; message: string } {
   if (sent.status === 'published') {
     return { title: 'Publicado', message: 'Sua publicação já aparece no Juntos.' };
@@ -99,9 +111,9 @@ export function sentCopy(sent: Sent): { title: string; message: string } {
     return {
       title: 'Em análise',
       message:
-        // F5: o filtro automático desconfiou da foto (ou não há filtro, e toda foto espera uma pessoa).
-        'Antes de aparecer para todos, a sua foto passa pelo olhar de uma pessoa da equipe da igreja. Enquanto isso, ' +
-        'a sua publicação fica "em análise" e só você a vê, em "Minhas publicações".',
+        'A sua foto está passando por uma conferência antes de aparecer para todos, e uma pessoa da equipe da ' +
+        'igreja olha em seguida. Enquanto isso, a sua publicação fica "em análise" e só você a vê, em ' +
+        '"Minhas publicações".',
     };
   }
   return {

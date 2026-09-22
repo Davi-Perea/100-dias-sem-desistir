@@ -16,7 +16,6 @@ import { setBibleProvider, type BibleTextProvider } from '@/reader/provider';
 import { sentCopy } from '@/ui/comunidade/publicar/fluxo';
 import { cameraConfigured } from '@/ui/comunidade/publicar/foto';
 import {
-  audienceLabel,
   buildNewPost,
   chipLabel,
   hasContent,
@@ -299,15 +298,12 @@ describe('rascunho (puro)', () => {
     expect(isDirty({ body: null, photoCount: 0, attachments: [reading] }, null)).toBe(true);
   });
 
-  test('rótulos: chip, "x" falado, versículo e público', () => {
+  test('rótulos: chip, "x" falado e versículo', () => {
     expect(chipLabel({ kind: 'leitura', day: 17, reference: 'Gênesis 39–45' })).toBe('Dia 17 · Gênesis 39–45');
     expect(chipLabel({ kind: 'leitura', day: 17, reference: null })).toBe('Dia 17');
     expect(removeLabel({ kind: 'oracao' })).toBe('Tirar oração: Oração');
     expect(verseLabel({ book: 'PSA', chapter: 23, verse: 1 })).toBe('Salmos 23:1');
     expect(verseCanonical({ book: 'PSA', chapter: 23, verse: 1 })).toBe('PSA 23:1');
-    expect(audienceLabel('igreja', 'Louvor')).toBe('Toda a igreja');
-    expect(audienceLabel('ministerio', 'Louvor')).toBe('Ministério Louvor');
-    expect(audienceLabel('ministerio', null)).toBe('Toda a igreja');
   });
 
   test('câmera só com o texto de finalidade declarado na build', () => {
@@ -316,9 +312,16 @@ describe('rascunho (puro)', () => {
     expect(cameraConfigured(null)).toBe(false);
   });
 
-  test('F5: "Em análise" com foto fala de uma pessoa olhando, e que só o autor vê', () => {
-    expect(sentCopy({ status: 'in_review', hadPhoto: true }).message).toMatch(/pessoa da equipe/);
-    expect(sentCopy({ status: 'in_review', hadPhoto: true }).message).toContain('só você a vê');
+  test('F5: "Em análise" com foto fala de conferência (sem inventar filtro) e diz que só o autor vê', () => {
+    // REVISÃO FINAL 2026-09-22: o texto não pode AFIRMAR que o filtro automático
+    // segurou AQUELA foto. O próprio F5 mantém o caminho seguro ("sem filtro
+    // configurado, cai para aprovação humana") e é nele que o servidor está hoje:
+    // sem MODERATION_PROVIDER, submit-post devolve in_review para TODA foto.
+    // Afirmar o filtro contaria um exame que não houve.
+    const message = sentCopy({ status: 'in_review', hadPhoto: true }).message;
+    expect(message).toMatch(/passando por uma conferência/);
+    expect(message).toContain('só você a vê');
+    expect(message).not.toMatch(/filtro automático segurou/);
   });
 });
 
@@ -472,7 +475,12 @@ describe('F2 · Criar post', () => {
     await render(<PublishScreen />);
     await fireEvent.press(await screen.findByTestId('attach-galeria'));
     expect(screen.getByTestId('photo-warning')).toBeTruthy();
-    expect(screen.getByText(/Só publique o rosto de outra pessoa se ela concordou/)).toBeTruthy();
+    expect(screen.getByText(/Não exponha outra pessoa/)).toBeTruthy();
+    // REVISÃO FINAL 2026-09-22: o aviso diz a verdade nos dois casos — com filtro
+    // automático ligado a foto limpa passa em segundos; sem ele, ela fica "em
+    // análise" até uma pessoa olhar (F5, caminho seguro, que é o do servidor hoje).
+    expect(screen.getByText(/passa por uma conferência antes de aparecer para a igreja/)).toBeTruthy();
+    expect(screen.getByText(/A localização da foto é apagada no seu celular/)).toBeTruthy();
     expect(mockLaunch).not.toHaveBeenCalled();
     await fireEvent.press(screen.getByTestId('photo-pick'));
     await screen.findByTestId('photo-thumb-3');
@@ -544,29 +552,30 @@ describe('F2 · Criar post', () => {
     expect(mockCamera).toHaveBeenCalledWith(expect.objectContaining({ exif: false }));
   });
 
-  test('público: "Toda a igreja ▾" abre as opções; "Meu ministério" vai no post', async () => {
+  test('sem escolha de público: não há botão, e todo post vai para a igreja inteira', async () => {
     const { createPost } = useFakeApi();
     await render(<PublishScreen />);
-    const button = await screen.findByTestId('audience-button');
-    expect(button.props.accessibilityLabel).toBe('Onde aparece: Toda a igreja');
-    await fireEvent.press(button);
-    await fireEvent.press(await screen.findByTestId('audience-ministry'));
-    expect(screen.getByTestId('audience-label').props.children).toBe('Ministério Louvor');
+    await screen.findByTestId('publish-input');
+    // 2026-09-22: a escolha de público saiu do rodapé.
+    expect(screen.queryByTestId('audience-button')).toBeNull();
+    expect(screen.queryByTestId('audience-sheet')).toBeNull();
     // A frase de quem vê continua a do fundador, palavra por palavra.
     expect(screen.getByText(audienceSentence())).toBeTruthy();
     await fireEvent.changeText(screen.getByTestId('publish-input'), 'Ensaio abençoado.');
     await fireEvent.press(screen.getByTestId('publish-send'));
     await screen.findByText('Publicado');
-    expect(createPost.mock.calls[0][0]).toMatchObject({ audience: 'ministerio' });
+    expect(createPost.mock.calls[0][0]).toMatchObject({ audience: 'igreja' });
   });
 
-  test('público sem ministério no perfil ("Nenhum"): só a igreja, com o caminho para escolher', async () => {
-    useFakeApi({ status: { ministry: null } });
+  test('mesmo com ministério no perfil, o post vai para a igreja inteira', async () => {
+    const { createPost } = useFakeApi();
     await render(<PublishScreen />);
-    await fireEvent.press(await screen.findByTestId('audience-button'));
-    expect(await screen.findByTestId('audience-no-ministry')).toBeTruthy();
-    expect(screen.queryByTestId('audience-ministry')).toBeNull();
-    expect(screen.getByTestId('publish-author-line').props.children).toBe('Ana');
+    await fireEvent.changeText(await screen.findByTestId('publish-input'), 'Ensaio abençoado.');
+    await fireEvent.press(screen.getByTestId('publish-send'));
+    await screen.findByText('Publicado');
+    expect(createPost.mock.calls[0][0]).toMatchObject({ audience: 'igreja' });
+    // O ministério continua aparecendo junto do nome de quem publica.
+    expect(screen.queryByTestId('audience-button')).toBeNull();
   });
 
   test('"Publicado" volta sozinho ao feed; com leitor de tela, espera o toque', async () => {

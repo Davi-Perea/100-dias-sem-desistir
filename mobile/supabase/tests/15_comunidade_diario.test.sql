@@ -7,13 +7,14 @@
 --   F1  tipo da atividade, anexos (dia, referência de versículo), até 4 fotos em ordem;
 --   F5  foto na hora com filtro automático (service_record_photo_checks); sem
 --       resultado limpo, continua em análise; texto segurado nunca é publicado pela foto;
---   F6  público 'igreja' ou o ministério do perfil; feed com escopo;
+--   F6  SUPERADO em 2026-09-22: acabou o público por ministério e o escopo do
+--       feed; todo post vai para a igreja inteira (20260923060000_comunidade_igreja_inteira.sql);
 --   F3  Amém VISÍVEL: número e até 3 rostinhos, sem user_id, com bloqueio nos dois sentidos;
 --   F8  atividade no app (Amém e comentário de outras pessoas nos meus posts), visto.
 -- =============================================================================
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(63);
+select plan(61);
 
 update private.community_settings set value = 'v-teste' where key in ('publish_consent_version', 'rules_version');
 update private.community_settings set value = repeat('a', 64) where key = 'publish_consent_sha256';
@@ -196,46 +197,40 @@ select ok(exists (select 1 from private.storage_deletion_queue where object_name
   'a foto recusada vai para a fila de exclusão do Storage');
 
 -- ---------------------------------------------------------------------------
--- F6: público 'ministerio' (o ministério do perfil) e escopo do feed
+-- F6 SUPERADO (2026-09-22): o público por ministério acabou; todo post vai para
+-- a igreja inteira (20260923060000_comunidade_igreja_inteira.sql)
 -- ---------------------------------------------------------------------------
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-8000-0000000015a1","role":"authenticated"}', true);
 set local role authenticated;
-insert into ids select 'louvor', post_id from public.create_community_post(
-  post_body => 'Ensaio com oração hoje.', post_activity => 'oracao', post_audience => 'ministerio');
-select is((select audience || ':' || audience_ministry from public.my_community_posts()
-            where post_id = (select id from ids where name = 'louvor')),
-  'ministerio:Louvor', 'F6: "Meu ministério" grava o ministério do perfil de quem publica');
+select throws_ok(
+  $$ select * from public.create_community_post(post_body => 'Ensaio com oração.', post_audience => 'ministerio') $$,
+  '22023', null, 'o público "Meu ministério" acabou: a RPC recusa');
 select throws_ok($$ select * from public.create_community_post(post_body => 'oi', post_audience => 'Intercessão') $$,
-  '22023', null, 'F6: não dá para publicar para um ministério qualquer pelo nome');
-reset role;
-
-select set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-8000-0000000015d1","role":"authenticated"}', true);
-set local role authenticated;
-select throws_ok($$ select * from public.create_community_post(post_body => 'oi', post_audience => 'ministerio') $$,
-  '22023', null, 'F6: sem ministério no perfil não há "Meu ministério"');
-reset role;
-
-select set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-8000-0000000015b1","role":"authenticated"}', true);
-set local role authenticated;
-select ok(exists (select 1 from public.community_feed() where post_id = (select id from ids where name = 'louvor')),
-  'F6: quem é do mesmo ministério vê no feed da igreja');
+  '22023', null, 'nem um ministério qualquer pelo nome');
+insert into ids select 'louvor', post_id from public.create_community_post(
+  post_body => 'Ensaio com oração hoje.', post_activity => 'oracao');
 select results_eq(
-  $$ select post_id from public.community_feed(feed_scope => 'ministerio') $$,
-  $$ select id from ids where name = 'louvor' $$,
-  'F6: o escopo "ministério" traz só o que foi para o meu ministério');
+  $$ select audience, audience_ministry from public.my_community_posts()
+      where post_id = (select id from ids where name = 'louvor') $$,
+  $$ values ('igreja'::text, null::text) $$,
+  'todo post nasce para a igreja inteira, sem ministério gravado');
 reset role;
 
+-- Carla é de outro ministério (Intercessão) e vê assim mesmo.
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-8000-0000000015c1","role":"authenticated"}', true);
 set local role authenticated;
-select ok(not exists (select 1 from public.community_feed() where post_id = (select id from ids where name = 'louvor')),
-  'F6: quem é de outro ministério não vê');
-select throws_ok($$ select public.set_amen((select id from ids where name = 'louvor'), true) $$, 'P0002', null,
-  'F6: nem dá Amém');
-select throws_ok($$ select * from public.create_community_comment((select id from ids where name = 'louvor'), 'oi') $$,
-  'P0002', null, 'F6: nem comenta');
-select is_empty($$ select * from public.community_feed(feed_scope => 'ministerio') $$,
-  'F6: o escopo "ministério" de outro ministério não traz o post do Louvor');
+select ok(exists (select 1 from public.community_feed() where post_id = (select id from ids where name = 'louvor')),
+  'quem é de outro ministério vê o post no feed');
+select ok(public.set_amen((select id from ids where name = 'louvor'), true), 'e dá Amém');
+select lives_ok($$ select public.set_amen((select id from ids where name = 'louvor'), false) $$, 'e pode retirar');
 insert into ids select 'carla', post_id from public.create_community_post(post_body => 'Orando pela cidade.');
+reset role;
+
+-- Dora não tem ministério no perfil e publica igual.
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-8000-0000000015d1","role":"authenticated"}', true);
+set local role authenticated;
+select is((select status from public.create_community_post(post_body => 'Sem ministério, mesma igreja.')), 'published',
+  'sem ministério no perfil publica igual');
 reset role;
 
 -- ---------------------------------------------------------------------------

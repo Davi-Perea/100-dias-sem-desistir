@@ -87,7 +87,13 @@ export type CommunityStatus = {
 export type PostKind = 'leitura' | 'oracao' | 'jejum' | 'versiculo';
 export const POST_KINDS: readonly PostKind[] = ['leitura', 'oracao', 'jejum', 'versiculo'];
 
-/** Feed da igreja inteira ou do meu ministério; público do post (F6, sem seguidores). */
+/**
+ * Público do post. Desde 2026-09-22 só existe 'igreja': todo post vai para a
+ * igreja inteira e o servidor recusa 'ministerio' (22023 → invalid_input). O
+ * valor 'ministerio' continua no tipo porque o servidor guarda a coluna e as
+ * linhas ANTIGAS publicadas para um ministério continuam restritas — o feed
+ * ainda pode devolvê-las para quem é daquele ministério.
+ */
 export type FeedScope = 'igreja' | 'ministerio';
 
 /**
@@ -116,8 +122,9 @@ export type DiaryFields = {
   verse: VerseAttachment | null;
   /** Até 4 fotos, na ordem do carrossel. photoPath continua sendo a primeira. */
   photoPaths: string[];
+  /** 'igreja' em tudo o que é publicado desde 2026-09-22 (ver FeedScope). */
   audience: FeedScope;
-  /** Nome do ministério quando audience = 'ministerio'. */
+  /** Nome do ministério de um post ANTIGO com audience = 'ministerio'. */
   audienceMinistry: string | null;
   /** Quantas pessoas disseram Amém (sem quem tem bloqueio comigo). */
   amenCount: number;
@@ -199,7 +206,7 @@ export type ActivityItem = {
   unread: boolean;
 };
 
-/** Entrada de createPost (F1, F5, F6). */
+/** Entrada de createPost (F1, F5). */
 export type NewPost = {
   body?: string | null;
   /** Compatível com a versão de uma foto só. */
@@ -209,5 +216,9 @@ export type NewPost = {
   day?: number | null;
   kind?: PostKind | null;
   verse?: VerseAttachment | null;
+  /**
+   * IGNORADO desde 2026-09-22: todo post vai para a igreja inteira. Continua
+   * aceito só para a tela que ainda tem o seletor compilar enquanto ele não sai.
+   */
   audience?: FeedScope;
 };

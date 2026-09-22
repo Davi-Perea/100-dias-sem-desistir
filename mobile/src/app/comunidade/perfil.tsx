@@ -10,6 +10,8 @@ import { AppText, Block, Button, Rule, StateView } from '@/ui/components';
 import { ministryChoice } from '@/ui/comunidade/perfil/EntradaFlow';
 import {
   AgeCheck,
+  AVATAR_OPTIONAL_NOTE,
+  AVATAR_STEP_TITLE,
   AvatarField,
   BioField,
   ContactFields,
@@ -29,9 +31,10 @@ import { announceNotice } from '@/ui/voce/announce';
 /**
  * Perfil da comunidade (feedback do fundador de 2026-09-22, C1, C4 e N3).
  *
- * Foto, nome, "Tenho 16 anos ou mais", ministério (ou "Nenhum"), bio opcional e
- * o e-mail opcional com a caixa SEPARADA de novidades (desmarcada). Para
- * publicar valem foto, nome, ministério e 16+; o topo diz o que falta.
+ * Nome, "Tenho 16 anos ou mais", e os passos OPCIONAIS: "Coloque uma foto",
+ * ministério (ou "Nenhum"), bio, e o e-mail com a caixa SEPARADA de novidades
+ * (desmarcada). Para publicar bastam nome e 16+ (`profileGaps`); o topo diz o que
+ * falta, e a foto nunca está nessa lista (pedido do fundador, 2026-09-22).
  *
  * Parâmetros: `next` (rota da Comunidade para seguir depois de salvar, vinda de
  * Publicar) e `day` (dia da leitura, repassado).
@@ -165,7 +168,8 @@ function ProfileForm({ api, status }: { api: CommunityApi; status: CommunityStat
       ) : null}
 
       <View style={{ gap: spacing.md }}>
-        <FieldHeader title="Foto de perfil">Aparece ao lado do seu nome. Necessária para publicar.</FieldHeader>
+        {/* Foto OPCIONAL (2026-09-22): um passo do perfil, nunca um portão para publicar. */}
+        <FieldHeader title={AVATAR_STEP_TITLE}>{AVATAR_OPTIONAL_NOTE}</FieldHeader>
         <AvatarField
           api={api}
           name={shownName ?? ''}
