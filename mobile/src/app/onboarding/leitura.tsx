@@ -3,7 +3,7 @@ import { router } from 'expo-router';
 import { track } from '@/analytics/analytics';
 import { updateSettings, useSettings, type ReadingMode } from '@/settings/settingsStore';
 import { Button, ChoiceRow } from '@/ui/components';
-import { OnboardingStep, StepSupport } from '@/ui/OnboardingStep';
+import { ONBOARDING_STEP, OnboardingStep } from '@/ui/OnboardingStep';
 
 /**
  * Rótulos do F2. As descrições de antes saíram com o desenho. "Seguir o guia no
@@ -16,27 +16,25 @@ const OPTIONS: { mode: ReadingMode; label: string }[] = [
   { mode: 'both', label: 'Vou alternar' },
 ];
 
-/** F2 · Como você vai ler — passo 1 de 3. "Continuar" fica desabilitado até escolher. */
+/**
+ * F2 · Como você vai ler — passo 3 de 4. "Continuar" fica desabilitado até
+ * escolher. A frase de apoio de baixo saiu a pedido do fundador (feedback E2).
+ */
 export default function ReadingModeScreen() {
   const settings = useSettings();
   const selected = settings?.readingMode ?? null;
 
   return (
     <OnboardingStep
-      step={1}
+      step={ONBOARDING_STEP.leitura}
       title="Como você pretende ler na maioria dos dias?"
-      support={
-        <StepSupport testID="reading-support">
-          Ler na Bíblia impressa não é pior. Dá para mudar depois quando quiser.
-        </StepSupport>
-      }
       footer={
         <Button
           title="Continuar"
           disabled={!selected}
           onPress={() => {
             if (selected) track({ name: 'reading_mode_selected', mode: selected });
-            router.push('/onboarding/jejum');
+            router.push('/onboarding/lembrete');
           }}
           testID="reading-continue"
         />

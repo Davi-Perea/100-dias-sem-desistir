@@ -46,6 +46,8 @@ jest.mock('expo-router', () => ({
   ),
 }));
 
+// Reanimated/worklets: mock global em jest.setup.js.
+
 const mockHideSplash = jest.fn(() => Promise.resolve());
 jest.mock('expo-splash-screen', () => ({
   hideAsync: () => mockHideSplash(),
@@ -212,7 +214,7 @@ describe('R4-9 · o F6 usa o cadeado do desenho', () => {
 
 /* ------------------------------------------------ F2 · passo do lembrete */
 
-describe('F2 · passo 3, lembrete', () => {
+describe('F2 · passo 4, lembrete', () => {
   test('R4-5: cada chip diz o horário que grava (21:00 grava 21h)', async () => {
     await seedSettings();
     await render(<LembreteStep />);
