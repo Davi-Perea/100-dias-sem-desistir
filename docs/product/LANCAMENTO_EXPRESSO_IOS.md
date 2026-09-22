@@ -12,6 +12,11 @@
   entra na primeira atualização. Comunidade continua fora da V1 (vem como atualização) e, quando vier, **sem mensagem
   privada**. Os textos do §4 têm duas variantes: **[COM ABA BÍBLIA]** e **[SEM ABA BÍBLIA]**. Use a que bater com o
   build enviado.
+- **Atualização (pacote da loja, 21/09):** a ficha agora vai **pelo terminal**. Os textos do §4 estão em
+  **`mobile/store.config.json`** (formato EAS Metadata, variante **[COM ABA BÍBLIA]**, que é a do build: a aba existe
+  e os 66 livros estão empacotados) e sobem com `eas metadata:push`; o binário sobe com `eas submit`. As três páginas
+  públicas (política, suporte, exclusão) estão prontas em **`site/`** na raiz do repositório, **não publicadas**. O que
+  continua sendo clique manual no App Store Connect está no §3, itens 13 a 15.
 - **Etiquetas:** **FATO** (fonte oficial, acessada em 21/09/2026, lista no fim) · **INFERÊNCIA** (conclusão minha)
   · **NÃO CONFIRMADO** (procurei e não achei fonte oficial).
 - **Senhas, pagamento, código de duas etapas e aceites de contrato são seus.** Eu não digito nenhum deles.
@@ -86,11 +91,17 @@ Tempo total de mão na massa: ~3 horas, fora as esperas da Apple.
 - [ ] **1. Inscrição Apple (pessoa física).** App Apple Developer no iPhone → Conta → Inscrever-se. Nome legal igual
       ao do documento. Pagar US$ 99. Se o app não oferecer a inscrição no Brasil: developer.apple.com/programs/enroll.
 - [ ] **2. Pedir a autorização à igreja/ao seu pai** (§2). Hoje mesmo.
-- [ ] **3. Política de privacidade e suporte publicados** (a Apple exige as duas URLs). Caminho mais rápido: uma
-      página pública gratuita sua (ex.: Google Sites) com o texto da Parte 1 de
-      `docs/legal/POLITICA_DE_PRIVACIDADE_rascunho.md` preenchido, e uma página de suporte com um e-mail que você lê.
-      Me mande as duas URLs e o e-mail: eles entram em `mobile/src/config/contato.ts` **antes** do build (sem isso,
-      a tela Privacidade não mostra o link e o app não mostra contato: diretriz 1.5 da Apple).
+- [ ] **3. Política de privacidade e suporte publicados** (a Apple exige as duas URLs). As páginas já estão
+      prontas em `site/`: `politica-de-privacidade.html` (Parte 1 do rascunho, caminho pessoa física, sem o
+      interruptor de estatísticas), `suporte.html` (contato e perguntas frequentes) e `excluir-conta.html` (a V1 não
+      tem conta; como apagar os dados do aparelho, sem prometer função futura), mais `estilo.css`. São HTML estático, sem script,
+      legíveis no celular, claro e escuro. **Antes de publicar:** troque todo `[PREENCHER: ...]` (nome, e-mail, igreja,
+      prazo de resposta, data de vigência) e, se der, peça a um advogado para ler a política. **Publicar é com você**
+      (eu não publico nada): qualquer hospedagem estática gratuita serve (ex.: GitHub Pages, Netlify arrastando a
+      pasta `site/`, ou colar o texto num Google Sites). O endereço tem de ser **https**. Me mande as duas URLs e o
+      e-mail: eles entram em `mobile/src/config/contato.ts` e em `mobile/store.config.json` **antes** do build (sem
+      isso, a tela Privacidade não mostra o link, o app não mostra contato, diretriz 1.5 da Apple, e o build de loja é
+      recusado pelo `app.config.ts`).
 - [ ] **4. Conta Expo:** crie em expo.dev (o e-mail é seu). Depois:
 
 ```powershell
@@ -115,7 +126,8 @@ npx eas-cli@latest init         # cria o projeto "biblia-app" e IMPRIME um id
 
 ```powershell
 npx eas-cli@latest build -p ios --profile production
-```\n
+```
+
   O EAS pede seu **Apple ID**, a senha e o **código de duas etapas** (você digita), escolhe o time e cria sozinho
   o identificador `com.cemdiassemdesistir.app` e os certificados: responda "sim" para deixar o EAS gerenciar.
   Leva ~20 a 60 min com fila (INFERÊNCIA; plano gratuito tem fila).
@@ -126,21 +138,58 @@ npx eas-cli@latest build -p ios --profile production
 
 ```powershell
 npx eas-cli@latest submit -p ios --latest
-```\n
+```
+
   Pede o Apple ID de novo. O build aparece no TestFlight em ~15 a 60 min ("Processando").
 - [ ] **11. Seu pai revisa no TestFlight** (instale o app TestFlight no seu iPhone; o build aparece para você).
       Em paralelo, siga para o 12: a revisão da Apple e a do seu pai correm juntas.
-- [ ] **12. Preencher a ficha** com os textos do §4: descrição, palavras-chave, URLs, categoria, classificação
-      etária, privacidade do app, direitos de conteúdo, preço **Grátis**, disponibilidade **só Brasil**, capturas.
-      **Capturas:** tire no seu iPhone pelo TestFlight (dia aberto, intercessão, modo altar, jornada, lembrete; e,
-      **[COM ABA BÍBLIA]**, um capítulo aberto na aba Bíblia, sem nenhuma outra tradução na tela).
-      A Apple aceita o tamanho de 6,9" (1320 × 2868) ou 6,5" (1284 × 2778). Se o seu iPhone for menor, as capturas têm
-      a mesma proporção; amplie para 1290 × 2796 ou 1320 × 2868 antes de subir (me mande que eu confiro).
-- [ ] **13. Lançamento manual:** em "Lançamento desta versão", marque **"Lançar esta versão manualmente"**. Assim,
-      se a Apple aprovar antes de o seu pai terminar, nada vai ao ar sem o seu clique.
-- [ ] **14. Enviar para revisão.**
+- [ ] **12. Subir a ficha pelo terminal (EAS Metadata).** Antes, troque em `mobile/store.config.json` todo
+      `[PREENCHER: ...]`: copyright (seu nome legal), nome da igreja (descrição e notas), e-mail de suporte, as duas
+      URLs do item 3, e o bloco `review` (seu nome, sobrenome, e-mail, telefone `+55 ...`, link do vídeo do item 6).
+      Ou me mande os dados que eu preencho. Depois:
+
+```powershell
+npx eas-cli@latest metadata:lint    # confere o arquivo; não pede login
+npx eas-cli@latest metadata:push    # pede o Apple ID (você digita) e grava tudo no App Store Connect
+```
+
+  O `metadata:lint` **falha de propósito** enquanto `review.email` estiver com `[PREENCHER]` (o schema exige e-mail
+  válido): é a trava para não subir a ficha pela metade. Com um e-mail de teste no lugar, o arquivo passa ("Store
+  configuration is valid", eas-cli 24.7.0, conferido em 21/09). As URLs e os outros `[PREENCHER]` **não** são
+  barrados pelo lint: confira com `Select-String -Path store.config.json -Pattern PREENCHER` (tem de voltar vazio).
+  O `metadata:push` precisa de o app já existir no App Store Connect (item 9) e de um build já enviado (item 10)
+  (FATO [E3]). **O que ele grava** (FATO, schema [E4]): nome, subtítulo, descrição, palavras-chave, texto
+  promocional, URLs de suporte e política, copyright, categorias (**Referência** + **Estilo de vida**), respostas da
+  classificação etária (todas "não/nenhum": 4+ esperado), dados de contato e notas para o revisor, e
+  **lançamento manual** (`automaticRelease: false`, que substitui o antigo item 13). Se você mudar algo no site da
+  Apple depois, `npx eas-cli@latest metadata:pull` traz de volta para o arquivo.
+- [ ] **13. O que continua sendo clique no App Store Connect** (o EAS Metadata não cobre, ou não vale a pena):
+      1. **Capturas de tela** (a documentação do EAS Metadata diz "Upload screenshots ✗", FATO [E3]): tire no seu
+         iPhone pelo TestFlight (dia aberto, intercessão, modo altar, jornada, lembrete, e um capítulo aberto na aba
+         Bíblia com o crédito BLIVRE visível, sem outra tradução na tela). A Apple aceita 6,9" (1320 × 2868) ou 6,5"
+         (1284 × 2778); se o seu iPhone for menor, amplie antes de subir (me mande que eu confiro).
+         (O eas-cli 24.7.0 já aceita um campo `screenshots` não documentado; não usamos. Sem ele, o
+         `metadata:push` não mexe nas capturas: pode rodar de novo depois de subi-las. FATO, código do eas-cli, 21/09.)
+      2. **Privacidade do app** → "Dados não coletados" (§4.8). Não faz parte do `store.config.json`.
+      3. **Direitos de conteúdo** → "contém conteúdo de terceiros: Sim; tem os direitos: Sim" (§4.9), só com a
+         autorização da §2.
+      4. **Preço Grátis** e **disponibilidade só Brasil** (Preços e disponibilidade).
+      5. **Classificação etária:** abra o questionário e confira. A pergunta de **social media** (obrigatória desde
+         set/2026, `FICHA_DE_LOJA_rascunho.md` §5.1) **não existe** no schema do EAS: responda **Não** à mão.
+         As menções no guia a temas como abuso, pornografia ou violência são **motivos de oração**, não retratos:
+         por isso "Nenhum" (INFERÊNCIA; releia se o revisor questionar).
+      6. **Escolher o build** na versão 1.0.0 (seção "Build"), se ele não aparecer já selecionado.
+      7. **Criptografia:** não deve perguntar (`usesNonExemptEncryption: false`); se perguntar, "não usa além da
+         isenta".
+- [ ] **14. Enviar para revisão** (botão "Adicionar para revisão" → "Enviar"). Clique seu: nem o `eas submit` nem o
+      `metadata:push` enviam para revisão sozinhos (INFERÊNCIA: a doc do EAS não diz que enviam, e o `submit` só sobe
+      o binário para o TestFlight).
 - [ ] **15. Pedir revisão acelerada** logo depois: developer.apple.com/contact/app-store/?topic=expedite. Texto
-      pronto no §4.11.
+      pronto no §4.11. (Formulário web, clique seu.)
+
+**Resumo do envio, em ordem:** `eas build` (item 8) → criar o app no site (item 9, clique) → `eas submit` (item 10)
+→ `eas metadata:push` (item 12) → capturas, privacidade, direitos, preço, build (item 13, cliques) → enviar para
+revisão (item 14, clique) → revisão acelerada (item 15, formulário).
 
 **Quarta:** aprovado e seu pai de acordo → "Lançar esta versão". Link público da App Store para a igreja.
 
@@ -153,6 +202,11 @@ npx eas-cli@latest submit -p ios --latest
 
 Conferido em 21/09 com o app **como estará no build**. Se alguma função listada na descrição sair do app antes do
 build, apague a linha dela. Contagens feitas no PowerShell.
+
+**Para o envio vale o `mobile/store.config.json`** (variante com aba Bíblia, sobe com `metadata:push`); esta seção
+fica como referência. Diferenças conferidas no código em 21/09: lá a descrição inclui "Sua reflexão" (a tela existe:
+Você › Minhas reflexões) e diz "Leia no próprio app ou na sua Bíblia" (o leitor do dia mostra a Bíblia Livre); as
+notas ao revisor citam as abas reais (Jornada, Bíblia, Você) e dizem que os lembretes ficam em Você › Lembretes.
 
 **4.1 Nome** (máx. 30): `100 dias sem desistir` (21). Se já existir outro app com esse nome:
 `100 dias sem desistir: guia` (27).
@@ -327,6 +381,13 @@ por configuração (me mande o log do EAS).
 - [E1] Expo — Submit to the Apple App Store (conta paga obrigatória; `--auto-submit`): https://docs.expo.dev/submit/ios/
 - [E2] Expo SDK 57 — app config (`ios.config.usesNonExemptEncryption`; `ios.supportsTablet` padrão `false`):
   https://docs.expo.dev/versions/v57.0.0/config/app/
+- [E3] Expo — EAS Metadata: https://docs.expo.dev/eas/metadata/ ("Upload screenshots" não suportado; beta) e
+  https://docs.expo.dev/eas/metadata/getting-started/ (app registrado na Apple e binário enviado antes do `push`;
+  arquivo na raiz do projeto ou em `metadataPath` do `eas.json`)
+- [E4] Expo — store config schema: https://docs.expo.dev/eas/metadata/schema/ e o schema do próprio eas-cli 24.7.0
+  (`schema/metadata-0.json`, que já traz os campos novos da classificação etária: `messagingAndChat`,
+  `userGeneratedContent`, `advertising`, `parentalControls`, `ageAssurance`, `healthOrWellnessTopics`,
+  `gunsOrOtherWeapons`, `ageRatingOverrideV2`; a página web ainda não lista esses campos)
 - [F13] Google Play — requisito de teste para contas pessoais novas: ver `docs/technical/ANDROID_VERIFICACAO_30_09.md`.
 
 **Não confirmado:** se a inscrição pelo app Apple Developer funciona no Brasil; prazo real de aprovação de pessoa física;
