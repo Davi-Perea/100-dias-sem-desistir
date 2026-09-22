@@ -20,6 +20,8 @@ import { setBibleProvider } from '@/reader/provider';
 import { _resetReflectionsCacheForTests, loadReflections, reflectionCount, saveReflection } from '@/reflections/reflectionsStore';
 import { _resetSettingsCacheForTests, loadSettings, SETTINGS_KEY } from '@/settings/settingsStore';
 
+// Reanimated não carrega no Jest sem o módulo nativo (ver support/reanimatedVoceMock).
+jest.mock('react-native-reanimated', () => jest.requireActual('./support/reanimatedVoceMock'));
 jest.mock('expo-router', () => ({
   router: { push: jest.fn(), replace: jest.fn(), back: jest.fn(), canGoBack: jest.fn(() => true) },
   useLocalSearchParams: () => ({}),
@@ -126,7 +128,7 @@ afterAll(() => {
 });
 
 describe('Você: só o que tem destaque', () => {
-  test('progresso e oito linhas com chevron; nada de conta, altar ou aviso solto', async () => {
+  test('progresso e dez linhas com chevron (V1: anotações e metas); nada de conta, altar ou aviso solto', async () => {
     await seedSettings();
     await render(<YouScreen />);
     await waitFor(() => expect(screen.getByTestId('progress-block')).toBeTruthy());
@@ -134,6 +136,8 @@ describe('Você: só o que tem destaque', () => {
     const rows = screen.getAllByTestId(/^row-/).map((node) => node.props.testID as string);
     expect(rows).toEqual([
       'row-reflections',
+      'row-notes',
+      'row-goals',
       'row-ministry',
       'row-fasting',
       'row-reminder',

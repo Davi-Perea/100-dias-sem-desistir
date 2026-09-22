@@ -1,12 +1,14 @@
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 
+import { demoDay } from '@/config/demo';
 import { altarForDisplay, getCampaign, getDay } from '@/journey/datasetSource';
+import { isDevBuild } from '@/journey/devBuild';
 import { listMinistries } from '@/journey/ministries';
 import { readingSummary } from '@/journey/readingSummary';
 import { dateOfDay, rawCampaignDay } from '@/journey/officialDay';
 import type { Campaign } from '@/journey/types';
-import type { ReminderSlot } from '@/settings/settingsStore';
+import { getCachedSettings, type ReminderSlot } from '@/settings/settingsStore';
 
 /**
  * Lembretes: notificações LOCAIS, sem conta e sem servidor (spec §15).
@@ -14,11 +16,13 @@ import type { ReminderSlot } from '@/settings/settingsStore';
  * como não declaramos SCHEDULE_EXACT_ALARM, o agendamento é inexato — o que a
  * política do Google Play exige para lembretes que não são despertador/calendário.
  *
- * Três famílias, cada uma com o próprio prefixo de identificador, TODAS presas
+ * Quatro famílias, cada uma com o próprio prefixo de identificador, TODAS presas
  * aos dias da campanha (Dia 1 a total_days) e agendadas com gatilho DATE:
  *  - leitura diária (LEM-01): um aviso por dia da campanha, em janela rolante;
  *  - véspera do dia do meu ministério (uma por dia do ministério, 2 ou 24);
- *  - altar de hoje às 12h de São Paulo (janela rolante).
+ *  - altar de hoje às 12h de São Paulo (janela rolante);
+ *  - ausência (feedback N2, 2026-09-22): dois avisos, 1 e 7 dias depois da
+ *    última abertura, refeitos a cada abertura.
  * As janelas são refeitas na abertura e a cada volta ao primeiro plano
  * (useReminderSync). O tamanho delas sai do orçamento de agendamentos
  * pendentes: ver `reminderWindowDays`.
@@ -35,6 +39,7 @@ export const DAILY_REMINDER_ID = 'daily-reading-reminder';
 export const DAILY_REMINDER_PREFIX = 'daily-reading-day-';
 export const MINISTRY_REMINDER_PREFIX = 'ministry-eve-';
 export const ALTAR_REMINDER_PREFIX = 'altar-today-';
+export const ABSENCE_REMINDER_PREFIX = 'absence-';
 /**
  * Canal com lockscreenVisibility PRIVATE (D-5). No Android, as configurações de
  * um canal ficam fixas depois de criado, então a mudança exige um id novo; o
@@ -57,9 +62,9 @@ export const ALTAR_TIME = { hour: 12, minute: 0 } as const;
  * Orçamento de agendamentos pendentes (LEM-01, LEM-04).
  * iOS: no máximo 64 por app; o que passar disso o sistema descarta em silêncio.
  * Reserva o maior ministério da escala inteiro (a véspera não tem janela: são
- * todos os dias do ministério) e uma folga para o teste do painel DEV; o resto
- * é dividido igualmente entre a leitura diária e o altar. Com a escala atual:
- * (64 − 24 − 2) / 2 = 19 dias para cada uma.
+ * todos os dias do ministério), os dois avisos de ausência (N2) e uma folga para
+ * o teste do painel DEV; o resto é dividido igualmente entre a leitura diária e
+ * o altar. Com a escala atual: (64 − 24 − 2 − 2) / 2 = 18 dias para cada uma.
  * Android: o limite prático é o do AlarmManager (500 alarmes por app) e a
  * campanha inteira cabe (100 + 100 + 24), então a janela cobre todos os dias
  * restantes e quem fica semanas sem abrir o app continua recebendo.
@@ -67,12 +72,14 @@ export const ALTAR_TIME = { hour: 12, minute: 0 } as const;
 // PROVISÓRIO (decisão do engenheiro, 2026-09-21: orçamento do iOS dividido em partes iguais entre leitura e altar; a véspera do ministério é reservada inteira porque não tem janela)
 export const IOS_PENDING_LIMIT = 64;
 const IOS_SLACK = 2;
+/** Atrasos dos avisos de ausência, em dias depois da última abertura (N2). */
+export const ABSENCE_DELAYS_DAYS = [1, 7] as const;
 const ANDROID_WINDOW_DAYS = 100;
 
 export function reminderWindowDays(platform: string = Platform.OS): number {
   if (platform === 'android') return ANDROID_WINDOW_DAYS;
   const largestMinistry = listMinistries().reduce((max, m) => Math.max(max, m.days.length), 0);
-  return Math.max(1, Math.floor((IOS_PENDING_LIMIT - IOS_SLACK - largestMinistry) / 2));
+  return Math.max(1, Math.floor((IOS_PENDING_LIMIT - IOS_SLACK - ABSENCE_DELAYS_DAYS.length - largestMinistry) / 2));
 }
 
 export type ReminderResult = { ok: true } | { ok: false; reason: string };
@@ -239,6 +246,90 @@ export function dailyReminderPlan(
   return plan;
 }
 
+/**
+ * Dia simulado da campanha, ou null na data real. Mesma regra do useJourney: o
+ * modo demonstração (config/demo.ts) vale mais que o dia do painel DEV, e em
+ * release nada disso existe.
+ */
+export function simulatedCampaignDay(): number | null {
+  if (!isDevBuild()) return null;
+  return demoDay() ?? getCachedSettings()?.dev.dayOverride ?? null;
+}
+
+/** Meia-noite local de `now` somada de `offsetDays`, no horário pedido. */
+function localDateFromToday(now: Date, offsetDays: number, time: { hour: number; minute: number }): Date {
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate() + offsetDays, time.hour, time.minute, 0, 0);
+}
+
+/**
+ * Leitura diária com o dia SIMULADO (feedback N1, 2026-09-22). Na demonstração
+ * o app finge que hoje é o Dia N, mas as notificações disparam no relógio de
+ * verdade: agendar pelas datas reais da campanha não mandava nada antes de
+ * 23/09. Aqui hoje (data real) é o Dia N, amanhã o N+1, e o texto nomeia a
+ * leitura desse dia simulado. Só existe em build de desenvolvimento.
+ */
+export function simulatedDailyReminderPlan(
+  time: { hour: number; minute: number } | null,
+  campaign: Campaign,
+  now: Date,
+  simulatedDay: number,
+  windowDays = reminderWindowDays(),
+): PlannedReminder[] {
+  if (!time) return [];
+  const plan: PlannedReminder[] = [];
+  for (let offset = 0; plan.length < windowDays; offset += 1) {
+    const day = simulatedDay + offset;
+    if (day > campaign.total_days) break;
+    const when = localDateFromToday(now, offset, time);
+    if (when.getTime() <= now.getTime()) continue;
+    plan.push({ id: `${DAILY_REMINDER_PREFIX}${day}`, day, when, title: DAILY_TITLE, body: dailyBody(day) });
+  }
+  return plan;
+}
+
+/**
+ * Avisos de ausência (feedback N2, 2026-09-22): no máximo dois, 1 e 7 dias
+ * depois da última abertura, com texto sem culpa. Cada abertura refaz os dois, então
+ * quem abre todo dia nunca recebe nenhum. Só dentro da campanha: o dia oficial
+ * no instante do disparo precisa estar entre 1 e total_days (com o dia simulado,
+ * conta a partir dele).
+ *
+ * PROVISÓRIO (decisão do engenheiro, 2026-09-22: sem desenho) O horário é o da
+ * última abertura, puxado para dentro de 09:00–20:00: quem abriu o app à
+ * meia-noite não recebe aviso de madrugada.
+ */
+export const ABSENCE_TITLE = DAILY_TITLE;
+export const ABSENCE_BODY = 'Sua leitura de hoje está esperando por você.';
+const ABSENCE_EARLIEST = { hour: 9, minute: 0 } as const;
+const ABSENCE_LATEST = { hour: 20, minute: 0 } as const;
+
+function withinQuietWindow(lastOpen: Date, offsetDays: number): Date {
+  const minutes = lastOpen.getHours() * 60 + lastOpen.getMinutes();
+  const earliest = ABSENCE_EARLIEST.hour * 60 + ABSENCE_EARLIEST.minute;
+  const latest = ABSENCE_LATEST.hour * 60 + ABSENCE_LATEST.minute;
+  if (minutes < earliest) return localDateFromToday(lastOpen, offsetDays, ABSENCE_EARLIEST);
+  if (minutes > latest) return localDateFromToday(lastOpen, offsetDays, ABSENCE_LATEST);
+  return localDateFromToday(lastOpen, offsetDays, { hour: lastOpen.getHours(), minute: lastOpen.getMinutes() });
+}
+
+export function absenceReminderPlan(
+  enabled: boolean,
+  campaign: Campaign,
+  lastOpen: Date,
+  simulatedDay: number | null = null,
+): PlannedReminder[] {
+  if (!enabled) return [];
+  const plan: PlannedReminder[] = [];
+  for (const offset of ABSENCE_DELAYS_DAYS) {
+    const when = withinQuietWindow(lastOpen, offset);
+    const day = simulatedDay === null ? rawCampaignDay(when, campaign) : simulatedDay + offset;
+    if (day < 1 || day > campaign.total_days) continue;
+    if (when.getTime() <= lastOpen.getTime()) continue;
+    plan.push({ id: `${ABSENCE_REMINDER_PREFIX}${offset}`, day, when, title: ABSENCE_TITLE, body: ABSENCE_BODY });
+  }
+  return plan;
+}
+
 /** Véspera de cada dia do ministério, só no futuro. O texto não nomeia o ministério (D-5). */
 export function ministryReminderPlan(ministry: string | null, days: number[], campaign: Campaign, now: Date): PlannedReminder[] {
   if (!ministry) return [];
@@ -358,8 +449,27 @@ export function syncDailyReminder(
   campaign: Campaign,
   now: Date,
   options?: SyncOptions,
+  simulatedDay: number | null = simulatedCampaignDay(),
 ): Promise<ReminderResult> {
-  return resync(DAILY_REMINDER_PREFIX, cancelLegacyDaily, () => dailyReminderPlan(time, campaign, now), options);
+  const plan = () =>
+    simulatedDay === null
+      ? dailyReminderPlan(time, campaign, now)
+      : simulatedDailyReminderPlan(time, campaign, now, simulatedDay);
+  return resync(DAILY_REMINDER_PREFIX, cancelLegacyDaily, plan, options);
+}
+
+/**
+ * Avisos de ausência (N2). Chamar a cada abertura e volta ao primeiro plano:
+ * `now` é a última abertura. Desligado, só cancela.
+ */
+export function syncAbsenceReminders(
+  enabled: boolean,
+  campaign: Campaign,
+  now: Date,
+  options?: SyncOptions,
+  simulatedDay: number | null = simulatedCampaignDay(),
+): Promise<ReminderResult> {
+  return resync(ABSENCE_REMINDER_PREFIX, null, () => absenceReminderPlan(enabled, campaign, now, simulatedDay), options);
 }
 
 /** Desliga a leitura diária. Passa pela mesma fila das sincronizações. */
@@ -425,9 +535,11 @@ export async function scheduleTestNotification(seconds = 5): Promise<ReminderRes
   return { ok: true };
 }
 
+/** Dia cujo texto o teste mostra: o simulado (demonstração, painel DEV) ou o de hoje. */
 function testDay(): number {
   const campaign = getCampaign();
-  return Math.min(campaign.total_days, Math.max(1, rawCampaignDay(new Date(), campaign)));
+  const day = simulatedCampaignDay() ?? rawCampaignDay(new Date(), campaign);
+  return Math.min(campaign.total_days, Math.max(1, day));
 }
 
 export async function listScheduledReminders() {

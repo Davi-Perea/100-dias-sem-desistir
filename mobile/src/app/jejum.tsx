@@ -48,13 +48,21 @@ export default function FastingScreen() {
 
       <ToggleRow
         label="Participar do propósito de jejum"
-        caption="Não perguntamos do que você jejua. O registro fica neste aparelho."
+        caption="Não perguntamos do que você jejua."
         checked={settings.fastingEnabled}
         // PER-02: se o disco recusar, o store não muda e o interruptor fica como está salvo.
         onToggle={() => updateSettings((s) => ({ ...s, fastingEnabled: !s.fastingEnabled })).catch(() => undefined)}
         first
         testID="fasting-enabled"
       />
+
+      {/*
+        E3 (2026-09-22): a pergunta do jejum saiu da entrada, e a nota que ela
+        tinha veio para cá, com o texto que o fundador aprovou.
+      */}
+      <AppText variant="bodySm" testID="fasting-privacy-note">
+        O registro do jejum fica só neste aparelho. Não vai para grupo, líder, relatório ou servidor.
+      </AppText>
 
       <Rule />
 
