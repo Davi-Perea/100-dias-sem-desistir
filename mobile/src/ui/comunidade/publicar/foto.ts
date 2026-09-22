@@ -60,7 +60,7 @@ import { assertPhotoSafeToUpload, PHOTO_JPEG_QUALITY, PHOTO_MAX_DIMENSION, strip
  */
 export const PICKER_QUALITY = 0.95;
 
-export type PickedAsset = { uri: string; width: number; height: number };
+export type PickedAsset = { uri: string; width: number; height: number; base64?: string | null };
 
 export type PreparedPhoto = {
   /** Arquivo reencodado, no cache do app (para a prévia). */
@@ -161,7 +161,17 @@ export const encodeWithManipulator: PhotoEncoder = async (uri, plan) => {
  * (photo_not_jpeg, photo_too_large, photo_has_metadata) se a foto não pode subir.
  */
 export async function preparePhoto(asset: PickedAsset, encode: PhotoEncoder = encodeWithManipulator): Promise<PreparedPhoto> {
-  const encoded = await encode(asset.uri, ({ width, height }) => fitWithin(width, height));
+  let encoded: { uri: string; width: number; height: number; base64: string };
+  try {
+    encoded = await encode(asset.uri, ({ width, height }) => fitWithin(width, height));
+  } catch (failure) {
+    // PLANO B (relato do fundador, 2026-09-22: "a foto não sobe"): quando o
+    // manipulador não abre o arquivo — acontece com HEIC dentro do Expo Go —,
+    // usamos os bytes que o PRÓPRIO seletor já decodificou e comprimiu em JPEG
+    // (pedimos base64 a ele). Sem redimensionar: o tamanho é conferido abaixo.
+    if (!asset.base64) throw failure;
+    encoded = { uri: asset.uri, width: asset.width, height: asset.height, base64: asset.base64 };
+  }
   // Limpa EXIF/XMP/IPTC antes de conferir: o iOS grava EXIF de orientação mesmo
   // no arquivo reencodado, e a conferência recusava a foto por causa disso.
   const bytes = stripJpegMetadata(base64ToBytes(encoded.base64));
@@ -177,13 +187,14 @@ export async function pickFromLibrary(): Promise<PickedAsset | null> {
     allowsMultipleSelection: false,
     // Sem EXIF e sem base64 do original: o que vale é o reencodado.
     exif: false,
-    base64: false,
+    // Plano B: se o manipulador falhar (HEIC no Expo Go), usamos estes bytes.
+    base64: true,
     quality: PICKER_QUALITY,
   });
   if (result.canceled) return null;
   const asset = result.assets?.[0];
   if (!asset?.uri) return null;
-  return { uri: asset.uri, width: asset.width ?? 0, height: asset.height ?? 0 };
+  return { uri: asset.uri, width: asset.width ?? 0, height: asset.height ?? 0, base64: asset.base64 ?? null };
 }
 
 /**
@@ -200,14 +211,15 @@ export async function pickManyFromLibrary(limit: number): Promise<PickedAsset[]>
     // Só faz sentido com seleção múltipla; com uma foto o iOS ignora.
     orderedSelection: limit > 1,
     exif: false,
-    base64: false,
+    // Plano B: se o manipulador falhar (HEIC no Expo Go), usamos estes bytes.
+    base64: true,
     quality: PICKER_QUALITY,
   });
   if (result.canceled) return [];
   return (result.assets ?? [])
     .filter((asset) => Boolean(asset?.uri))
     .slice(0, limit)
-    .map((asset) => ({ uri: asset.uri, width: asset.width ?? 0, height: asset.height ?? 0 }));
+    .map((asset) => ({ uri: asset.uri, width: asset.width ?? 0, height: asset.height ?? 0, base64: asset.base64 ?? null }));
 }
 
 /**
@@ -236,7 +248,8 @@ export async function takePhoto(): Promise<CameraResult> {
     mediaTypes: ['images'],
     allowsEditing: false,
     exif: false,
-    base64: false,
+    // Plano B: se o manipulador falhar (HEIC no Expo Go), usamos estes bytes.
+    base64: true,
     quality: PICKER_QUALITY,
   });
   if (result.canceled) return { kind: 'canceled' };

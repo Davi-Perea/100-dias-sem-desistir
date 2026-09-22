@@ -248,7 +248,11 @@ export default function PublishScreen() {
         await addPrepared(await pickManyFromLibrary(photosLeft));
       }
     } catch (failure) {
-      setPhotoError(toCommunityError(failure).message);
+      // Em desenvolvimento, o motivo cru vai junto: sem ele, "não foi possível
+      // preparar esta foto" não diz em que passo parou (relato do fundador,
+      // 2026-09-22). Em release, só a frase para a pessoa.
+      const detail = __DEV__ && failure instanceof Error && failure.message ? ` (${failure.message})` : '';
+      setPhotoError(`${toCommunityError(failure).message}${detail}`);
     } finally {
       setPhotoStage('idle');
     }
