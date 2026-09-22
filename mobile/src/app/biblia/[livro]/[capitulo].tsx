@@ -182,7 +182,13 @@ export default function BibleChapterScreen() {
           <StateView kind="loading" />
         ) : (
           <>
-            <ChapterText verses={passage.verses} heading={passage.heading} fontSize={fontSize} />
+            <ChapterText
+              verses={passage.verses}
+              heading={passage.heading}
+              fontSize={fontSize}
+              book={position.book}
+              chapter={position.chapter}
+            />
             {/* Atribuição exigida pela licença (CC BY), no fim de cada capítulo. */}
             <AppText variant="caption" style={{ marginTop: spacing.lg }} testID="bible-attribution">
               {metadata.copyrightNotice}

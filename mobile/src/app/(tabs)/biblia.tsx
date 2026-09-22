@@ -1,9 +1,10 @@
-import { router, useFocusEffect } from 'expo-router';
+import { router, useFocusEffect, type Href } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { View } from 'react-native';
 
 import type { Book } from '@/bible/books';
 import { useJourney } from '@/journey/useJourney';
+import { markCount, useMarks } from '@/marks/marksStore';
 import { getBibleProvider } from '@/reader/provider';
 import { AppText, Button, Screen, ScreenScroll, SettingRow } from '@/ui/components';
 import {
@@ -34,6 +35,7 @@ export default function BibleTab() {
   const metadata = getBibleProvider().getMetadata();
   const [last, setLast] = useState<BiblePosition | null>(null);
   const plan = todayPlanState(useJourney());
+  const marks = markCount(useMarks());
   /** Um primário por tela: com o "Ler" do plano em aberto, o "Continuar em" vira contorno. */
   const planIsPrimary = plan?.kind === 'today' && !plan.completed;
 
@@ -73,6 +75,18 @@ export default function BibleTab() {
             variant={planIsPrimary ? 'outline' : 'primary'}
             onPress={() => router.push(chapterHref(last))}
             testID="bible-continue"
+          />
+        ) : null}
+
+        {/* B2: com alguma marca ou anotação, o atalho para a lista. Sem nenhuma,
+            a linha não aparece (a lista vazia não ajuda quem nunca marcou). */}
+        {marks > 0 ? (
+          <SettingRow
+            label="Minhas anotações"
+            value={String(marks)}
+            first
+            onPress={() => router.push('/anotacoes' as Href)}
+            testID="bible-marks"
           />
         ) : null}
 

@@ -54,7 +54,7 @@ jest.mock('@expo/vector-icons', () => ({ Ionicons: () => null }));
 const TODAY = 17;
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const mockRouter = require('expo-router').router as { back: jest.Mock };
+const mockRouter = require('expo-router').router as { back: jest.Mock; replace: jest.Mock };
 
 function loadCampaignOnDay(day: number) {
   const base: JourneyDataset = devDataset();
@@ -178,7 +178,7 @@ describe('B1 · guia sem texto licenciado', () => {
     await fireEvent.press(screen.getByTestId('reader-next'));
 
     await fireEvent.press(screen.getByTestId('reader-complete'));
-    await waitFor(() => expect(mockRouter.back).toHaveBeenCalled());
+    await waitFor(() => expect(mockRouter.replace).toHaveBeenCalledWith(`/concluido/${day}`));
     _resetCompletionsCacheForTests();
     expect(isDayCompleted(await loadCompletions(campaignId), day)).toBe(true);
   });
