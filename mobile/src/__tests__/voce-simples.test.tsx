@@ -7,7 +7,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { AccessibilityInfo, Alert, Linking } from 'react-native';
 
-import YouScreen from '@/app/(tabs)/voce';
+import SettingsScreen from '@/app/ajustes';
 import HelpScreen from '@/app/ajuda';
 import ReminderScreen from '@/app/lembrete';
 import PrivacyScreen from '@/app/privacidade';
@@ -127,11 +127,11 @@ afterAll(() => {
   resetToBundledContent();
 });
 
-describe('Você: só o que tem destaque', () => {
-  test('progresso e dez linhas com chevron (V1: anotações e metas); nada de conta, altar ou aviso solto', async () => {
+describe('Ajustes (F7: a lista que era o Você)', () => {
+  test('dez linhas com chevron (V1: anotações e metas); nada de conta, altar ou aviso solto', async () => {
     await seedSettings();
-    await render(<YouScreen />);
-    await waitFor(() => expect(screen.getByTestId('progress-block')).toBeTruthy());
+    await render(<SettingsScreen />);
+    await waitFor(() => expect(screen.getByTestId('row-reflections')).toBeTruthy());
 
     const rows = screen.getAllByTestId(/^row-/).map((node) => node.props.testID as string);
     expect(rows).toEqual([

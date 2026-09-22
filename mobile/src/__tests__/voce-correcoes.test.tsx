@@ -7,6 +7,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { AccessibilityInfo, StyleSheet } from 'react-native';
 
 import YouScreen from '@/app/(tabs)/voce';
+import SettingsScreen from '@/app/ajustes';
 import AppearanceScreen from '@/app/aparencia';
 import HelpScreen from '@/app/ajuda';
 import AccountScreen from '@/app/conta';
@@ -171,7 +172,7 @@ describe('D1 · Você', () => {
     mockCloud.email = 'lider@exemplo.com';
     mockCloud.role = 'admin';
     await seedSettings();
-    await render(<YouScreen />);
+    await render(<SettingsScreen />);
     await waitFor(() => expect(screen.getByTestId('row-help')).toBeTruthy());
     expect(screen.queryByTestId('row-leader-tools')).toBeNull();
     expect(screen.queryByTestId('row-admin')).toBeNull();
@@ -198,7 +199,7 @@ describe('D1 · Você', () => {
 
   test('R2-3: "Leitura" abre a tela com "Como eu leio"; D-4: sem linha de estatísticas', async () => {
     await seedSettings();
-    await render(<YouScreen />);
+    await render(<SettingsScreen />);
     await waitFor(() => expect(screen.getByTestId('row-reading')).toBeTruthy());
     expect(screen.getByTestId('row-reading').props.accessibilityLabel).toBe('Leitura, No app');
     await fireEvent.press(screen.getByTestId('row-reading'));

@@ -6,7 +6,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { render, renderHook, screen, waitFor } from '@testing-library/react-native';
 
-import YouScreen from '@/app/(tabs)/voce';
+// F7: as linhas do antigo Você foram para /ajustes (engrenagem do perfil).
+import SettingsScreen from '@/app/ajustes';
 import { DEMO_DAY_DEFAULT, demoDay, demoSeedDays, isDemoMode } from '@/config/demo';
 import { _resetDemoSeedForTests } from '@/journey/demoSeed';
 import { loadDataset, resetToDevFixtures } from '@/journey/datasetSource';
@@ -171,17 +172,17 @@ describe('com __DEV__ e o modo ligado', () => {
     expect(result.current.isDevContent).toBe(true);
   });
 
-  test('o Você esconde a entrada do painel de desenvolvimento', async () => {
+  test('Ajustes esconde a entrada do painel de desenvolvimento', async () => {
     setDemoEnv('true');
     expect(loadDataset(datasetBeforeStart(), 'development').ok).toBe(true);
-    await render(<YouScreen />);
+    await render(<SettingsScreen />);
     await screen.findByTestId('row-help');
     expect(screen.queryByText('Painel de desenvolvimento')).toBeNull();
   });
 
-  test('sem o modo, o painel continua no Você em desenvolvimento', async () => {
+  test('sem o modo, o painel continua em Ajustes em desenvolvimento', async () => {
     expect(loadDataset(datasetBeforeStart(), 'development').ok).toBe(true);
-    await render(<YouScreen />);
+    await render(<SettingsScreen />);
     await screen.findByTestId('row-help');
     expect(screen.getByText('Painel de desenvolvimento')).toBeTruthy();
   });
