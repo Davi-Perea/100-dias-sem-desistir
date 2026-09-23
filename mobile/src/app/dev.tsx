@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Redirect, router } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { Alert, View } from 'react-native';
+import { View } from 'react-native';
 
 import { recordedEvents } from '@/analytics/analytics';
 import { demoDay } from '@/config/demo';
@@ -14,6 +14,7 @@ import { resetReflections } from '@/reflections/reflectionsStore';
 import { isDevBuild } from '@/journey/devBuild';
 import { updateSettings, useSettings } from '@/settings/settingsStore';
 import { wipeLocalData } from '@/settings/wipeLocalData';
+import { confirmar } from '@/ui/confirmar';
 import { AppText, Button, Card, Divider, Screen, ScreenScroll, StateView } from '@/ui/components';
 import { spacing, useTheme } from '@/ui/theme';
 
@@ -31,13 +32,15 @@ export default function DevRoute() {
 
 /** Pede confirmação antes de apagar tudo (PER-03): não há como desfazer. */
 function confirmWipe(onConfirm: () => void) {
-  Alert.alert(
-    'Apagar todos os dados locais?',
-    'Progresso, jejum, reflexões, preferências e posição de leitura deste aparelho serão apagados. Não dá para desfazer.',
-    [
-      { text: 'Cancelar', style: 'cancel' },
-      { text: 'Apagar tudo', style: 'destructive', onPress: onConfirm },
-    ],
+  confirmar(
+    {
+      titulo: 'Apagar todos os dados locais?',
+      mensagem:
+        'Progresso, jejum, reflexões, preferências e posição de leitura deste aparelho serão apagados. Não dá para desfazer.',
+      confirmar: 'Apagar tudo',
+      destrutivo: true,
+    },
+    onConfirm,
   );
 }
 

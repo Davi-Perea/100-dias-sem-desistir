@@ -1,6 +1,6 @@
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Alert, KeyboardAvoidingView, ScrollView, useWindowDimensions, View } from 'react-native';
+import { KeyboardAvoidingView, ScrollView, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { getDay } from '@/journey/datasetSource';
@@ -9,6 +9,7 @@ import { readingSummary } from '@/journey/readingSummary';
 import { useJourney } from '@/journey/useJourney';
 import { deleteReflection, getReflection, saveReflection, useReflections } from '@/reflections/reflectionsStore';
 import { BackBar, goBackOrHome } from '@/ui/BackBar';
+import { confirmar } from '@/ui/confirmar';
 import { LockedDayScreen } from '@/ui/LockSheet';
 import { TextField } from '@/ui/TextField';
 import { AppText, Block, Button, DevContentBanner, Screen, StateView } from '@/ui/components';
@@ -124,29 +125,36 @@ export default function ReflectionScreen() {
       goBackOrHome();
       return;
     }
-    Alert.alert('Descartar o que você escreveu?', 'Esta reflexão não foi salva neste aparelho.', [
-      { text: 'Continuar escrevendo', style: 'cancel' },
-      { text: 'Descartar', style: 'destructive', onPress: goBackOrHome },
-    ]);
+    confirmar(
+      {
+        titulo: 'Descartar o que você escreveu?',
+        mensagem: 'Esta reflexão não foi salva neste aparelho.',
+        confirmar: 'Descartar',
+        cancelar: 'Continuar escrevendo',
+        destrutivo: true,
+      },
+      goBackOrHome,
+    );
   };
 
   const remove = () => {
-    Alert.alert('Excluir reflexão', 'Esta reflexão será apagada deste aparelho.', [
-      { text: 'Cancelar', style: 'cancel' },
+    confirmar(
       {
-        text: 'Excluir',
-        style: 'destructive',
-        onPress: async () => {
-          setSaveFailed(false);
-          try {
-            await deleteReflection(journey.campaign.id, day);
-            goBackOrHome();
-          } catch {
-            setSaveFailed(true);
-          }
-        },
+        titulo: 'Excluir reflexão',
+        mensagem: 'Esta reflexão será apagada deste aparelho.',
+        confirmar: 'Excluir',
+        destrutivo: true,
       },
-    ]);
+      async () => {
+        setSaveFailed(false);
+        try {
+          await deleteReflection(journey.campaign.id, day);
+          goBackOrHome();
+        } catch {
+          setSaveFailed(true);
+        }
+      },
+    );
   };
 
   const save = async () => {
