@@ -1,4 +1,4 @@
-import { Alert, Linking, View } from 'react-native';
+import { Alert, Linking, Platform, View } from 'react-native';
 
 import { isCloudConfigured } from '@/cloud/config';
 import { PRIVACY_URL } from '@/config/contato';
@@ -53,6 +53,19 @@ export default function PrivacyScreen() {
         <AppText variant="bodySm">
           Seu progresso, suas reflexões, seu jejum e suas preferências ficam guardados só neste aparelho.
         </AppText>
+        {/*
+          Precisão, não ressalva jurídica (auditoria de 2026-09-23): no Android o
+          backup na nuvem está desligado no app.config (allowBackup: false). No
+          iPhone, o backup do iCloud é do sistema e leva os dados do app junto —
+          para o iCloud da própria pessoa, nunca para a igreja. Dizer "só neste
+          aparelho" sem essa linha era promessa que o app não cumpre sozinho.
+        */}
+        {Platform.OS === 'ios' ? (
+          <AppText variant="bodySm" testID="privacy-icloud">
+            Se você usa o backup do iCloud, essas informações entram no seu próprio backup, como as dos outros
+            apps. Elas continuam sendo suas: não vão para a igreja nem para a liderança.
+          </AppText>
+        ) : null}
         {cloud ? null : (
           <AppText variant="bodySm" testID="privacy-no-send">
             Nesta versão o app não envia seus dados a ninguém. Não há conta, anúncio nem rastreamento. Os

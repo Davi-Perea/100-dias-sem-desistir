@@ -1,4 +1,4 @@
-import { useLocalSearchParams } from 'expo-router';
+import { Stack, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Alert, KeyboardAvoidingView, ScrollView, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -111,6 +111,25 @@ export default function ReflectionScreen() {
   const minViewport = FIELD_LINE * 3 * fontScale + FIELD_PADDING;
   const footerPinned = columnHeight === 0 || footerHeight === 0 || columnHeight - footerHeight >= minViewport;
 
+  /**
+   * O que foi digitado e ainda não foi salvo. "Cancelar" e o arrastar do modal
+   * descartam a reflexão sem gravar nada — e três parágrafos escritos às cinco
+   * da manhã não podem sumir por um toque errado. Mesma pergunta que a tela de
+   * publicar já faz (auditoria de 2026-09-23).
+   */
+  const dirty = draft.trim() !== stored.trim();
+
+  const cancel = () => {
+    if (!dirty) {
+      goBackOrHome();
+      return;
+    }
+    Alert.alert('Descartar o que você escreveu?', 'Esta reflexão não foi salva neste aparelho.', [
+      { text: 'Continuar escrevendo', style: 'cancel' },
+      { text: 'Descartar', style: 'destructive', onPress: goBackOrHome },
+    ]);
+  };
+
   const remove = () => {
     Alert.alert('Excluir reflexão', 'Esta reflexão será apagada deste aparelho.', [
       { text: 'Cancelar', style: 'cancel' },
@@ -194,6 +213,10 @@ export default function ReflectionScreen() {
 
   return (
     <Screen edges={['top', 'left', 'right']}>
+      {/* Esta rota é modal: no iPhone, arrastar para baixo fecha e o texto some
+          sem passar por "Cancelar". Com algo escrito e não salvo, o arrastar
+          desliga — a saída é o botão, que pergunta. */}
+      <Stack.Screen options={{ gestureEnabled: !dirty }} />
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         // R1-4: 'padding' também no Android. Com o edge-to-edge (obrigatório no
@@ -211,6 +234,7 @@ export default function ReflectionScreen() {
           <BackBar
             label="Cancelar"
             chevron={false}
+            onBack={cancel}
             title={`Dia ${day}`}
             rightAction={{
               label: 'Excluir',

@@ -5,6 +5,7 @@ import { join } from 'path';
 import { AccessibilityInfo } from 'react-native';
 
 import GoalsStep from '@/app/onboarding/metas';
+import { quoteFrame } from '@/bible/quote';
 import { CUSTOM_GOAL_LABEL, CUSTOM_GOAL_MAX, GOALS, normalizeCustomGoal } from '@/config/goals';
 import type { JourneyDay } from '@/journey/types';
 import {
@@ -210,9 +211,9 @@ describe('J4 · o versículo do dia entre aspas, com a referência embaixo', () 
     expect(screen.getByTestId('daily-notice-reference').props.children).toBe('Provérbios 3:5 · Bíblia Livre');
   });
 
-  test('tradução que já vem com aspas não ganha uma segunda camada', async () => {
+  test('tradução que já usa aspas não ganha uma segunda camada', async () => {
     // Gênesis 12:2–3 é fala de Deus: a Bíblia Livre já fecha com aspas. A
-    // moldura cede; o texto da tradução continua intacto.
+    // moldura cede inteira; o texto da tradução continua intacto.
     const FALA = 'E farei de ti uma grande nação; e em ti serão benditas todas as famílias da terra.”';
     mockKeyVerse.value = { label: 'Gênesis 12:2-3', text: FALA, translation: 'Bíblia Livre' };
     await render(<DailyVerseNotice visible day={1} dayData={DAY} onClose={() => {}} />);
@@ -221,9 +222,38 @@ describe('J4 · o versículo do dia entre aspas, com a referência embaixo', () 
     expect(screen.getByTestId('daily-notice-verse-text').props.children).toBe(FALA);
 
     const quoted = screen.getByLabelText(FALA);
-    expect(quoted.props.children).toEqual([OPEN_QUOTE, expect.anything(), '']);
-    // Nenhuma aspa de fechamento dobrada em lugar nenhum da tela.
-    expect(JSON.stringify(screen.toJSON())).not.toContain(`${CLOSE_QUOTE}${CLOSE_QUOTE}`);
+    expect(quoted.props.children).toEqual(['', expect.anything(), '']);
+    // Nenhuma aspa dobrada em lugar nenhum da tela.
+    const desenho = JSON.stringify(screen.toJSON());
+    expect(desenho).not.toContain(`${CLOSE_QUOTE}${CLOSE_QUOTE}`);
+    expect(desenho).not.toContain(`${OPEN_QUOTE}${OPEN_QUOTE}`);
+  });
+
+  test('a moldura nunca desemparelha as aspas de um versículo (Dia 100 incluído)', () => {
+    // O defeito do Dia 100 era a moldura entrar num versículo que já abria fala
+    // no meio: saíam três aspas de abertura para duas de fechamento.
+    const conta = (s: string, c: string) => s.split(c).length - 1;
+    const emparelhado = (s: string) => conta(s, OPEN_QUOTE) === conta(s, CLOSE_QUOTE);
+
+    const CASOS = [
+      'Confia no SENHOR de todo o teu coração.', // sem aspas: ganha a moldura
+      'E disse-lhes: “Por que fazeis essas coisas?”', // fala interna fechada
+      '“Eis que faço novas todas as coisas.”', // fala inteira
+      'E veio um homem de Deus a Eli, e disse-lhe: “Assim diz o SENHOR:', // abre e não fecha
+    ];
+
+    for (const texto of CASOS) {
+      const { open, close } = quoteFrame(texto);
+      const antes = conta(texto, OPEN_QUOTE) - conta(texto, CLOSE_QUOTE);
+      const depois = conta(open + texto + close, OPEN_QUOTE) - conta(open + texto + close, CLOSE_QUOTE);
+      // A moldura não pode PIORAR o que a tradução entregou.
+      expect(depois).toBe(antes);
+    }
+
+    // Sem aspas próprias, a moldura entra e fica emparelhada.
+    const { open, close } = quoteFrame(CASOS[0]);
+    expect(open).toBe(OPEN_QUOTE);
+    expect(emparelhado(open + CASOS[0] + close)).toBe(true);
   });
 
   test('sem texto achado, fica só a referência — e nenhuma aspa solta', async () => {
