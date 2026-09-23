@@ -210,6 +210,22 @@ describe('J4 · o versículo do dia entre aspas, com a referência embaixo', () 
     expect(screen.getByTestId('daily-notice-reference').props.children).toBe('Provérbios 3:5 · Bíblia Livre');
   });
 
+  test('tradução que já vem com aspas não ganha uma segunda camada', async () => {
+    // Gênesis 12:2–3 é fala de Deus: a Bíblia Livre já fecha com aspas. A
+    // moldura cede; o texto da tradução continua intacto.
+    const FALA = 'E farei de ti uma grande nação; e em ti serão benditas todas as famílias da terra.”';
+    mockKeyVerse.value = { label: 'Gênesis 12:2-3', text: FALA, translation: 'Bíblia Livre' };
+    await render(<DailyVerseNotice visible day={1} dayData={DAY} onClose={() => {}} />);
+
+    await waitFor(() => expect(screen.getByTestId('daily-notice-verse-text')).toBeTruthy());
+    expect(screen.getByTestId('daily-notice-verse-text').props.children).toBe(FALA);
+
+    const quoted = screen.getByLabelText(FALA);
+    expect(quoted.props.children).toEqual([OPEN_QUOTE, expect.anything(), '']);
+    // Nenhuma aspa de fechamento dobrada em lugar nenhum da tela.
+    expect(JSON.stringify(screen.toJSON())).not.toContain(`${CLOSE_QUOTE}${CLOSE_QUOTE}`);
+  });
+
   test('sem texto achado, fica só a referência — e nenhuma aspa solta', async () => {
     mockKeyVerse.value = { label: 'Provérbios 3:5', text: null, translation: null };
     await render(<DailyVerseNotice visible day={1} dayData={DAY} onClose={() => {}} />);
