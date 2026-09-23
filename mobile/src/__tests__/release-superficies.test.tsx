@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { render, screen, waitFor } from '@testing-library/react-native';
+import { render, screen } from '@testing-library/react-native';
 import type { ReactElement, ReactNode } from 'react';
 
 import TabsLayout from '@/app/(tabs)/_layout';
@@ -66,6 +66,8 @@ jest.mock('expo-router', () => {
     useSegments: () => [],
     useFocusEffect: () => {},
     Stack: { Screen: () => null },
+    // A guarda de /juntos e /admin usa Redirect (auditoria de lançamento web).
+    Redirect: () => null,
     Link: ({ children }: { children: unknown }) => children,
   };
 });
@@ -148,10 +150,18 @@ describe('nenhuma tela alcançável em release diz "indisponível"', () => {
     expect(allText()).not.toMatch(UNAVAILABLE);
   });
 
-  test('Comunidade (rota escondida, mas ainda alcançável por link): só o altar e o propósito', async () => {
+  /**
+   * Mudou em 23/09, na auditoria de lançamento web: a rota não é mais alcançável
+   * por link. No aparelho, esconder a aba bastava; na web toda rota é uma URL
+   * digitável, e uma tela chamada "Comunidade" respondendo numa versão que não
+   * tem comunidade é confusão pública. Agora ela redireciona para a casa.
+   *
+   * O teste continua existindo para provar que NADA de indisponível aparece —
+   * só que agora por um motivo mais forte: a tela nem chega a desenhar.
+   */
+  test('Comunidade: a rota redireciona e não desenha tela nenhuma', async () => {
     await render(<TogetherScreen />);
-    await waitFor(() => expect(screen.getByTestId('altar-today')).toBeTruthy());
-    expect(screen.getByTestId('open-proposito')).toBeTruthy();
+    expect(screen.queryByTestId('altar-today')).toBeNull();
     expect(screen.queryByTestId('join-cta')).toBeNull();
     expect(allText()).not.toMatch(UNAVAILABLE);
   });

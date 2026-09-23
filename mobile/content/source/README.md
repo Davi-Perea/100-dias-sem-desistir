@@ -60,4 +60,17 @@ que apareça nos nomes da escala.
 
 | Identificador (`rights_reference`) | O que foi autorizado | Quem, quando, canal | Onde está a cópia |
 |---|---|---|---|
-| — | Nada ainda (`pending_authorization`) | — | — |
+| `autorizacao-2026-09-23` | Publicar o guia diário dos 100 Dias e a escala no app | Esdras Gabriel Perea, Pastor Presidente · 23/09/2026 · e-mail (esdrasgabriel10@gmail.com) | **A ANEXAR:** o e-mail original ainda não foi arquivado aqui |
+| — | Nomes de líderes: **não** autorizados (`leader_names_authorized = false`) | — | — |
+
+> **Pendência de arquivo, aberta em 23/09/2026.** O registro acima foi ditado pelo fundador no
+> encerramento do lançamento web, sob prazo. A cópia do e-mail **não** foi anexada a este repositório.
+> Enquanto isso não for feito, a linha é um registro de palavra, não um comprovante — e é o comprovante
+> que serve se alguém um dia perguntar de onde veio o direito de publicar o material da igreja.
+> Anexar o e-mail (PDF ou .eml) em `content/source/` e trocar "A ANEXAR" pelo nome do arquivo.
+>
+> Contexto verificado em 23/09/2026: o endereço informado como canal (`esdrasgabriel10@gmail.com`) é o
+> da conta sob a qual esta sessão de trabalho rodou, e é distinto da conta de publicação usada pelo
+> fundador (`pereadavi12@gmail.com`, Davi Perea). Os dois sobrenomes coincidem, o que é coerente com o
+> registro: quem autorizou é o Pastor Presidente, e o fundador é quem publica. Anexar o e-mail resolve
+> a pendência de vez.

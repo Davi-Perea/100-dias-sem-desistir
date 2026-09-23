@@ -443,15 +443,32 @@ describe('DIR-04/05/06: o README diz a verdade', () => {
     expect(readme).toMatch(/não\*\* está\s+ligado a nenhum script/);
   });
 
-  test('DIR-06: a variante production recusa gerar config sem autorização no dataset embarcado', () => {
-    expect(() => assertRightsForStore(MOBILE)).toThrow(/rights_status "pending_authorization"/);
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'store-'));
-    fs.mkdirSync(path.join(root, 'content', '100-dias-2026'), { recursive: true });
+  /**
+   * Em 23/09/2026 a igreja autorizou e o dataset embarcado virou "authorized",
+   * então o projeto real passa a PASSAR neste portão. A prova de que o portão
+   * ainda barra é feita com um dataset pendente construído aqui — assim ela não
+   * depende da situação de direitos do dia.
+   */
+  test('DIR-06: a variante production recusa gerar config com dataset pendente', () => {
+    const pendente = fs.mkdtempSync(path.join(os.tmpdir(), 'store-pendente-'));
+    fs.mkdirSync(path.join(pendente, 'content', '100-dias-2026'), { recursive: true });
     fs.writeFileSync(
-      path.join(root, 'content', '100-dias-2026', 'dataset.json'),
+      path.join(pendente, 'content', '100-dias-2026', 'dataset.json'),
+      JSON.stringify({ provenance: { rights_status: 'pending_authorization', rights_reference: null } }),
+    );
+    expect(() => assertRightsForStore(pendente)).toThrow(/rights_status "pending_authorization"/);
+
+    const autorizado = fs.mkdtempSync(path.join(os.tmpdir(), 'store-'));
+    fs.mkdirSync(path.join(autorizado, 'content', '100-dias-2026'), { recursive: true });
+    fs.writeFileSync(
+      path.join(autorizado, 'content', '100-dias-2026', 'dataset.json'),
       JSON.stringify({ provenance: { rights_status: 'authorized', rights_reference: 'autorizacao-2026-09-25' } }),
     );
-    expect(() => assertRightsForStore(root)).not.toThrow();
+    expect(() => assertRightsForStore(autorizado)).not.toThrow();
+  });
+
+  test('DIR-06: o projeto real, já autorizado, passa no portão de direitos', () => {
+    expect(() => assertRightsForStore(MOBILE)).not.toThrow();
   });
 
   test('1.5 / 5.1.1(i): a variante production recusa gerar config sem e-mail de suporte e URL https da política', () => {

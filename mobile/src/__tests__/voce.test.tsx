@@ -193,7 +193,8 @@ describe('telas que saem de Você', () => {
     expect(screen.queryByText('Ajuda e contato')).toBeNull();
     expect(screen.queryByText(/pending_authorization|dev_fixture|partially_authorized/)).toBeNull();
     expect(screen.getByTestId('help-rights').props.children.join('')).toMatch(
-      /Situação dos direitos: aguardando autorização escrita da igreja\./,
+      // Autorizado pela igreja em 23/09/2026 (autorizacao-2026-09-23).
+      /Situação dos direitos: autorizado pela igreja./,
     );
     // 2026-09-22: a faixa de "aguardando autorização" saiu das telas; a situação
     // dos direitos continua escrita aqui, e a pendência tem uma linha só, em

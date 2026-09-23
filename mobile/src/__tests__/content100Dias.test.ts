@@ -34,6 +34,24 @@ const TOTAL_CHAPTERS = BOOKS.reduce((sum, book) => sum + book.chapters, 0);
 
 const clone = (d: JourneyDataset): JourneyDataset => JSON.parse(JSON.stringify(d));
 
+/**
+ * Cópia do conteúdo real FORÇADA ao estado pendente.
+ *
+ * Em 23/09/2026 a igreja autorizou a publicação, e o dataset embarcado passou a
+ * ser "authorized". Os testes do portão partiam do dataset real supondo que ele
+ * estivesse pendente — o que era verdade até aquele dia e deixou de ser.
+ *
+ * Partir daqui torna essas provas independentes do estado do conteúdo: elas
+ * testam o PORTÃO, não a situação de direitos de hoje. Se a autorização for
+ * revogada ou trocada, nada aqui precisa mudar.
+ */
+const pendente = (): JourneyDataset => {
+  const d = clone(dataset);
+  d.provenance.rights_status = 'pending_authorization';
+  d.provenance.rights_reference = null;
+  return d;
+};
+
 afterEach(() => {
   resetToBundledContent();
 });
@@ -41,7 +59,8 @@ afterEach(() => {
 describe('dataset embarcado dos 100 Dias', () => {
   test('é o conteúdo ativo por padrão ao abrir o app', () => {
     expect(getDataset().campaign.id).toBe('lagoinha-100-dias-2026');
-    expect(contentStateOf(getDataset())).toBe('pending');
+    // Autorizado desde 23/09/2026 (autorizacao-2026-09-23).
+    expect(contentStateOf(getDataset())).toBe('authorized');
   });
 
   test('o JSON versionado corresponde às fontes .docx (conversor determinístico)', () => {
@@ -166,18 +185,26 @@ describe('proveniência e direitos do conteúdo real', () => {
     }
   });
 
-  test('está pendente de autorização: o portão de produção bloqueia, mas não por ser fixture', () => {
-    expect(dataset.provenance.rights_status).toBe('pending_authorization');
-    const gate = assertProductionReady(dataset);
+  test('o conteúdo real está autorizado e passa no portão de produção', () => {
+    expect(dataset.provenance.rights_status).toBe('authorized');
+    expect(dataset.provenance.rights_reference).toBe('autorizacao-2026-09-23');
+    // A referência vai para dentro do app: não pode carregar nome de pessoa.
+    expect(dataset.provenance.rights_reference).toMatch(/^[a-z0-9-]+$/);
+    expect(assertProductionReady(dataset).valid).toBe(true);
+    expect(loadDataset(dataset, 'production').ok).toBe(true);
+  });
+
+  test('pendente, o portão de produção bloqueia — e não por ser fixture', () => {
+    const gate = assertProductionReady(pendente());
     expect(gate.valid).toBe(false);
     const codes = gate.issues.map((i) => i.code);
     expect(codes).toContain('production.rights');
     expect(codes).not.toContain('production.dev_fixture');
-    expect(loadDataset(dataset, 'production').ok).toBe(false);
+    expect(loadDataset(pendente(), 'production').ok).toBe(false);
   });
 
   test('vira "authorized" só com a referência da autorização', () => {
-    const authorized = clone(dataset);
+    const authorized = pendente();
     authorized.provenance.rights_status = 'authorized';
     expect(assertProductionReady(authorized).issues.map((i) => i.code)).toContain('provenance.rights_reference');
     authorized.provenance.rights_reference = 'e-mail da liderança, 2026-09-xx';
@@ -194,7 +221,7 @@ describe('proveniência e direitos do conteúdo real', () => {
   });
 
   test('o portão de produção recusa um dataset que traga nomes sem autorização', () => {
-    const smuggled = clone(dataset);
+    const smuggled = pendente();
     smuggled.provenance.rights_status = 'authorized';
     smuggled.provenance.rights_reference = 'autorizacao';
     smuggled.days[0].altar = { ministry: 'Intercessão/Bálsamo', leaders_label: 'Prs. Leandra e Daniel' };
@@ -204,11 +231,11 @@ describe('proveniência e direitos do conteúdo real', () => {
 
   test('com autorização, o rótulo passa a ser exibível', () => {
     // Liberar nomes num dataset ainda pendente continua sendo erro de validação.
-    const pendingWithNames = clone(dataset);
+    const pendingWithNames = pendente();
     pendingWithNames.provenance.leader_names_authorized = true;
     expect(validateDataset(pendingWithNames).issues.map((i) => i.code)).toContain('provenance.leader_names');
 
-    const authorized = clone(dataset);
+    const authorized = pendente();
     authorized.provenance.rights_status = 'authorized';
     authorized.provenance.rights_reference = 'autorizacao';
     authorized.provenance.leader_names_authorized = true;
@@ -221,7 +248,7 @@ describe('proveniência e direitos do conteúdo real', () => {
     resetToDevFixtures();
     expect(contentStateOf(getDataset())).toBe('fixture');
     resetToBundledContent();
-    expect(contentStateOf(getDataset())).toBe('pending');
+    expect(contentStateOf(getDataset())).toBe('authorized');
   });
 });
 

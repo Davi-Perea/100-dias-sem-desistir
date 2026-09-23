@@ -195,3 +195,70 @@ describe('nenhuma tela da V1 depende do Alert.alert, que não existe na web', ()
     expect(fonte).toMatch(/if \(perguntar\(texto\)\) aoConfirmar\(\);/);
   });
 });
+
+/* ------------------------------------------ rotas digitáveis na web pública */
+
+/**
+ * AUDITORIA DE LANÇAMENTO WEB 2026-09-23: no aparelho, uma aba escondida é
+ * inalcançável. Na web, TODA rota é uma URL que dá para digitar — e `/juntos` e
+ * `/admin` respondiam, mesmo com a aba escondida e a nuvem desligada.
+ *
+ * As duas guardas usam as chaves que JÁ existiam. Nenhum interruptor novo,
+ * `COMMUNITY_ENABLED` não mudou de valor, e a autorização de verdade continua
+ * sendo a do servidor.
+ */
+describe('a V1 pública não expõe rota inacabada nem tela de administração', () => {
+  test('/juntos redireciona para a casa enquanto a Comunidade estiver desligada', () => {
+    const fonte = readFileSync(join(__dirname, '..', 'app', '(tabs)', 'juntos.tsx'), 'utf8');
+    expect(fonte).toMatch(/if \(!COMMUNITY_ENABLED\) return <Redirect href="\/" \/>;/);
+    // A guarda é a MESMA chave que esconde a aba — não um valor novo.
+    expect(fonte).toMatch(/from '@\/config\/features'/);
+  });
+
+  test('/admin redireciona para a casa sem nuvem configurada', () => {
+    const fonte = readFileSync(join(__dirname, '..', 'app', 'admin.tsx'), 'utf8');
+    expect(fonte).toMatch(/if \(!isCloudConfigured\(\)\) return <Redirect href="\/" \/>;/);
+  });
+
+  test('COMMUNITY_ENABLED continua desligado na V1 — a guarda não é desculpa para ligar', () => {
+    const fonte = readFileSync(join(__dirname, '..', 'config', 'features.ts'), 'utf8');
+    expect(fonte).toMatch(/export const COMMUNITY_ENABLED = false;/);
+  });
+
+  test('a aba da Comunidade continua sem entrada na barra', () => {
+    const fonte = readFileSync(join(__dirname, '..', 'app', '(tabs)', '_layout.tsx'), 'utf8');
+    expect(fonte).toMatch(/href: COMMUNITY_ENABLED \? undefined : null/);
+  });
+
+  /**
+   * Escrito em 23/09 às 03h, quando o portão ainda estava fechado, dizendo:
+   * "se um dia isto virar authorized, terá sido pela autorização da igreja".
+   * Virou, no mesmo dia, com a autorização do Pastor Presidente registrada em
+   * content/source/README.md. O teste passa a guardar as condições que a
+   * autorização NÃO dispensa.
+   */
+  test('autorizado, o conteúdo real carrega referência neutra e segue sem nomes de líderes', () => {
+    const dataset = JSON.parse(
+      readFileSync(join(__dirname, '..', '..', 'content', '100-dias-2026', 'dataset.json'), 'utf8'),
+    );
+    expect(dataset.provenance.rights_status).toBe('authorized');
+    // A referência entra no pacote do app: identificador neutro, sem nome de
+    // pessoa, sem tratamento (Pr., Pra.), sem espaço.
+    expect(dataset.provenance.rights_reference).toBe('autorizacao-2026-09-23');
+    expect(dataset.provenance.rights_reference).toMatch(/^[a-z0-9-]+$/);
+    // Autorizar a publicação do guia NÃO autoriza nomes de líderes: são duas
+    // permissões, e só uma foi dada.
+    expect(dataset.provenance.leader_names_authorized).toBe(false);
+    expect((dataset.days as { altar?: { leaders_label?: string | null } }[]).filter((d) => d.altar && d.altar.leaders_label)).toEqual([]);
+    expect(JSON.stringify(dataset)).not.toMatch(/Prs?.|Pra./);
+  });
+
+  test('o registro de quem autorizou fica FORA do app', () => {
+    const readme = readFileSync(join(__dirname, '..', '..', 'content', 'source', 'README.md'), 'utf8');
+    expect(readme).toMatch(/autorizacao-2026-09-23/);
+    expect(readme).toMatch(/Esdras Gabriel Perea/);
+    // O nome de quem autorizou não pode entrar no pacote: só o identificador.
+    const dataset = readFileSync(join(__dirname, '..', '..', 'content', '100-dias-2026', 'dataset.json'), 'utf8');
+    expect(dataset).not.toMatch(/Esdras|Perea|gmail/i);
+  });
+});

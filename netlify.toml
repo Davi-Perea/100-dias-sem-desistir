@@ -1,0 +1,51 @@
+# Publicação web do "100 dias sem desistir".
+#
+# Origem pública final: https://100diassemdesistir.com.br
+# O endereço *.netlify.app existe só para conferência técnica e NUNCA deve ser
+# divulgado: o armazenamento do app é localStorage, que é por origem. Quem
+# começar num endereço e for movido para outro perde progresso, reflexões e
+# jejum — e não existe migração possível sem mandar dado sensível para um
+# servidor, o que este produto não faz.
+
+[build]
+  base    = "mobile"
+  command = "npx expo export --platform web"
+  publish = "dist"
+
+# O export com `output: "static"` não gera HTML para rota dinâmica (/dia/5,
+# /reader/12, /biblia/GEN/1) porque nenhuma rota declara generateStaticParams.
+# Sem este fallback, link direto e F5 devolvem 404. O status 200 é obrigatório:
+# um 301 mudaria a URL e quebraria o roteador.
+[[redirects]]
+  from   = "/*"
+  to     = "/index.html"
+  status = 200
+
+# www vai para o domínio canônico, permanente.
+[[redirects]]
+  from   = "https://www.100diassemdesistir.com.br/*"
+  to     = "https://100diassemdesistir.com.br/:splat"
+  status = 301
+  force  = true
+
+# O HTML não pode ficar preso em cache, senão um deploy novo demora a aparecer
+# para quem já abriu o site. Os bundles têm hash no nome e podem ser eternos.
+[[headers]]
+  for = "/index.html"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+[[headers]]
+  for = "/_expo/static/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+# Cabeçalhos de segurança. O app não embute nada de terceiro: fontes, texto
+# bíblico e imagens são empacotados. Não há analytics, não há rastreamento.
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options   = "nosniff"
+    X-Frame-Options          = "DENY"
+    Referrer-Policy          = "strict-origin-when-cross-origin"
+    Permissions-Policy       = "geolocation=(), microphone=(), camera=(), interest-cohort=()"

@@ -1,7 +1,8 @@
-import { router, Stack, useFocusEffect } from 'expo-router';
+import { Redirect, router, Stack, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Alert, View } from 'react-native';
 
+import { isCloudConfigured } from '@/cloud/config';
 import { CloudError } from '@/cloud/errors';
 import { adminSetGroupRole, listActiveGroups, listGroupMembers } from '@/cloud/groups';
 import type { Group, GroupMembership, Profile } from '@/cloud/types';
@@ -18,7 +19,24 @@ type Row = GroupMembership & { profile?: Profile };
  * A verificação real é do servidor: `admin_set_group_role` recusa quem não é
  * administrador. A checagem daqui só evita mostrar uma tela inútil.
  */
-export default function AdminScreen() {
+/**
+ * AUDITORIA DE LANÇAMENTO WEB, 2026-09-23: na web, `/admin` era uma URL
+ * digitável. Sem sessão de administrador ela já mostrava só "Área restrita", e
+ * o servidor recusa qualquer ação de quem não é admin — então não havia poder
+ * exposto. Ainda assim, numa V1 pública, uma tela chamada "Administração"
+ * alcançável por qualquer pessoa é convite para ninguém.
+ *
+ * Sem nuvem configurada — que é toda build de release da V1 — esta tela não tem
+ * como fazer nada. Então ela simplesmente não existe ali. Mesmo padrão de
+ * `/dev` e `/componentes`. Nenhuma regra de permissão foi afrouxada: a guarda
+ * do servidor continua sendo a que vale.
+ */
+export default function AdminRoute() {
+  if (!isCloudConfigured()) return <Redirect href="/" />;
+  return <AdminScreen />;
+}
+
+function AdminScreen() {
   const { colors } = useTheme();
   const session = useCloudSession();
   const [groups, setGroups] = useState<Group[] | null>(null);
