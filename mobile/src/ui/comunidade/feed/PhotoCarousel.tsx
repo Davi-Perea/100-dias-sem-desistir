@@ -87,13 +87,24 @@ export function PhotoCarousel({
 
 function Photo({ url, size, label, testID }: { url: string | undefined; size: number; label: string; testID: string }) {
   const { colors } = useTheme();
-  const [failed, setFailed] = useState(false);
+  /**
+   * AUDITORIA EXTERNA 2026-09-23: a URL das fotos é assinada e vence. Quando
+   * vencia, a imagem falhava, um `failed` booleano virava true — e ficava true
+   * para sempre. O feed até pedia uma URL nova e a entregava a este mesmo
+   * componente montado, mas ele continuava mostrando "não foi possível".
+   *
+   * Guardar QUAL url falhou, em vez de "falhou", resolve sem efeito nenhum: a
+   * falha vale para aquele endereço, e um endereço novo nasce limpo. O erro da
+   * url nova continua aparecendo normalmente.
+   */
+  const [failedUrl, setFailedUrl] = useState<string | null>(null);
+  const failed = url !== undefined && failedUrl === url;
   return (
     <View style={{ width: size, height: size, backgroundColor: colors.surfaceSunken, justifyContent: 'center' }}>
       {url && !failed ? (
         <Image
           source={{ uri: url }}
-          onError={() => setFailed(true)}
+          onError={() => setFailedUrl(url)}
           style={{ width: '100%', height: '100%' }}
           resizeMode="cover"
           accessible
@@ -105,7 +116,18 @@ function Photo({ url, size, label, testID }: { url: string | undefined; size: nu
         <AppText variant="caption" style={{ textAlign: 'center', padding: spacing.lg }}>
           Não foi possível mostrar a foto agora.
         </AppText>
-      ) : null}
+      ) : (
+        // Sem URL ainda: em rede lenta, isto era um quadrado do tamanho da tela
+        // que o leitor de tela pulava em silêncio, entre o texto e o Amém.
+        <AppText
+          variant="caption"
+          accessibilityLiveRegion="polite"
+          style={{ textAlign: 'center', padding: spacing.lg, color: colors.textSecondary }}
+          testID={`${testID}-carregando`}
+        >
+          Carregando a foto…
+        </AppText>
+      )}
     </View>
   );
 }

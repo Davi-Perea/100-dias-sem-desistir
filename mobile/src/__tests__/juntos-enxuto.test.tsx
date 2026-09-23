@@ -28,7 +28,7 @@ import { AmenButton } from '@/ui/comunidade/feed/AmenButton';
 import { ConhecaOJuntos, INTRO_LINES, INTRO_TITLE } from '@/ui/comunidade/feed/ConhecaOJuntos';
 import { _resetJuntosIntroForTests, JUNTOS_INTRO_KEY, useJuntosIntro } from '@/ui/comunidade/feed/conheca';
 import { AVATAR_OPTIONAL_NOTE, AVATAR_RULES, AVATAR_STEP_TITLE } from '@/ui/comunidade/perfil/PerfilCampos';
-import { PICKER_QUALITY, pickManyFromLibrary, preparePhoto } from '@/ui/comunidade/publicar/foto';
+import { PICKER_QUALITY, pickManyFromLibrary, preparePhoto, takePhoto } from '@/ui/comunidade/publicar/foto';
 import { RULES_SUMMARY } from '@/ui/comunidade/publicar/textos';
 import { Icon } from '@/ui/icons';
 import { BRAND_YELLOW, palettes } from '@/ui/theme';
@@ -490,3 +490,68 @@ describe('6 · regras curtas na tela de aceite', () => {
   });
 });
 
+
+/* ------------------------------------------- 7 · fotos: plano B e memória */
+
+/**
+ * AUDITORIA EXTERNA 2026-09-23, achados 1 e 2 das fotos.
+ */
+describe('7 · o plano B da foto existe onde cabe, e só onde cabe', () => {
+  test('a câmera devolve o base64 que ela própria pediu (antes era jogado fora)', async () => {
+    mockCamera.mockImplementation(async () => ({
+      canceled: false,
+      assets: [{ uri: 'file:///cache/Camera/IMG_0042.jpeg', width: 4000, height: 3000, base64: 'QUJD' }],
+    }));
+
+    const result = await takePhoto();
+    expect(result.kind).toBe('photo');
+    // Sem isto, o plano B nunca funcionava para quem tirasse a foto na hora:
+    // o seletor entregava os bytes e o app os descartava na linha seguinte.
+    expect(result.kind === 'photo' && result.asset.base64).toBe('QUJD');
+    expect(mockCamera.mock.calls[0][0].base64).toBe(true);
+  });
+
+  test('a câmera pede base64, porque é uma foto só', async () => {
+    mockCamera.mockImplementation(async () => ({
+      canceled: false,
+      assets: [{ uri: 'file:///cache/Camera/IMG_0043.jpeg', width: 100, height: 100, base64: 'QQ==' }],
+    }));
+    await takePhoto();
+    expect(mockCamera.mock.calls[0][0].base64).toBe(true);
+  });
+
+  test('a seleção múltipla NÃO pede base64: quatro strings grandes de uma vez era o pico', async () => {
+    galleryReturns({ sourceUri: 'content://media/external/images/media/42', heic: false, count: 4 });
+    await pickManyFromLibrary(4);
+    expect(mockLaunch.mock.calls[0][0].base64).toBe(false);
+    expect(mockLaunch.mock.calls[0][0].allowsMultipleSelection).toBe(true);
+  });
+
+  test('com uma foto só, a galeria continua pedindo base64: o custo é de uma', async () => {
+    galleryReturns({ sourceUri: 'content://media/external/images/media/42', heic: false, count: 1 });
+    await pickManyFromLibrary(1);
+    expect(mockLaunch.mock.calls[0][0].base64).toBe(true);
+  });
+
+  test('sem o plano B, a seleção múltipla continua funcionando pelo caminho normal', async () => {
+    galleryReturns({ sourceUri: 'content://media/external/images/media/42', heic: true, count: 4 });
+    const assets = await pickManyFromLibrary(4);
+    expect(assets).toHaveLength(4);
+    // Nenhuma carrega base64: é isso que tira o pico de memória.
+    for (const asset of assets) expect(asset.base64 ?? null).toBeNull();
+    // E o caminho normal (URI → manipulador → bytes) segue de pé para as quatro.
+    for (const asset of assets) {
+      const photo = await preparePhoto(asset);
+      expect(photo.bytes.byteLength).toBeGreaterThan(0);
+    }
+  });
+
+  test('se o manipulador falhar sem plano B, é erro tratado — nunca exceção solta', async () => {
+    galleryReturns({ sourceUri: 'content://media/external/images/media/42', heic: true, count: 2 });
+    const [asset] = await pickManyFromLibrary(2);
+    // Simula o manipulador não abrindo ESTE arquivo (HEIC dentro do Expo Go).
+    (global as unknown as { __undecodable: Set<string> }).__undecodable.add(asset.uri);
+    expect(asset.base64 ?? null).toBeNull();
+    await expect(preparePhoto(asset)).rejects.toBeDefined();
+  });
+});

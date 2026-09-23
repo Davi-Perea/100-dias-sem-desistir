@@ -1,10 +1,10 @@
 import { router } from 'expo-router';
 import { type ReactNode, useEffect, useState } from 'react';
-import { KeyboardAvoidingView, Modal, Pressable, ScrollView, useWindowDimensions, View } from 'react-native';
+import { FlatList, KeyboardAvoidingView, Modal, Pressable, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { CommunityApi } from '@/community/api';
-import type { CommunityStatus } from '@/community/types';
+import { COMMENTS_SERVER_LIMIT, type CommunityStatus } from '@/community/types';
 import { AppText, Rule } from '@/ui/components';
 import { Icon } from '@/ui/icons';
 import { floatShadow, glass, MIN_TOUCH, radius, spacing, useReducedMotion, useTheme } from '@/ui/theme';
@@ -132,7 +132,12 @@ function SheetBody({
     load();
   }, [load]);
 
-  let body: ReactNode;
+  // AUDITORIA EXTERNA 2026-09-23: mesma correção da tela cheia (CommentsScreen),
+  // porque é por esta folha que a maioria das conversas é aberta. Lista
+  // virtualizada, e o teto do servidor avisado em vez de cortar calado.
+  const noTeto = talk.list.phase === 'ready' && talk.list.items.length >= COMMENTS_SERVER_LIMIT;
+
+  let body: ReactNode = null;
   if (talk.list.phase === 'loading') body = <FeedSkeleton gutter={GUTTER} />;
   else if (talk.list.phase === 'error') {
     body = (
@@ -142,22 +147,9 @@ function SheetBody({
     );
   } else if (talk.list.items.length === 0) {
     body = <CommentsEmpty />;
-  } else {
-    body = (
-      <View>
-        {talk.list.items.map((comment) => (
-          <CommentRow
-            key={comment.commentId}
-            comment={comment}
-            onMore={() =>
-              setReport({ kind: 'comment', commentId: comment.commentId, authorName: comment.authorName, isMine: comment.isMine })
-            }
-            onAmen={(next) => talk.toggleAmen(comment.commentId, next)}
-          />
-        ))}
-      </View>
-    );
   }
+
+  const comentarios = talk.list.phase === 'ready' ? talk.list.items : [];
 
   return (
     <KeyboardAvoidingView behavior="padding" style={{ maxHeight: height * 0.9 }}>
@@ -202,13 +194,39 @@ function SheetBody({
           </Pressable>
         </View>
         <Rule />
-        <ScrollView
+        <FlatList
+          data={comentarios}
+          keyExtractor={(comment) => comment.commentId}
+          renderItem={({ item: comment }) => (
+            <CommentRow
+              comment={comment}
+              onMore={() =>
+                setReport({
+                  kind: 'comment',
+                  commentId: comment.commentId,
+                  authorName: comment.authorName,
+                  isMine: comment.isMine,
+                })
+              }
+              onAmen={(next) => talk.toggleAmen(comment.commentId, next)}
+            />
+          )}
+          ListEmptyComponent={body}
+          ListFooterComponent={
+            noTeto ? (
+              <View style={{ paddingHorizontal: GUTTER, paddingTop: spacing.md }}>
+                <AppText variant="caption" accessibilityLiveRegion="polite" testID="comments-truncated">
+                  Esta conversa passou de {COMMENTS_SERVER_LIMIT} comentários. Por enquanto o app mostra os{' '}
+                  {COMMENTS_SERVER_LIMIT} primeiros.
+                </AppText>
+              </View>
+            ) : null
+          }
           style={{ flexShrink: 1 }}
           contentContainerStyle={{ paddingBottom: spacing.lg }}
           keyboardShouldPersistTaps="handled"
-        >
-          {body}
-        </ScrollView>
+          testID="comments-sheet-list"
+        />
         {talk.list.phase === 'ready' ? (
           <Composer
             value={talk.text}

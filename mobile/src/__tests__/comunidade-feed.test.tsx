@@ -492,7 +492,35 @@ describe('C1: feed', () => {
       before_published_at: first[19].published_at,
       before_post: first[19].post_id,
     });
-    expect(screen.getByTestId(`post-${POST(21)}`)).toBeTruthy();
+    // A página seguinte entrou na lista. Desde a virtualização (auditoria de
+    // 23/09) o feed é uma FlatList: um cartão lá embaixo NÃO fica montado até a
+    // rolagem chegar nele — é para isso que a lista existe. A prova de que a
+    // página chegou é o conteúdo da lista, não a montagem de um cartão distante.
+    const lista = screen.getByTestId('feed-scroll');
+    expect(lista.props.data).toHaveLength(22);
+    expect(lista.props.data[21].postId).toBe(POST(21));
+    expect(lista.props.keyExtractor(lista.props.data[21])).toBe(`p-${POST(21)}`);
+  });
+
+  test('a virtualização não monta o feed inteiro de uma vez', async () => {
+    // AUDITORIA EXTERNA 2026-09-23: antes eram 200 cartões montados ao mesmo
+    // tempo, cada um com carrossel de fotos, e a memória só subia.
+    setup({ community_feed: { data: Array.from({ length: 40 }, (_, i) => feedRow(i)) } });
+    await render(<FeedScreen />);
+    await waitFor(() => expect(screen.getByTestId('feed-scroll')).toBeTruthy());
+
+    const lista = screen.getByTestId('feed-scroll');
+    expect(lista.props.data).toHaveLength(40);
+    // Os 40 estão na lista; montados, bem menos que isso. O testID do CARTÃO é
+    // `post-<uuid>`; os botões de dentro dele também começam com "post-", então
+    // a conta só vale ancorada no formato do uuid.
+    const cartoes = new Set(
+      screen
+        .queryAllByTestId(/^post-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/)
+        .map((node) => node.props.testID),
+    );
+    expect(cartoes.size).toBeGreaterThan(0);
+    expect(cartoes.size).toBeLessThan(40);
   });
 
   test('C2: feed vazio no primeiro dia, sem cara de erro, com "Ler o dia 1"', async () => {

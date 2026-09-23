@@ -1,6 +1,6 @@
 import { router, useFocusEffect } from 'expo-router';
 import { type ReactNode, useState } from 'react';
-import { Pressable, RefreshControl, ScrollView, View } from 'react-native';
+import { FlatList, Pressable, RefreshControl, ScrollView, View } from 'react-native';
 
 import type { CommunityApi } from '@/community/api';
 import { DEMO_BADGE, DEMO_LABELS_ON_SCREEN, isCommunityDemo } from '@/community/demoApi';
@@ -405,28 +405,104 @@ function ReadyFeed({
   const openComments = (target: CommentsTarget) => setComments({ target, text: '', notice: null });
 
   const state = feed.state;
-  let list: ReactNode;
+
+  /**
+   * AUDITORIA EXTERNA 2026-09-23: o feed era um `ScrollView` com `cards.map`.
+   * A paginação existia no servidor, mas a tela ia empilhando: 20, 40, 80, 200
+   * cartões, todos montados ao mesmo tempo, cada um com carrossel de fotos. A
+   * memória só subia, e a rolagem ia travando junto.
+   *
+   * Agora é `FlatList`, que desmonta o que saiu da tela. O desenho não mudou:
+   * mesmo cartão, mesmo cabeçalho, mesmo botão "Ver publicações anteriores",
+   * mesma linha de aceite, mesmo puxar-para-atualizar, mesmo `testID`.
+   *
+   * `ListHeaderComponent`/`ListFooterComponent` recebem ELEMENTOS já criados, e
+   * não funções de componente definidas aqui dentro: função nova a cada render
+   * faria a lista remontar o cabeçalho inteiro a cada toque.
+   */
+  const cards = state.phase === 'ready' ? [...state.inReview, ...state.posts] : [];
+
+  let vazio: ReactNode = null;
   if (state.phase === 'loading') {
-    list = <FeedSkeleton gutter={FEED_GUTTER} />;
+    vazio = <FeedSkeleton gutter={FEED_GUTTER} />;
   } else if (state.phase === 'error') {
-    list = (
+    vazio = (
       <View style={{ paddingHorizontal: FEED_GUTTER }}>
         <FeedError message={state.message} onRetry={() => feed.reload()} />
       </View>
     );
-  } else if (state.posts.length === 0 && state.inReview.length === 0) {
-    list = (
+  } else if (cards.length === 0) {
+    vazio = (
       <View style={{ paddingHorizontal: FEED_GUTTER }}>
         <FeedEmpty day={day} firstDay={day <= 1} />
       </View>
     );
-  } else {
-    const cards = [...state.inReview, ...state.posts];
-    list = (
-      <View>
-        {cards.map((card) => (
+  }
+
+  const cabecalho = (
+    <>
+      {header}
+      <View style={{ paddingHorizontal: FEED_GUTTER, gap: spacing.sm }}>
+        <DevContentBanner state={journey.contentState} compact />
+        {!online ? <OfflineNotice /> : null}
+        {/* A linha do aceite, enquanto ele falta: diz o que o próximo toque
+            (dizer Amém, comentar, publicar) significa, ANTES do toque, e o link
+            abre as regras e o consentimento destacado. Depois do aceite ela sai. */}
+        {gated ? (
+          <AceiteLine onOpenRules={() => router.push(COMMUNITY_ROUTES.regras)} testID="feed-aceite-line" />
+        ) : null}
+        {feed.notice ? <SaveErrorNotice message={feed.notice} testID="feed-notice" /> : null}
+        {consentNotice ? (
+          <AppText variant="rowLabel" accessibilityLiveRegion="polite" testID="feed-consent-notice">
+            {consentNotice}
+          </AppText>
+        ) : null}
+      </View>
+    </>
+  );
+
+  const rodape =
+    state.phase === 'ready' ? (
+      <>
+        {cards.length > 0 ? (
+          <View style={{ paddingHorizontal: FEED_GUTTER }}>
+            {state.ended ? (
+              <FeedEnd />
+            ) : (
+              <View style={{ gap: spacing.sm, paddingVertical: spacing.lg }}>
+                <Button
+                  title="Ver publicações anteriores"
+                  variant="outline"
+                  loading={feed.loadingMore}
+                  onPress={() => feed.loadMore()}
+                  testID="feed-more"
+                />
+                {feed.moreError ? <SaveErrorNotice message={feed.moreError} testID="feed-more-error" /> : null}
+              </View>
+            )}
+          </View>
+        ) : null}
+        {/* "Minhas publicações" saiu do fim da rolagem: virou atalho do TOPO
+            (2026-09-22), e repetir o mesmo destino duas vezes na mesma tela só
+            daria dois botões com o mesmo nome para o leitor de tela. */}
+        <View style={{ paddingHorizontal: FEED_GUTTER, gap: spacing.xs }}>
+          <Button
+            title="Regras do Juntos"
+            variant="underline"
+            onPress={() => router.push(COMMUNITY_ROUTES.regras)}
+            testID="feed-rules"
+          />
+        </View>
+      </>
+    ) : null;
+
+  return (
+    <>
+      <FlatList
+        data={cards}
+        keyExtractor={(card) => `${card.inReview ? 'r' : 'p'}-${card.postId}`}
+        renderItem={({ item: card }) => (
           <PostCard
-            key={`${card.inReview ? 'r' : 'p'}-${card.postId}`}
             card={card}
             gutter={FEED_GUTTER}
             photos={feed.photos}
@@ -452,68 +528,16 @@ function ReadyFeed({
               })
             }
           />
-        ))}
-        <View style={{ paddingHorizontal: FEED_GUTTER }}>
-          {state.ended ? (
-            <FeedEnd />
-          ) : (
-            <View style={{ gap: spacing.sm, paddingVertical: spacing.lg }}>
-              <Button
-                title="Ver publicações anteriores"
-                variant="outline"
-                loading={feed.loadingMore}
-                onPress={() => feed.loadMore()}
-                testID="feed-more"
-              />
-              {feed.moreError ? <SaveErrorNotice message={feed.moreError} testID="feed-more-error" /> : null}
-            </View>
-          )}
-        </View>
-      </View>
-    );
-  }
-
-  return (
-    <>
-      <ScrollView
+        )}
+        ListHeaderComponent={cabecalho}
+        ListEmptyComponent={vazio}
+        ListFooterComponent={rodape}
         contentContainerStyle={{ flexGrow: 1, paddingBottom: spacing.xxl }}
         refreshControl={
           <RefreshControl refreshing={feed.refreshing} onRefresh={feed.refresh} accessibilityLabel="Atualizar" />
         }
         testID="feed-scroll"
-      >
-        {header}
-        <View style={{ paddingHorizontal: FEED_GUTTER, gap: spacing.sm }}>
-          <DevContentBanner state={journey.contentState} compact />
-          {!online ? <OfflineNotice /> : null}
-          {/* A linha do aceite, enquanto ele falta: diz o que o próximo toque
-              (dizer Amém, comentar, publicar) significa, ANTES do toque, e o link
-              abre as regras e o consentimento destacado. Depois do aceite ela sai. */}
-          {gated ? (
-            <AceiteLine onOpenRules={() => router.push(COMMUNITY_ROUTES.regras)} testID="feed-aceite-line" />
-          ) : null}
-          {feed.notice ? <SaveErrorNotice message={feed.notice} testID="feed-notice" /> : null}
-          {consentNotice ? (
-            <AppText variant="rowLabel" accessibilityLiveRegion="polite" testID="feed-consent-notice">
-              {consentNotice}
-            </AppText>
-          ) : null}
-        </View>
-        {list}
-        {state.phase === 'ready' ? (
-          // "Minhas publicações" saiu do fim da rolagem: virou atalho do TOPO
-          // (2026-09-22), e repetir o mesmo destino duas vezes na mesma tela só
-          // daria dois botões com o mesmo nome para o leitor de tela.
-          <View style={{ paddingHorizontal: FEED_GUTTER, gap: spacing.xs }}>
-            <Button
-              title="Regras do Juntos"
-              variant="underline"
-              onPress={() => router.push(COMMUNITY_ROUTES.regras)}
-              testID="feed-rules"
-            />
-          </View>
-        ) : null}
-      </ScrollView>
+      />
       <ReportSheet
         api={api}
         target={sheet}

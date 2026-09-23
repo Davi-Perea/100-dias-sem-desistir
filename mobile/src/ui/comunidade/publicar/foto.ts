@@ -200,6 +200,20 @@ export async function pickFromLibrary(): Promise<PickedAsset | null> {
 /**
  * Galeria com várias fotos (F2: até 4 por post). `limit` = quantas ainda cabem.
  * Com 1, é o mesmo seletor de sempre. Cada foto ainda passa por `preparePhoto`.
+ *
+ * AUDITORIA EXTERNA 2026-09-23 (pico de memória): este é o ÚNICO caminho que
+ * traz mais de uma foto, e era o único que multiplicava o custo. Com
+ * `base64: true`, o seletor devolvia, de uma vez, o texto base64 de TODAS as
+ * fotos escolhidas — e base64 ocupa cerca de 1,33× os bytes do arquivo. Quatro
+ * fotos de celular moderno viravam quatro strings grandes vivas ao mesmo tempo,
+ * ainda antes de o app tocar na primeira, e por cima disso vinha a imagem
+ * manipulada e o base64 dela. Em Android intermediário é onde o app morria.
+ *
+ * Aqui o base64 deixa de ser pedido: o caminho normal é URI → manipulador →
+ * bytes finais, uma foto por vez. O plano B (base64 do próprio seletor)
+ * continua existindo onde o custo é de UMA foto: câmera e foto de perfil.
+ * Com seleção múltipla, uma falha do manipulador vira erro na tela, com o nome
+ * da foto — que é melhor do que o app fechar sozinho.
  */
 export async function pickManyFromLibrary(limit: number): Promise<PickedAsset[]> {
   if (limit <= 0) return [];
@@ -211,8 +225,8 @@ export async function pickManyFromLibrary(limit: number): Promise<PickedAsset[]>
     // Só faz sentido com seleção múltipla; com uma foto o iOS ignora.
     orderedSelection: limit > 1,
     exif: false,
-    // Plano B: se o manipulador falhar (HEIC no Expo Go), usamos estes bytes.
-    base64: true,
+    // Uma foto só: cabe o plano B. Várias: só URI (ver o bloco acima).
+    base64: limit === 1,
     quality: PICKER_QUALITY,
   });
   if (result.canceled) return [];
@@ -255,5 +269,12 @@ export async function takePhoto(): Promise<CameraResult> {
   if (result.canceled) return { kind: 'canceled' };
   const asset = result.assets?.[0];
   if (!asset?.uri) return { kind: 'canceled' };
-  return { kind: 'photo', asset: { uri: asset.uri, width: asset.width ?? 0, height: asset.height ?? 0 } };
+  // AUDITORIA EXTERNA 2026-09-23: o `base64: true` acima era pedido e jogado
+  // fora aqui. A galeria guardava o seu; a câmera, não. O plano B existia no
+  // papel e nunca funcionava para quem tirasse a foto na hora. É uma foto só —
+  // o custo de memória é limitado, ao contrário da seleção múltipla.
+  return {
+    kind: 'photo',
+    asset: { uri: asset.uri, width: asset.width ?? 0, height: asset.height ?? 0, base64: asset.base64 ?? null },
+  };
 }

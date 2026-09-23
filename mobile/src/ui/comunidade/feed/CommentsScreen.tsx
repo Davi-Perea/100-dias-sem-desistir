@@ -1,10 +1,10 @@
 import { router, useFocusEffect } from 'expo-router';
 import { type ReactNode, useCallback, useState } from 'react';
-import { KeyboardAvoidingView, ScrollView, View } from 'react-native';
+import { FlatList, KeyboardAvoidingView, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { CommunityApi } from '@/community/api';
-import type { CommunityStatus } from '@/community/types';
+import { COMMENTS_SERVER_LIMIT, type CommunityStatus } from '@/community/types';
 import { BackBar } from '@/ui/BackBar';
 import { AppText, Rule, Screen } from '@/ui/components';
 import { MAX_CONTENT_WIDTH, spacing } from '@/ui/theme';
@@ -85,7 +85,28 @@ function ReadyComments({
     }, [load]),
   );
 
-  let body: ReactNode;
+  /**
+   * AUDITORIA EXTERNA 2026-09-23 (escala da conversa).
+   *
+   * Duas coisas, e só uma delas é resolvível aqui:
+   *
+   * 1. RENDER — era `items.map` dentro de um ScrollView: num post muito
+   *    comentado, todas as linhas ficavam montadas ao mesmo tempo. Virou
+   *    FlatList, que desmonta o que saiu da tela. Resolvido.
+   *
+   * 2. PAGINAÇÃO — o servidor NÃO tem cursor. `private.community_post_comments`
+   *    devolve `limit 200`, ordenado do mais antigo para o mais novo, sem
+   *    `before`/`after`. Isso não é payload infinito (é o que a auditoria
+   *    supôs), é pior de outro jeito: é um corte SILENCIOSO. Num post com 250
+   *    comentários, os 50 mais novos simplesmente não existem para ninguém, e
+   *    nada na tela diz isso. Baixar tudo e fatiar aqui seria fingir que
+   *    escala; então a tela passa a AVISAR quando bateu no teto, e a paginação
+   *    de verdade fica registrada como pendência de servidor
+   *    (docs/technical/COMUNIDADE_V2_COMENTARIOS_PAGINACAO.md).
+   */
+  const noTeto = talk.list.phase === 'ready' && talk.list.items.length >= COMMENTS_SERVER_LIMIT;
+
+  let body: ReactNode = null;
   if (talk.list.phase === 'loading') body = <FeedSkeleton gutter={GUTTER} />;
   else if (talk.list.phase === 'error') {
     body = (
@@ -95,22 +116,9 @@ function ReadyComments({
     );
   } else if (talk.list.items.length === 0) {
     body = <CommentsEmpty />;
-  } else {
-    body = (
-      <View>
-        {talk.list.items.map((comment) => (
-          <CommentRow
-            key={comment.commentId}
-            comment={comment}
-            onMore={() =>
-              setSheet({ kind: 'comment', commentId: comment.commentId, authorName: comment.authorName, isMine: comment.isMine })
-            }
-            onAmen={(next) => talk.toggleAmen(comment.commentId, next)}
-          />
-        ))}
-      </View>
-    );
   }
+
+  const comentarios = talk.list.phase === 'ready' ? talk.list.items : [];
 
   return (
     <Screen edges={['top', 'left', 'right']}>
@@ -121,9 +129,38 @@ function ReadyComments({
         <View style={{ flex: 1, width: '100%', maxWidth: MAX_CONTENT_WIDTH + GUTTER * 2, alignSelf: 'center' }}>
           <CommentsHeader />
           <Rule />
-          <ScrollView contentContainerStyle={{ flexGrow: 1, paddingBottom: spacing.lg }} keyboardShouldPersistTaps="handled">
-            {body}
-          </ScrollView>
+          <FlatList
+            data={comentarios}
+            keyExtractor={(comment) => comment.commentId}
+            renderItem={({ item: comment }) => (
+              <CommentRow
+                comment={comment}
+                onMore={() =>
+                  setSheet({
+                    kind: 'comment',
+                    commentId: comment.commentId,
+                    authorName: comment.authorName,
+                    isMine: comment.isMine,
+                  })
+                }
+                onAmen={(next) => talk.toggleAmen(comment.commentId, next)}
+              />
+            )}
+            ListEmptyComponent={body}
+            ListFooterComponent={
+              noTeto ? (
+                <View style={{ paddingHorizontal: GUTTER, paddingTop: spacing.md }}>
+                  <AppText variant="caption" accessibilityLiveRegion="polite" testID="comments-truncated">
+                    Esta conversa passou de {COMMENTS_SERVER_LIMIT} comentários. Por enquanto o app mostra os{' '}
+                    {COMMENTS_SERVER_LIMIT} primeiros.
+                  </AppText>
+                </View>
+              ) : null
+            }
+            contentContainerStyle={{ flexGrow: 1, paddingBottom: spacing.lg }}
+            keyboardShouldPersistTaps="handled"
+            testID="comments-list"
+          />
           {talk.list.phase === 'ready' ? (
             <Composer
               value={talk.text}

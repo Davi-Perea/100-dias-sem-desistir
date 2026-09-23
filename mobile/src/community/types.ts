@@ -111,6 +111,18 @@ export const MAX_POST_PHOTOS = 4;
 export const MAX_AMEN_FACES = 3;
 
 /**
+ * Teto que o SERVIDOR aplica na conversa: `private.community_post_comments`
+ * termina em `limit 200`, e não tem cursor. O que passa disso não chega ao app.
+ *
+ * O número mora aqui para a tela poder AVISAR que bateu no teto, em vez de
+ * cortar em silêncio (auditoria externa de 2026-09-23). Se o limite mudar no
+ * SQL, muda aqui junto — há teste conferindo os dois.
+ * A paginação de verdade está registrada em
+ * docs/technical/COMUNIDADE_V2_COMENTARIOS_PAGINACAO.md.
+ */
+export const COMMENTS_SERVER_LIMIT = 200;
+
+/**
  * Campos do diário compartilhado, comuns ao feed e a "Minhas publicações".
  * createCommunityApi e a demonstração SEMPRE preenchem todos (o Required abaixo
  * é o que elas devolvem); em FeedPost/MyPost eles são opcionais só para as telas

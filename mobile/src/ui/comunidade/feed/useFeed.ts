@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import type { CommunityApi } from '@/community/api';
 import type { FeedCursor, FeedPost, MyPost, VerseAttachment } from '@/community/types';
@@ -120,7 +120,8 @@ export function useFeed(
   scope: FeedScope = 'igreja',
 ) {
   const [state, setState] = useState<FeedState>({ phase: 'loading' });
-  const [photos, setPhotos] = useState<Map<string, string>>(new Map());
+  // Bruto: tudo o que já foi assinado. A tela recebe `photos`, a versão podada.
+  const [signed, setSigned] = useState<Map<string, string>>(new Map());
   const [loadingMore, setLoadingMore] = useState(false);
   const [moreError, setMoreError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -141,13 +142,49 @@ export function useFeed(
           cards.flatMap((c) => [...c.photoPaths, c.avatarPath, ...c.amenFaces.map((f) => f.avatarPath)]),
         );
         if (urls.size === 0) return;
-        setPhotos((prev) => new Map([...prev, ...urls]));
+        setSigned((prev) => new Map([...prev, ...urls]));
       } catch {
         // Sem URL a foto mostra o quadro "Foto indisponível"; o texto continua.
       }
     },
     [api],
   );
+
+  /**
+   * Poda do mapa de URLs assinadas (AUDITORIA EXTERNA 2026-09-23).
+   *
+   * O mapa só crescia: cada página, cada atualizar e cada troca de escopo
+   * somavam endereços, e nada saía. Quem bloqueava alguém, trocava de escopo e
+   * puxava mais páginas ia acumulando URL de foto que não está mais em lugar
+   * nenhum da tela.
+   *
+   * A poda é DERIVADA, não um efeito que escreve estado: o que a tela recebe é
+   * o mapa assinado filtrado pelos cartões que a lista ainda guarda. Não busca
+   * nada, não agenda render nenhum, e quando nada sobra devolve o próprio mapa
+   * (a mesma identidade, para as telas não remontarem à toa).
+   */
+  const photos = useMemo(() => {
+    if (signed.size === 0) return signed;
+    const vivos = new Set<string>();
+    if (state.phase === 'ready') {
+      for (const card of [...state.inReview, ...state.posts]) {
+        for (const path of card.photoPaths) vivos.add(path);
+        if (card.avatarPath) vivos.add(card.avatarPath);
+        for (const face of card.amenFaces) if (face.avatarPath) vivos.add(face.avatarPath);
+      }
+    }
+    let sobra = false;
+    for (const path of signed.keys()) {
+      if (!vivos.has(path)) {
+        sobra = true;
+        break;
+      }
+    }
+    if (!sobra) return signed;
+    const podado = new Map<string, string>();
+    for (const [path, url] of signed) if (vivos.has(path)) podado.set(path, url);
+    return podado;
+  }, [signed, state]);
 
   const load = useCallback(
     async (mode: 'initial' | 'refresh' = 'initial') => {

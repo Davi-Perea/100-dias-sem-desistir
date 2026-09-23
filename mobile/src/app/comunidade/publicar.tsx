@@ -231,10 +231,20 @@ export default function PublishScreen() {
 
   /* ------------------------------------------------------------- fotos */
 
+  /**
+   * Uma foto por vez, e cada original é solto assim que vira bytes finais
+   * (AUDITORIA EXTERNA 2026-09-23, pico de memória). O laço já era serial; o que
+   * faltava era largar o que não serve mais: enquanto `assets` segurasse as
+   * quatro, nenhuma podia ser recolhida antes do fim do laço.
+   */
   const addPrepared = async (assets: PickedAsset[]) => {
     const prepared: PhotoItem[] = [];
     let failure: string | null = null;
-    for (const asset of assets) {
+    const fila = [...assets];
+    while (fila.length > 0) {
+      // `shift` tira a referência da fila: a partir daqui só a variável local
+      // aponta para esta foto, e ela morre no fim da volta.
+      const asset = fila.shift() as PickedAsset;
       try {
         const photo = await preparePhoto(asset);
         photoSeq.current += 1;
