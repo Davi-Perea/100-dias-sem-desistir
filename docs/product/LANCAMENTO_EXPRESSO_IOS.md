@@ -250,7 +250,7 @@ Todo dia o app mostra, num lugar só:
 
 Entrou depois do começo? Tudo bem. O app começa no dia de hoje, e os dias que ficaram para trás continuam abertos para você fazer no seu ritmo.
 
-Cada dia abre à meia-noite (horário de Brasília), na data dele.
+A campanha começa em 23 de setembro. A partir dali, os 100 dias ficam abertos: se quiser, você pode ler adiantado. O app continua destacando o dia em que a igreja está, e marcar como lido vale para hoje e para os dias que já passaram.
 
 Funciona sem internet e sem cadastro. O que você marca fica só no seu celular. Não pedimos nome, e-mail nem telefone.
 
@@ -315,7 +315,7 @@ This app is the official daily companion for the "100 Dias" (100 Days) prayer an
 
 How the app works:
 - No login, no account, no in-app purchases, no user-generated content shared with others. Everything stays on the device and works offline.
-- Each campaign day unlocks at 00:00 São Paulo time (UTC-3) on its date. Day 1 unlocks on September 23, 2026.
+- Before September 23, 2026 no campaign day is available. From Day 1 on, all 100 days are readable and a person may read ahead. Reading ahead does not advance progress: a day can only be marked as read on its own date or later, and the app always highlights the church's official day, which follows the São Paulo clock (UTC-3).
 - Before September 23, the app shows the countdown to Day 1 and the purpose of the campaign. This is intentional: the church asked that no day be opened early.
 - From September 23 on, the Today screen shows the day's reading, the prayer guide, altar mode and reminders.
 - [WITHOUT BIBLE TAB] The app does not display Bible text; it shows chapter references for people to read in their own Bible.
@@ -329,7 +329,7 @@ Contact: [YOUR NAME], [PHONE], [E-MAIL].
 **4.11 Pedido de revisão acelerada** (formulário [A5]):
 
 ```
-Our app "100 dias sem desistir" is the companion app for the "100 Dias" campaign of [CHURCH NAME], which starts on Wednesday, September 23, 2026 (Day 1) and runs until December 31, 2026. About 3,000 people from the church are waiting to use it from Day 1. The app content is the church's own daily guide, used with its written authorization, and each day unlocks on its date. We kindly ask for an expedited review so the app is available when the campaign starts on September 23.
+Our app "100 dias sem desistir" is the companion app for the "100 Dias" campaign of [CHURCH NAME], which starts on Wednesday, September 23, 2026 (Day 1) and runs until December 31, 2026. About 3,000 people from the church are waiting to use it from Day 1. The app content is the church's own daily guide, used with its written authorization, and the campaign opens on its start date. We kindly ask for an expedited review so the app is available when the campaign starts on September 23.
 ```
 
 ---

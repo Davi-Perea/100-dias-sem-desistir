@@ -62,9 +62,10 @@ export const ALTAR_TIME = { hour: 12, minute: 0 } as const;
  * Orçamento de agendamentos pendentes (LEM-01, LEM-04).
  * iOS: no máximo 64 por app; o que passar disso o sistema descarta em silêncio.
  * Reserva o maior ministério da escala inteiro (a véspera não tem janela: são
- * todos os dias do ministério), os dois avisos de ausência (N2) e uma folga para
- * o teste do painel DEV; o resto é dividido igualmente entre a leitura diária e
- * o altar. Com a escala atual: (64 − 24 − 2 − 2) / 2 = 18 dias para cada uma.
+ * todos os dias do ministério), os dois avisos de ausência (N2), o aviso de
+ * retomada que tapa o fim da janela (`coverageFallback`) e uma folga para o
+ * teste do painel DEV; o resto é dividido igualmente entre a leitura diária e
+ * o altar. Com a escala atual: (64 − 24 − 2 − 1 − 2) / 2 = 17 dias para cada uma.
  * Android: o limite prático é o do AlarmManager (500 alarmes por app) e a
  * campanha inteira cabe (100 + 100 + 24), então a janela cobre todos os dias
  * restantes e quem fica semanas sem abrir o app continua recebendo.
@@ -74,12 +75,15 @@ export const IOS_PENDING_LIMIT = 64;
 const IOS_SLACK = 2;
 /** Atrasos dos avisos de ausência, em dias depois da última abertura (N2). */
 export const ABSENCE_DELAYS_DAYS = [1, 7] as const;
+/** O aviso de retomada no fim da janela (`coverageFallback`): um só, sempre. */
+const COVERAGE_RESERVE = 1;
 const ANDROID_WINDOW_DAYS = 100;
 
 export function reminderWindowDays(platform: string = Platform.OS): number {
   if (platform === 'android') return ANDROID_WINDOW_DAYS;
   const largestMinistry = listMinistries().reduce((max, m) => Math.max(max, m.days.length), 0);
-  return Math.max(1, Math.floor((IOS_PENDING_LIMIT - IOS_SLACK - ABSENCE_DELAYS_DAYS.length - largestMinistry) / 2));
+  const free = IOS_PENDING_LIMIT - IOS_SLACK - COVERAGE_RESERVE - ABSENCE_DELAYS_DAYS.length - largestMinistry;
+  return Math.max(1, Math.floor(free / 2));
 }
 
 export type ReminderResult = { ok: true } | { ok: false; reason: string };
@@ -243,7 +247,49 @@ export function dailyReminderPlan(
       body: dailyBody(officialAtFire),
     });
   }
+  const coverage = coverageFallback(plan, time, campaign, now, windowDays);
+  if (coverage) plan.push(coverage);
   return plan;
+}
+
+/** Aviso de retomada: título e corpo não falam de dia nenhum, porque ele dispara longe. */
+export const COVERAGE_TITLE = 'A leitura continua te esperando';
+export const COVERAGE_BODY = 'Abra o app quando puder: os dias que passaram continuam abertos para você.';
+export const COVERAGE_REMINDER_ID = `${DAILY_REMINDER_PREFIX}retomada`;
+
+/**
+ * Tapa-buraco da janela rolante (AUDITORIA EXTERNA 2026-09-23, P1).
+ *
+ * No iOS só cabem 64 agendamentos pendentes por app, então a leitura diária é
+ * agendada numa janela rolante de ~18 dias, renovada toda vez que o app abre.
+ * Quem liga o lembrete e some some de vez: a janela acaba, nada mais dispara, e
+ * o aviso de ausência não cobre esse caso porque ele só é agendado com o
+ * lembrete diário DESLIGADO (`absenceScheduled`) — justamente para não dar dois
+ * avisos no mesmo dia. Resultado: a pessoa que mais precisava do lembrete era a
+ * única que parava de receber, em silêncio.
+ *
+ * Um agendamento só, um dia depois do último da janela, no mesmo horário que a
+ * pessoa escolheu. Abrir o app cancela e reagenda a família inteira, então ele
+ * empurra junto com a janela e nunca chega a disparar em uso normal — só para
+ * quem sumiu. No Android a janela cobre a campanha inteira e ele não existe.
+ *
+ * Não repete: se a pessoa ignorar, o app não insiste. Um lembrete que ninguém
+ * atende não vira três.
+ */
+function coverageFallback(
+  plan: PlannedReminder[],
+  time: { hour: number; minute: number },
+  campaign: Campaign,
+  now: Date,
+  windowDays: number,
+): PlannedReminder | null {
+  const last = plan[plan.length - 1];
+  // Sem janela cheia, a campanha inteira já está coberta: nada a tapar.
+  if (!last || plan.length < windowDays) return null;
+  if (last.day >= campaign.total_days) return null;
+  const when = localDateTimeForDay(last.day + 1, campaign, time);
+  if (when.getTime() <= now.getTime()) return null;
+  return { id: COVERAGE_REMINDER_ID, day: last.day + 1, when, title: COVERAGE_TITLE, body: COVERAGE_BODY };
 }
 
 /**
@@ -399,7 +445,21 @@ async function cancelWithPrefix(prefix: string): Promise<void> {
  * `{ ok: false }` em vez de exceção solta: quem chamou precisa saber para poder
  * desfazer a preferência em vez de prometer um aviso que não vem.
  */
+/**
+ * Uma tentativa de agendamento é tudo ou nada.
+ *
+ * AUDITORIA EXTERNA 2026-09-23: antes, se o item 3 falhasse, os itens 1 e 2
+ * ficavam agendados no sistema e a função devolvia `ok: false`. A tela então
+ * dizia "não foi possível ativar o lembrete" enquanto o celular continuava com
+ * dois alarmes armados — e ninguém conseguia desligá-los, porque para o app o
+ * lembrete estava desligado.
+ *
+ * O rollback desfaz SÓ o que esta tentativa criou. Não toca em nenhuma outra
+ * família de lembrete: `resync` já cancelou o prefixo desta antes de chamar
+ * aqui, então tudo o que está nesta lista nasceu nesta tentativa.
+ */
 async function schedulePlan(plan: PlannedReminder[]): Promise<ReminderResult> {
+  const scheduledNow: string[] = [];
   for (const item of plan) {
     try {
       await Notifications.scheduleNotificationAsync({
@@ -411,7 +471,13 @@ async function schedulePlan(plan: PlannedReminder[]): Promise<ReminderResult> {
           channelId: ANDROID_CHANNEL_ID,
         },
       });
+      scheduledNow.push(item.id);
     } catch {
+      // O cancelamento não pode derrubar o aviso do erro: se ele próprio falhar,
+      // a pessoa continua vendo a recusa, que é a informação que importa.
+      for (const id of scheduledNow) {
+        await Notifications.cancelScheduledNotificationAsync(id).catch(() => {});
+      }
       return { ok: false, reason: 'O sistema recusou o agendamento do lembrete. Tente de novo mais tarde.' };
     }
   }
