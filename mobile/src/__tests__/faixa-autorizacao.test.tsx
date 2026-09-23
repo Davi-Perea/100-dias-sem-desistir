@@ -97,6 +97,23 @@ function sourceFiles(): string[] {
   return out;
 }
 
+/**
+ * Cópia PENDENTE do conteúdo real. Desde 23/09/2026 o dataset embarcado está
+ * autorizado, então o estado pendente precisa ser construído aqui para ser
+ * testado. Isso deixa estas provas independentes da situação de direitos do
+ * dia: elas testam a TELA, não a autorização vigente.
+ */
+function pendingCopy(): JourneyDataset {
+  return {
+    ...BUNDLED_CONTENT,
+    provenance: {
+      ...BUNDLED_CONTENT.provenance,
+      rights_status: 'pending_authorization',
+      rights_reference: null,
+    },
+  };
+}
+
 /** Cópia autorizada do conteúdo real. O `dataset.json` NUNCA é editado. */
 function authorizedCopy(): JourneyDataset {
   return {
@@ -182,7 +199,8 @@ describe('a faixa de autorização saiu das telas', () => {
     expect(screen.queryByTestId('content-banner')).toBeNull();
     // A linha de direitos continua, em palavras e sem o valor técnico (F5).
     expect(screen.getByTestId('help-rights').props.children.join('')).toMatch(
-      /Situação dos direitos: aguardando autorização escrita da igreja\./,
+      // Autorizado pela igreja em 23/09/2026 (autorizacao-2026-09-23).
+      /Situação dos direitos: autorizado pela igreja./,
     );
     expect(screen.queryByText(/pending_authorization/)).toBeNull();
   });
@@ -190,6 +208,7 @@ describe('a faixa de autorização saiu das telas', () => {
 
 describe('a pendência vira uma linha discreta em Ajustes', () => {
   test('com o conteúdo real pendente, a linha aparece uma vez e explica', async () => {
+    expect(loadDataset(pendingCopy(), 'development').ok).toBe(true);
     await seedSettings();
     await render(<SettingsScreen />);
     await waitFor(() => expect(screen.getByTestId('row-reflections')).toBeTruthy());
@@ -203,6 +222,7 @@ describe('a pendência vira uma linha discreta em Ajustes', () => {
   });
 
   test('a linha não é alarme: nada de alerta para o leitor de tela', async () => {
+    expect(loadDataset(pendingCopy(), 'development').ok).toBe(true);
     await seedSettings();
     await render(<SettingsScreen />);
     await waitFor(() => expect(screen.getByTestId('rights-pending-note')).toBeTruthy());

@@ -230,12 +230,35 @@ describe('a V1 pública não expõe rota inacabada nem tela de administração',
     expect(fonte).toMatch(/href: COMMUNITY_ENABLED \? undefined : null/);
   });
 
-  test('o portão de direitos continua fechado e intocado', () => {
+  /**
+   * Escrito em 23/09 às 03h, quando o portão ainda estava fechado, dizendo:
+   * "se um dia isto virar authorized, terá sido pela autorização da igreja".
+   * Virou, no mesmo dia, com a autorização do Pastor Presidente registrada em
+   * content/source/README.md. O teste passa a guardar as condições que a
+   * autorização NÃO dispensa.
+   */
+  test('autorizado, o conteúdo real carrega referência neutra e segue sem nomes de líderes', () => {
     const dataset = JSON.parse(
       readFileSync(join(__dirname, '..', '..', 'content', '100-dias-2026', 'dataset.json'), 'utf8'),
     );
-    // Se um dia isto virar "authorized", terá sido pela autorização da igreja —
-    // nunca para destravar um deploy.
-    expect(dataset.provenance.rights_status).toBe('pending_authorization');
+    expect(dataset.provenance.rights_status).toBe('authorized');
+    // A referência entra no pacote do app: identificador neutro, sem nome de
+    // pessoa, sem tratamento (Pr., Pra.), sem espaço.
+    expect(dataset.provenance.rights_reference).toBe('autorizacao-2026-09-23');
+    expect(dataset.provenance.rights_reference).toMatch(/^[a-z0-9-]+$/);
+    // Autorizar a publicação do guia NÃO autoriza nomes de líderes: são duas
+    // permissões, e só uma foi dada.
+    expect(dataset.provenance.leader_names_authorized).toBe(false);
+    expect((dataset.days as { altar?: { leaders_label?: string | null } }[]).filter((d) => d.altar && d.altar.leaders_label)).toEqual([]);
+    expect(JSON.stringify(dataset)).not.toMatch(/Prs?.|Pra./);
+  });
+
+  test('o registro de quem autorizou fica FORA do app', () => {
+    const readme = readFileSync(join(__dirname, '..', '..', 'content', 'source', 'README.md'), 'utf8');
+    expect(readme).toMatch(/autorizacao-2026-09-23/);
+    expect(readme).toMatch(/Esdras Gabriel Perea/);
+    // O nome de quem autorizou não pode entrar no pacote: só o identificador.
+    const dataset = readFileSync(join(__dirname, '..', '..', 'content', '100-dias-2026', 'dataset.json'), 'utf8');
+    expect(dataset).not.toMatch(/Esdras|Perea|gmail/i);
   });
 });
