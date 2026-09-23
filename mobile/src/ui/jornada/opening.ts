@@ -10,6 +10,9 @@ export const LEAD_ROWS = 3;
  * empurrar o painel para fora da janela. Com a acolhida (A2), abre nela. Fora da
  * campanha em curso, abre no topo (`null`).
  *
+ * 2026-09-22: quando o cabeçalho e as linhas passadas cabem acima do painel, a
+ * abertura vai ao topo — assim o contador de dias lidos aparece sem rolar.
+ *
  * `offsets`/`lengths` são os mesmos números do `getItemLayout` da lista.
  */
 export function openingOffset({
@@ -34,6 +37,11 @@ export function openingOffset({
   const first = Math.max(0, todayIndex - LEAD_ROWS);
   const above = today - (offsets[first] ?? 0);
   const room = Math.max(0, viewport - (lengths[todayIndex] ?? 0) - spacing.lg);
+  // Se TUDO o que existe acima de hoje (o cabeçalho com o contador de dias lidos
+  // e as linhas passadas) couber acima do painel, a casa abre no topo: o
+  // contador não pode nascer fora da tela (o fundador não o viu, 2026-09-22).
+  // Quando não couber, o painel de hoje vence — é o que a pessoa vem fazer.
+  if (today <= room) return 0;
   return Math.max(0, today - Math.min(above, room));
 }
 

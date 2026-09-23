@@ -1,6 +1,7 @@
 import { router } from 'expo-router';
 
 import { SUPPORT_EMAIL } from '@/config/contato';
+import { countGoals } from '@/config/goals';
 import { fastingKeptCount, type FastingLog } from '@/fasting/fastingStore';
 import { reflectionCount, type Reflections } from '@/reflections/reflectionsStore';
 import type { Settings } from '@/settings/settingsStore';
@@ -36,7 +37,8 @@ export function SettingsList({
   fasting: FastingLog | null;
 }) {
   const kept = fastingKeptCount(fasting);
-  const goalCount = settings.profile.goals.length;
+  // "Outra meta" escrita conta como meta: quem só escreveu a dela não pode ver "Escolher".
+  const goalCount = countGoals(settings.profile.goals, settings.profile.customGoal);
 
   return (
     <>
@@ -93,7 +95,9 @@ export function SettingsList({
         <SettingRow label="Sobre os 100 dias" onPress={() => router.push('/proposito')} first testID="row-proposito" />
         <SettingRow label="Privacidade" onPress={() => router.push('/privacidade')} testID="row-privacy" />
         <SettingRow
-          label={SUPPORT_EMAIL ? 'Ajuda e contato' : 'Ajuda'}
+          // Espaço em branco conta como ausente (regra em config/contato.ts):
+          // um e-mail só com espaços prometeria contato e abriria uma tela sem ele.
+          label={SUPPORT_EMAIL?.trim() ? 'Ajuda e contato' : 'Ajuda'}
           onPress={() => router.push('/ajuda')}
           testID="row-help"
         />

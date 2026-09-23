@@ -20,6 +20,15 @@
 - **Etiquetas:** **FATO** (fonte oficial, acessada em 21/09/2026, lista no fim) · **INFERÊNCIA** (conclusão minha)
   · **NÃO CONFIRMADO** (procurei e não achei fonte oficial).
 - **Senhas, pagamento, código de duas etapas e aceites de contrato são seus.** Eu não digito nenhum deles.
+- **Atualização de 2026-09-22 (agente "Políticas das lojas"):** reverifiquei as políticas das duas lojas hoje. **Este
+  roteiro continua válido como está** — o que ele descreve (V1 sem Comunidade, sem conta, sem nuvem) é justamente a
+  versão que passa. Três acréscimos, no §3.1 e no §6 novo:
+  1. a pergunta de **social media** do questionário etário é **obrigatória desde setembro de 2026** (FATO,
+     https://developer.apple.com/news/?id=tlur8uvi, acesso 2026-09-22): responder **Não** à mão, como o item 13.5 já diz;
+  2. o **Android tem prazo de 30/09/2026** para a verificação de desenvolvedor no Brasil — a conta do Play precisa ser
+     criada agora, mesmo sem envio (§6);
+  3. a Comunidade desenhada no feedback de hoje **não entra** neste envio; a lista do que ela exige está em
+     `docs/product/CONFORMIDADE_LOJAS.md` §7.B.
 
 ---
 
@@ -359,6 +368,29 @@ estava. Mesmo com a aba, **não** abrir dias da campanha antes da data para o re
 **Outros riscos:** inscrição Apple travar em verificação de identidade (sem prazo publicado; se passar de 48 h, abra
 contato com o suporte do Developer Program); nome "100 dias sem desistir" já em uso (alternativa no §4.1); build falhar
 por configuração (me mande o log do EAS).
+
+---
+
+## 6. Depois do envio: o que não pode ser esquecido (acrescentado em 2026-09-22)
+
+Enviar não é o fim. Estes três são os que tiram app do ar **depois** de aprovado.
+
+1. **Android: verificação de desenvolvedor, prazo 30/09/2026.** O Brasil é um dos quatro primeiros países onde a
+   exigência vale; pacote não registrado é removido do Play a partir dessa data (FATO,
+   https://developer.android.com/developer-verification, acesso 2026-09-22). Conta pessoal nova ainda precisa de
+   **documento oficial** e de **verificação por aparelho Android real** pelo app Play Console (FATO,
+   https://support.google.com/googleplay/android-developer/answer/14316361, acesso 2026-09-22). Some a isso o teste
+   fechado com 12 pessoas por 14 dias (`docs/technical/ANDROID_VERIFICACAO_30_09.md`). **Crie a conta do Play esta
+   semana**, mesmo sem nada para enviar: nada disso depende de código, e tudo tem espera.
+2. **Coerência entre o app e o que foi declarado.** "Dados não coletados" e "sem conteúdo de usuário" são verdade hoje
+   e deixam de ser no minuto em que a Comunidade ou qualquer envio de dado entrar no build. Declaração que não bate
+   com o app é motivo de remoção nas duas lojas — e ninguém percebe até a remoção. Quando a Comunidade entrar,
+   **primeiro** se atualiza o questionário etário, o App Privacy e o Data safety; depois se envia.
+3. **O e-mail de suporte tem de ser lido.** A diretriz 1.5 e a 1.2 exigem contato alcançável; caixa de e-mail
+   abandonada vira reclamação de usuário e, no caso de conteúdo de usuário, motivo de remoção.
+
+Quadro completo, com o que falta para a Comunidade e quem resolve cada item:
+**`docs/product/CONFORMIDADE_LOJAS.md`**.
 
 ---
 

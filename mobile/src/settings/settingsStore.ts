@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useCallback, useEffect, useState } from 'react';
 
-import { isGoalId, type GoalId } from '@/config/goals';
+import { isGoalId, normalizeCustomGoal, type GoalId } from '@/config/goals';
 import { isDevBuild } from '@/journey/devBuild';
 import { createWriteQueue } from '@/progress/writeQueue';
 import { READER_FONT_DEFAULT, normalizeReaderFontSize } from '@/reader/readerFontSize';
@@ -14,7 +14,13 @@ export type ReminderSlot = 'morning' | 'afternoon' | 'evening' | 'custom' | 'non
 /** Limite do nome: cabe em qualquer saudação sem quebrar a tela. */
 export const PROFILE_NAME_MAX = 40;
 
-export type Profile = { name: string | null; goals: GoalId[] };
+/**
+ * `customGoal` é a "Outra meta" (feedback do fundador, 2026-09-22): a meta
+ * escrita pela pessoa, até `CUSTOM_GOAL_MAX`. Vale ao lado de `goals`, nunca no
+ * lugar delas; `null` quando ela não escreveu nenhuma. Mesmo tratamento das
+ * outras: só neste aparelho, fora de analytics e do servidor.
+ */
+export type Profile = { name: string | null; goals: GoalId[]; customGoal: string | null };
 
 export type Settings = {
   onboardingCompleted: boolean;
@@ -71,7 +77,7 @@ export const DEFAULT_SETTINGS: Settings = {
   milestonesKept: [],
   ministry: null,
   altarReminder: false,
-  profile: { name: null, goals: [] },
+  profile: { name: null, goals: [], customGoal: null },
   dev: { dayOverride: null },
 };
 
@@ -88,7 +94,13 @@ export function normalizeProfileName(value: unknown): string | null {
 function normalizeProfile(value: unknown): Profile {
   const p = (value && typeof value === 'object' ? value : {}) as Record<string, unknown>;
   const goals = Array.isArray(p.goals) ? p.goals.filter(isGoalId) : [];
-  return { name: normalizeProfileName(p.name), goals: Array.from(new Set(goals)) };
+  return {
+    name: normalizeProfileName(p.name),
+    goals: Array.from(new Set(goals)),
+    // Texto livre passa pela mesma normalização da tela: vazio ou só espaços
+    // volta a `null`, para "Outra meta" não ficar marcada sem meta nenhuma.
+    customGoal: normalizeCustomGoal(p.customGoal),
+  };
 }
 
 let cache: Settings | null = null;

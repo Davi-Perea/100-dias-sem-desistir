@@ -19,10 +19,19 @@ import { faces, floatShadow, glass, MIN_TOUCH, radius, spacing, useGutter, useRe
  * - O versículo-base vem de `key_verse_reference`; o texto é o da Bíblia Livre
  *   empacotada, com a atribuição curta ao lado (a completa fica no leitor e em
  *   "Sobre"). Sem achar o texto, fica só a referência.
+ * - 2026-09-22 (feedback do fundador: "parece um texto solto"): o versículo vem
+ *   ENTRE ASPAS TIPOGRÁFICAS (“ ”), separado da ênfase por um filete, e a
+ *   referência embaixo. As aspas são MOLDURA, não texto: ficam em nós próprios,
+ *   e o versículo continua exatamente como está na tradução — nem uma letra
+ *   mudada, cortada ou acrescentada dentro dele.
  * - O véu NÃO fecha ao toque (o pedido é "só o X"); o voltar do Android fecha,
  *   como o X, porque prender a pessoa num aviso seria pior.
  * - Com "Reduzir movimento", aparece sem animação.
  */
+/** Aspas tipográficas do pt-BR. Escapadas para não dependerem do encoding do arquivo. */
+export const OPEN_QUOTE = '“';
+export const CLOSE_QUOTE = '”';
+
 export function DailyVerseNotice({
   visible,
   day,
@@ -145,10 +154,31 @@ export function DailyVerseNotice({
 
             {reference ? (
               <View style={{ gap: spacing.sm }} testID="daily-notice-verse">
-                {/* O texto da tradução como veio: sem aspas, cortes ou ajustes. */}
+                {/* Filete: a ênfase da igreja acaba aqui e o versículo começa. */}
+                {title ? (
+                  <View
+                    testID="daily-notice-divider"
+                    style={{
+                      height: 1,
+                      alignSelf: 'stretch',
+                      backgroundColor: isDark ? glass.hairlineDark : glass.hairline,
+                      marginBottom: spacing.xs,
+                    }}
+                  />
+                ) : null}
+                {/* Aspas em nós SEPARADOS: o texto da tradução segue como veio,
+                    sem aspas dentro dele, sem cortes e sem ajustes. */}
                 {current?.text ? (
-                  <AppText variant="quote" style={{ fontSize: 19, lineHeight: 30 }} testID="daily-notice-verse-text">
-                    {current.text}
+                  <AppText
+                    variant="quote"
+                    accessibilityLabel={current.text}
+                    style={{ fontSize: 19, lineHeight: 30 }}
+                  >
+                    {OPEN_QUOTE}
+                    <AppText variant="quote" style={{ fontSize: 19, lineHeight: 30 }} testID="daily-notice-verse-text">
+                      {current.text}
+                    </AppText>
+                    {CLOSE_QUOTE}
                   </AppText>
                 ) : null}
                 <AppText

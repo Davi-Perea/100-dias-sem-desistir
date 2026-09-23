@@ -1,6 +1,9 @@
 import { Pressable, View } from 'react-native';
 
 import { AppText, Avatar, Button } from '../components';
+// Uma frase só para o contador, aqui e no topo da Jornada (pedido do fundador,
+// 2026-09-22: mesmo número, mesmo rótulo falado nos dois lugares).
+import { readCounterLabel } from '../jornada/JourneyHeader';
 import { MIN_TOUCH, radius, spacing, useTheme } from '../theme';
 import { FlameIcon, GearIcon } from './ProfileIcons';
 
@@ -50,7 +53,7 @@ export function ProfileHeader({
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md }}>
         <View
           accessible
-          accessibilityLabel={`${readCount} ${daysWord} no total`}
+          accessibilityLabel={readCounterLabel(readCount)}
           testID="read-counter"
           style={{
             flexDirection: 'row',

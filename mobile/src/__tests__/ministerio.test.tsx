@@ -118,7 +118,9 @@ describe('tela Meu ministério', () => {
     }
     expect(screen.queryByText(/Prs?\.|Pra\./)).toBeNull();
     expect(screen.getByText(/Fica só neste aparelho/)).toBeTruthy();
-    expect(screen.getByTestId('content-banner')).toBeTruthy();
+    // 2026-09-22: com o conteúdo REAL da igreja não há faixa nenhuma. A
+    // pendência de autorização virou uma linha em Ajustes (faixa-autorizacao).
+    expect(screen.queryByTestId('content-banner')).toBeNull();
   });
 
   test('escolher "Kids" grava só neste aparelho, mostra os dias no altar e agenda as vésperas', async () => {

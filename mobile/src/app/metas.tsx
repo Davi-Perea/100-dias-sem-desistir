@@ -2,7 +2,7 @@ import { useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { View } from 'react-native';
 
-import { GOALS, type GoalId } from '@/config/goals';
+import { GOALS, normalizeCustomGoal, type GoalId } from '@/config/goals';
 import {
   PROFILE_NAME_MAX,
   normalizeProfileName,
@@ -11,6 +11,7 @@ import {
   type Profile,
 } from '@/settings/settingsStore';
 import { AppText, Cap, SaveErrorNotice, Screen, StateView } from '@/ui/components';
+import { CustomGoalRow } from '@/ui/entrada/CustomGoalRow';
 import { TextField } from '@/ui/TextField';
 import { spacing } from '@/ui/theme';
 import { SubScreen } from '@/ui/voce/SubScreen';
@@ -68,6 +69,12 @@ function GoalsForm({ profile: saved, focusName }: { profile: Profile; focusName:
       goals: profile.goals.includes(id) ? profile.goals.filter((g) => g !== id) : [...profile.goals, id],
     }));
 
+  // "Outra meta": a mesma linha e a mesma regra da entrada, no molde de Você.
+  const changeCustomGoal = (next: string | null) => {
+    const clean = normalizeCustomGoal(next);
+    if (clean !== saved.customGoal) save((profile) => ({ ...profile, customGoal: clean }));
+  };
+
   return (
     <SubScreen title="Minhas metas" gap={spacing.xl}>
       <View style={{ gap: spacing.sm }}>
@@ -109,6 +116,7 @@ function GoalsForm({ profile: saved, focusName }: { profile: Profile; focusName:
               testID={`goal-${goal.id}`}
             />
           ))}
+          <CustomGoalRow value={saved.customGoal} onChange={changeCustomGoal} row={ToggleRow} />
         </View>
       </View>
 

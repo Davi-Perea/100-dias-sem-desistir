@@ -501,10 +501,14 @@ function JourneyTrail({
         // ficava com altura zero.
         ListHeaderComponent={
           <View onLayout={settle(setHeaderHeight)} style={{ gap: spacing.md, paddingBottom: spacing.lg }}>
-            <JourneyHeader />
-            {/* PROVISÓRIO (pergunta 5 ao designer): a faixa de conteúdo não autorizado
-                (invariante C-07) não tem lugar no desenho; fica compacta, logo abaixo
-                do cabeçalho, enquanto a igreja não autorizar. */}
+            {/* F7/feedback de 2026-09-22: o contador de dias lidos do Você também
+                no topo da Jornada, com o mesmo número (`completedCount`) e o
+                mesmo rótulo falado. Nunca zera e nada cobra de quem faltou. */}
+            <JourneyHeader readCount={journey.completedCount} />
+            {/* Só o aviso de conteúdo FICTÍCIO (fixtures DEV) desenha aqui: a
+                pendência de autorização da igreja NÃO aparece nesta aba — ela é
+                uma linha só, em Ajustes (feedback do fundador, 2026-09-22). Ver
+                `DevContentBanner`, que não desenha nada com `pending`. */}
             <DevContentBanner state={journey.contentState} compact />
             {/* F4 · a faixa depende da rede REAL do aparelho (expo-network), não do
                 estado da nuvem: quem usa sem conta também a vê, e uma recusa do

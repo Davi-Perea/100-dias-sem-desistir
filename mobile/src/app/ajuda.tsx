@@ -28,6 +28,11 @@ const RIGHTS_LABEL: Record<RightsStatus, string> = {
  */
 export default function HelpScreen() {
   const dataset = useDataset();
+  // Nada de rótulo sem valor (feedback do fundador, 2026-09-22): `null`, string
+  // vazia e espaços em branco são a MESMA coisa — não há contato. O `''` já caía
+  // fora pela veracidade; `'   '` passava e renderizaria "Enviar um e-mail" com
+  // um valor invisível ao lado.
+  const supportEmail = SUPPORT_EMAIL?.trim() || null;
   const metadata = getBibleProvider().getMetadata();
   // Mesma regra do leitor: sem tradução licenciada não há aviso de copyright a
   // mostrar. O do provedor de desenvolvimento é texto de placeholder (2.1).
@@ -37,8 +42,9 @@ export default function HelpScreen() {
   return (
     <SubScreen
       // Sem contato preenchido o título não promete um (1.5).
-      title={SUPPORT_EMAIL ? 'Ajuda e contato' : 'Ajuda'}
-      // PROVISÓRIO (pergunta 5 ao designer): aviso de conteúdo compacto, abaixo do cabeçalho.
+      title={supportEmail ? 'Ajuda e contato' : 'Ajuda'}
+      // Só o aviso de conteúdo FICTÍCIO desenha aqui. A pendência de autorização
+      // da igreja saiu das telas em 2026-09-22 e virou uma linha em Ajustes.
       banner={<DevContentBanner state={contentState()} compact />}
     >
       <View style={{ gap: spacing.md }}>
@@ -67,19 +73,20 @@ export default function HelpScreen() {
       </View>
 
       {/*
-        Apple 1.5: contato alcançável no app. Sem e-mail preenchido em
-        config/contato.ts a seção não aparece (nunca um link quebrado).
+        Apple 1.5: contato alcançável no app. Sem e-mail em config/contato.ts a
+        seção INTEIRA some — filete, cap "Fale com a gente" e linha. Nunca um
+        rótulo sem valor, nunca um link quebrado, nunca um endereço inventado.
       */}
-      {SUPPORT_EMAIL ? (
+      {supportEmail ? (
         <>
           <Rule />
           <View style={{ gap: spacing.md }}>
             <Cap>Fale com a gente</Cap>
             <SettingRow
               label="Enviar um e-mail"
-              value={SUPPORT_EMAIL}
+              value={supportEmail}
               onPress={() => {
-                Linking.openURL(`mailto:${SUPPORT_EMAIL}`).catch(() => {});
+                Linking.openURL(`mailto:${supportEmail}`).catch(() => {});
               }}
               first
               testID="help-contact"

@@ -8,6 +8,7 @@ import { track } from '@/analytics/analytics';
 import { expandChapters, parseReference } from '@/bible/references';
 import { getDay } from '@/journey/datasetSource';
 import { formatDayDate } from '@/journey/officialDay';
+import { readingSummary } from '@/journey/readingSummary';
 import { useJourney } from '@/journey/useJourney';
 import { isDayCompleted, setDayCompleted } from '@/progress/completionsStore';
 import { getBibleProvider, type Passage } from '@/reader/provider';
@@ -19,6 +20,7 @@ import { LockedDayScreen } from '@/ui/LockSheet';
 import { ChapterText } from '@/ui/biblia/ChapterText';
 import { AppText, Button, Cap, DevContentBanner, Screen, StateView } from '@/ui/components';
 import { ErrorState } from '@/ui/entrada/States';
+import { OwnBiblePlan } from '@/ui/leitor/OwnBiblePlan';
 import { ReaderFooter, type ReaderPrimary } from '@/ui/leitor/ReaderFooter';
 import { ReaderGuide } from '@/ui/leitor/ReaderGuide';
 import { ReaderTopBar } from '@/ui/leitor/ReaderTopBar';
@@ -45,6 +47,12 @@ const READER_GUTTER = 26;
  * - TEXTO (provedor licenciado): cap do livro, numeral do capítulo, o texto com
  *   os números de versículo que o PROVEDOR fornecer e a atribuição no fim. O app
  *   nunca inventa estrutura de versículos (REGRAS 1.5; LACUNAS B1).
+ *
+ * Acima dos dois está o MODO DE LEITURA da pessoa (feedback do fundador,
+ * 2026-09-22): quem escolheu "Vou ler na minha Bíblia" abre a tela enxuta do
+ * `OwnBiblePlan` — referência do dia, capítulos e "Concluir leitura" —, sem
+ * texto e sem passar capítulo por capítulo. "Ler aqui no app" troca para o
+ * leitor com texto e guarda a preferência, como o "Ler agora" da Jornada.
  */
 export default function ReaderScreen() {
   const { day } = useLocalSearchParams<{ day: string }>();
@@ -84,6 +92,16 @@ export default function ReaderScreen() {
   const metadata = provider.getMetadata();
   /** Sem texto licenciado o leitor é o guia (ver o topo). */
   const hasLicensedText = !metadata.isDevPlaceholder;
+  /**
+   * Modo de leitura da pessoa. Enquanto as preferências não voltaram do disco
+   * (`settings === null`) o modo é desconhecido e a tela espera: abrir o texto
+   * para só depois trocar pela tela enxuta seria um pisca-pisca no lugar de uma
+   * decisão. A regra é a MESMA do painel de hoje (`preferOwnBible` da Jornada):
+   * só `own_bible` é a própria Bíblia; `both` continua no leitor do app.
+   */
+  const [readInApp, setReadInApp] = useState(false);
+  const readingMode = settings ? (settings.lastUsedReadingMode ?? settings.readingMode) : null;
+  const ownBibleMode = !readInApp && readingMode === 'own_bible';
 
   const chapters = useMemo(() => {
     if (!dayData) return [];
@@ -109,8 +127,11 @@ export default function ReaderScreen() {
   // Os três efeitos abaixo são separados de propósito: a posição voltar do
   // disco (positionReady) não pode pedir o capítulo de novo nem jogar a
   // rolagem para o topo de quem já começou a ler um capítulo longo (Salmo 119).
+  // Na tela enxuta nada é pedido ao provedor: quem lê na própria Bíblia não abriu
+  // texto nenhum, e buscar a passagem seria trabalho (e, com provedor online,
+  // requisição) por conta de uma leitura que não vai acontecer aqui.
   useEffect(() => {
-    if (!reference || !unlocked || !hasLicensedText) return;
+    if (!reference || !unlocked || !hasLicensedText || ownBibleMode) return;
     let alive = true;
     provider.getPassage(reference).then(
       (loaded) => alive && setResult({ key: chapterKey, passage: loaded }),
@@ -120,7 +141,7 @@ export default function ReaderScreen() {
     return () => {
       alive = false;
     };
-  }, [reference, chapterKey, provider, hasLicensedText, unlocked]);
+  }, [reference, chapterKey, provider, hasLicensedText, unlocked, ownBibleMode]);
 
   useEffect(() => {
     if (!positionReady || !unlocked || chapters.length === 0) return;
@@ -226,7 +247,7 @@ export default function ReaderScreen() {
     try {
       await setDayCompleted(journey.campaign.id, dayNumber, true);
       if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-      track({ name: 'reading_completed', dayNumber, mode: 'in_app' });
+      track({ name: 'reading_completed', dayNumber, mode: ownBibleMode ? 'own_bible' : 'in_app' });
       // Feedback de 2026-09-22: concluir leva à tela de conclusão do dia (com
       // confete). Com a Comunidade ligada, o "Continuar" de lá segue para o B4.
       // `replace`: voltar de lá não reabre o leitor já concluído.
@@ -264,6 +285,78 @@ export default function ReaderScreen() {
   // marcos só contam o dia que já chegou). No último capítulo fica "Voltar" e
   // a frase diz a partir de quando o dia pode ser concluído, como no A3.
   const completable = journey.isDayCompletable(dayNumber);
+
+  // ---------------------------------------------- tela enxuta da própria Bíblia
+  // Enquanto as preferências não voltaram do disco, o modo é desconhecido: a
+  // tela espera em vez de abrir o texto e trocar no quadro seguinte.
+  if (!settings) {
+    return (
+      <Screen>
+        <StateView kind="loading" />
+      </Screen>
+    );
+  }
+
+  if (ownBibleMode) {
+    const summary = readingSummary(dayData);
+    /** "Ler aqui no app" grava a preferência, como o "Ler agora" da Jornada. */
+    const readHere = () => {
+      setReadInApp(true);
+      track({ name: 'reading_started', dayNumber, mode: 'in_app' });
+      // Preferência de conveniência: se a gravação falhar, o texto abre do mesmo jeito.
+      updateSettings((s) => ({ ...s, lastUsedReadingMode: 'in_app' })).catch(() => {});
+    };
+    return (
+      <Screen edges={['left', 'right']}>
+        <ScrollView
+          testID="reader-scroll"
+          contentInsetAdjustmentBehavior="never"
+          contentContainerStyle={{
+            paddingHorizontal: READER_GUTTER,
+            paddingTop: (barHeight || insets.top + MIN_TOUCH + 3) + spacing.xl,
+            paddingBottom: Math.max(insets.bottom, spacing.lg) + spacing.xxl,
+            gap: spacing.lg,
+            width: '100%',
+            maxWidth: MAX_CONTENT_WIDTH + READER_GUTTER * 2,
+            alignSelf: 'center',
+          }}
+        >
+          <DevContentBanner state={journey.contentState} compact />
+          <OwnBiblePlan
+            reference={summary?.label ?? chapterLabel}
+            detail={summary?.detail ?? null}
+            chapters={chapters.map((chapter) => `${chapter.bookName} ${chapter.chapter}`)}
+            done={done}
+            completable={completable}
+            busy={busy}
+            saveFailed={saveFailed}
+            futureNote={
+              !done && !completable
+                ? `Você poderá concluir este dia a partir de ${formatDayDate(dayNumber, journey.campaign)}.`
+                : undefined
+            }
+            onComplete={completeDay}
+            onBack={goBackOrHome}
+            onReadInApp={hasLicensedText ? readHere : undefined}
+          />
+        </ScrollView>
+
+        <ReaderTopBar
+          topInset={insets.top}
+          title={`Dia ${dayNumber}`}
+          // Sem capítulo aberto não há posição a dizer, nem tamanho de texto a mudar.
+          showPosition={false}
+          dayNumber={dayNumber}
+          chapterIndex={0}
+          chapterCount={chapters.length}
+          done={done}
+          onClose={goBackOrHome}
+          onHeight={setBarHeight}
+        />
+      </Screen>
+    );
+  }
+
   const futureNote =
     isLastChapter && !done && !completable
       ? `Você poderá concluir este dia a partir de ${formatDayDate(dayNumber, journey.campaign)}.`

@@ -214,10 +214,20 @@ describe('A1 · a abertura mostra as linhas logo acima de hoje', () => {
   const lengths = [48, 48, 48, 48, 48, 440, 48];
   const base = { running: true, offsets, lengths, todayIndex: 5, welcomeIndex: -1 };
 
-  test('abre três linhas acima de hoje quando o painel inteiro ainda cabe', () => {
+  test('cabendo tudo acima do painel, abre no topo (o contador de dias lidos aparece)', () => {
+    // 700 − 440 − 16 = 244 de folga, e acima de hoje há 240: cabe a trilha inteira
+    // com o cabeçalho. Correção de 2026-09-22: o contador não nasce fora da tela.
     const offset = openingOffset({ ...base, viewport: 700 });
-    expect(offset).toBe(96);
-    expect(openingIndex(offsets, offset)).toBe(2);
+    expect(offset).toBe(0);
+    expect(openingIndex(offsets, offset)).toBe(0);
+  });
+
+  test('não cabendo tudo, mostra as três linhas acima de hoje', () => {
+    // Cabeçalho de 120 empurrando a trilha: 360 acima de hoje contra 244 de folga.
+    const withHeader = offsets.map((value) => value + 120);
+    const offset = openingOffset({ ...base, offsets: withHeader, viewport: 700 });
+    expect(offset).toBe(withHeader[2]);
+    expect(openingIndex(withHeader, offset)).toBe(2);
   });
 
   test('numa janela curta mostra só o que cabe sem cortar o painel', () => {

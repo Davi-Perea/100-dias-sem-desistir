@@ -1210,12 +1210,26 @@ export function SaveErrorNotice({ message = SAVE_ERROR_COPY, testID = 'save-erro
 }
 
 /**
- * Aviso de conteúdo não liberado para o público (invariante C-07, bloqueante).
+ * Aviso de conteúdo FICTÍCIO de desenvolvimento (fixtures `DEV_ONLY`).
  *
- * Não está no desenho — e é obrigatório enquanto a igreja não autorizar a
- * publicação: builds de release falham na abertura sem essa autorização. Três
- * estados: fixture (conteúdo fictício), pending (conteúdo REAL, sem autorização
- * escrita) e authorized (não renderiza). Os textos são literais do invariante.
+ * 2026-09-22 (feedback do fundador na prévia do Dia 23): a faixa "Conteúdo real
+ * dos 100 Dias, aguardando autorização…" SAIU de todas as telas. Ela repetia em
+ * cada tela um assunto que é da igreja e não de quem lê, e emoldurava o
+ * material real como se fosse provisório. No lugar dela ficou UMA linha
+ * discreta dentro de Ajustes (`src/app/ajustes.tsx`), enquanto o dataset
+ * estiver em `pending_authorization`.
+ *
+ * O que NÃO mudou — e nunca foi esta faixa: a trava de publicação. Quem impede
+ * a distribuição é o build. `assertRightsForStore` (app.config.ts) recusa gerar
+ * a variante de loja e `assertProductionReady` (journey/datasetSource.ts)
+ * derruba um release na abertura com conteúdo não autorizado.
+ *
+ * O que CONTINUA em todas as telas: o aviso das fixtures. Conteúdo fictício não
+ * pode ser confundido com o material da igreja em nenhuma tela (REGRAS §17–18),
+ * e ele só existe em build de desenvolvimento e no painel DEV.
+ *
+ * Por isso `pending` e `authorized` não renderizam nada. A prop `state` fica:
+ * quem chama continua passando o estado do conteúdo, sem saber desta regra.
  */
 export function DevContentBanner({
   state,
@@ -1230,15 +1244,12 @@ export function DevContentBanner({
   const theme = useTheme();
   const colors = tone === 'theme' ? theme.colors : fixedPalette(tone);
   const face = useFace();
-  if (state === 'authorized') return null;
-  const text =
-    state === 'fixture'
-      ? compact
-        ? 'Conteúdo de desenvolvimento.'
-        : 'Conteúdo de desenvolvimento. Textos e cronograma são fictícios e não representam o plano da igreja.'
-      : compact
-        ? 'Aguardando autorização da igreja.'
-        : 'Conteúdo real dos 100 Dias, aguardando autorização escrita da igreja para publicação. Não distribuir esta versão.';
+  // `pending` e `authorized` não têm faixa: o conteúdo real da igreja aparece
+  // sem moldura, e a pendência de autorização mora em Ajustes.
+  if (state !== 'fixture') return null;
+  const text = compact
+    ? 'Conteúdo de desenvolvimento.'
+    : 'Conteúdo de desenvolvimento. Textos e cronograma são fictícios e não representam o plano da igreja.';
   return (
     <View
       accessibilityRole="alert"

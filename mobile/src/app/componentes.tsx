@@ -197,8 +197,10 @@ export default function ComponentCatalog() {
 
         <Section title="Faixas">
           <OfflineBanner />
-          <DevContentBanner state="pending" />
-          <DevContentBanner state="pending" compact />
+          {/* Só o estado `fixture` desenha: `pending` saiu das telas em 2026-09-22
+              (virou uma linha em Ajustes) e `authorized` nunca desenhou. */}
+          <DevContentBanner state="fixture" />
+          <DevContentBanner state="fixture" compact />
         </Section>
 
         <Section title="Ícones da barra">
