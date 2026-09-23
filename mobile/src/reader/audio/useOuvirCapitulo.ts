@@ -1,5 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
+import { ALTURA, ALVO_DE_CARACTERES, PAUSA_ENTRE_TRECHOS_MS, VELOCIDADE } from './ajustes';
+import { agrupar, type Trecho } from './textoParaFala';
 import { aguardarVozes, sinteseDisponivel, type VozLocal } from './vozPtBr';
 
 /**
@@ -39,7 +41,7 @@ export type EstadoDaLeitura = 'indisponivel' | 'carregando' | 'parado' | 'tocand
 
 export type Leitura = {
   estado: EstadoDaLeitura;
-  /** Índice (base 0) do versículo em curso ou onde a leitura parou. */
+  /** Versículo (base 0) em que a leitura está. Derivado do trecho em curso. */
   versiculoAtual: number;
   /** Vozes locais em português encontradas neste aparelho, da melhor para a pior. */
   vozes: VozLocal[];
@@ -78,7 +80,7 @@ export function useOuvirCapitulo(versiculos: readonly string[], chaveDoCapitulo:
    * tudo o que estava pendente vira passado, sem depender de tempo nenhum.
    */
   const geracao = useRef(0);
-  const versiculosRef = useRef(versiculos);
+  const trechosRef = useRef<Trecho[]>([]);
   const vozRef = useRef<SpeechSynthesisVoice | null>(null);
 
   /* ------------------------------------------------------------ as vozes */
@@ -109,9 +111,10 @@ export function useOuvirCapitulo(versiculos: readonly string[], chaveDoCapitulo:
    * Quem lê estas refs é a callback `onend` de uma fala já em curso: ela não
    * enxerga o render atual, então precisa deste espelho.
    */
+  const trechos = useMemo(() => agrupar(versiculos, ALVO_DE_CARACTERES), [versiculos]);
   useEffect(() => {
-    versiculosRef.current = versiculos;
-  }, [versiculos]);
+    trechosRef.current = trechos;
+  }, [trechos]);
 
   useEffect(() => {
     vozRef.current = vozEscolhida?.voz ?? null;
@@ -131,7 +134,7 @@ export function useOuvirCapitulo(versiculos: readonly string[], chaveDoCapitulo:
 
   const falarDe = useCallback(
     (inicio: number) => {
-      const lista = versiculosRef.current;
+      const lista = trechosRef.current;
       const voz = vozRef.current;
       if (!voz || inicio >= lista.length) {
         setEstado('parado');
@@ -146,16 +149,20 @@ export function useOuvirCapitulo(versiculos: readonly string[], chaveDoCapitulo:
       const atual = () => geracao.current === minhaGeracao;
 
       const dizer = (i: number) => {
-        const texto = lista[i];
-        if (typeof texto !== 'string' || texto.trim().length === 0) {
-          // Versículo vazio não trava a fila: pula para o próximo.
+        const trecho = lista[i];
+        if (!trecho || trecho.texto.trim().length === 0) {
           seguir(i);
           return;
         }
-        const fala = new SpeechSynthesisUtterance(texto);
+        const fala = new SpeechSynthesisUtterance(trecho.texto);
         fala.voice = voz;
         fala.lang = voz.lang;
-        fala.onend = () => seguir(i);
+        fala.rate = VELOCIDADE;
+        fala.pitch = ALTURA;
+        // A pausa entre trechos é um tempo de espera nosso, e não um silêncio
+        // no texto: o motor não respeita pontuação inventada para isso, e SSML
+        // ele fala em voz alta (medido em 23/09/2026).
+        fala.onend = () => setTimeout(() => seguir(i), PAUSA_ENTRE_TRECHOS_MS);
         fala.onerror = () => {
           // Um erro de motor não pode deixar o botão preso em "tocando" — mas o
           // "erro" que o cancelamento gera pertence a uma corrida já encerrada.
@@ -174,12 +181,12 @@ export function useOuvirCapitulo(versiculos: readonly string[], chaveDoCapitulo:
           return;
         }
         indice.current = proximo;
-        setVersiculoAtual(proximo);
+        setVersiculoAtual(lista[proximo]?.primeiroVersiculo ?? 0);
         dizer(proximo);
       };
 
       indice.current = inicio;
-      setVersiculoAtual(inicio);
+      setVersiculoAtual(lista[inicio]?.primeiroVersiculo ?? 0);
       setEstado('tocando');
       dizer(inicio);
     },

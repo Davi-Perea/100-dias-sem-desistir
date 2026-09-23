@@ -2,6 +2,8 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { POC_OUVIR_CAPITULO, POC_OUVIR_ENABLED, POC_OUVIR_LIVRO } from '@/config/features';
+import { ALTURA, VELOCIDADE } from '@/reader/audio/ajustes';
+import { agrupar, versiculoParaFala } from '@/reader/audio/textoParaFala';
 import { ehLocal, sinteseDisponivel } from '@/reader/audio/vozPtBr';
 
 /**
@@ -88,10 +90,12 @@ describe('só voz local', () => {
   test('sem voz local, o recurso fica indisponível — não há caminho para voz remota', () => {
     const hook = ler('reader', 'audio', 'useOuvirCapitulo.ts');
     expect(hook).toContain("setEstado(encontradas.length > 0 ? 'parado' : 'indisponivel')");
-    const controle = ler('ui', 'biblia', 'OuvirCapitulo.tsx');
-    // Indisponível não desenha nada: nem botão desligado, nem aviso técnico.
-    expect(controle).toContain("leitura.estado === 'indisponivel'");
-    expect(controle).toContain('return null');
+    // O portão mora na TELA: sem voz local, `ouvir` é null, o player não é
+    // desenhado e o rodapé normal do leitor fica. Nem botão desligado, nem aviso.
+    const tela = ler('app', 'biblia', '[livro]', '[capitulo].tsx');
+    expect(tela).toContain("leitura.estado !== 'indisponivel'");
+    expect(tela).toContain('{ouvir ? (');
+    expect(tela).toContain('<ReaderFooter');
   });
 
   test('em plataforma sem Web Speech API a síntese é declarada indisponível', () => {
@@ -112,7 +116,9 @@ describe('só o texto da Bíblia é falado', () => {
 
   test('a tela passa só o texto dos versículos', () => {
     const tela = ler('app', 'biblia', '[livro]', '[capitulo].tsx');
-    expect(tela).toContain('passage.verses.map((v) => v.text)');
+    // O texto falado é derivado dos versículos, e de mais nada.
+    expect(tela).toContain('passage?.verses.map((v) => v.text)');
+    expect(tela).toContain('useOuvirCapitulo(versiculosFalados');
   });
 
   test('o motor da fala não importa nenhuma store de conteúdo do usuário', () => {
@@ -124,12 +130,51 @@ describe('só o texto da Bíblia é falado', () => {
 });
 
 describe('o desenho da leitura', () => {
-  test('fala versículo a versículo, não o capítulo inteiro', () => {
+  /**
+   * A MEDIÇÃO MUDOU ESTA DECISÃO. O primeiro desenho falava um versículo por vez
+   * e soava picado. Eu supus silêncio entre falas; medi e a borda custa só
+   * ~98 ms. A causa é o REINÍCIO DE ENTONAÇÃO a cada fala nova — um versículo
+   * que continua a ideia soava como afirmação encerrada.
+   *
+   * Agora fala em GRUPOS de ~320 caracteres, sem nunca partir um versículo, e o
+   * "Continuar" volta ao começo do grupo (poucos segundos, não um capítulo).
+   */
+  test('fala em grupos, sem partir versículo', () => {
     const hook = ler('reader', 'audio', 'useOuvirCapitulo.ts');
-    expect(hook).toContain('new SpeechSynthesisUtterance(texto)');
-    // Uma fala por versículo: o texto vem de um índice da lista.
-    expect(hook).toContain('const texto = lista[i]');
-    expect(hook).not.toContain(".join(' ')");
+    expect(hook).toContain('agrupar(versiculos, ALVO_DE_CARACTERES)');
+    expect(hook).toContain('new SpeechSynthesisUtterance(trecho.texto)');
+    const versos = ['No princípio criou Deus os céus e a terra.', 'E disse Deus: Haja luz; e houve luz.'];
+    const grupos = agrupar(versos, 320);
+    // Os dois cabem num grupo só, e nenhum versículo foi partido.
+    expect(grupos).toHaveLength(1);
+    expect(grupos[0].primeiroVersiculo).toBe(0);
+    // Um versículo sozinho maior que o alvo continua inteiro: nunca se corta ao meio.
+    const gigante = agrupar(['a'.repeat(900) + '.'], 320);
+    expect(gigante).toHaveLength(1);
+  });
+
+  test('velocidade e altura saem das constantes medidas', () => {
+    const hook = ler('reader', 'audio', 'useOuvirCapitulo.ts');
+    expect(hook).toContain('fala.rate = VELOCIDADE');
+    expect(hook).toContain('fala.pitch = ALTURA');
+    expect(VELOCIDADE).toBe(0.9);
+    expect(ALTURA).toBe(1.0);
+  });
+
+  test('a normalização mexe em pontuação, nunca em palavra', () => {
+    const antes = 'E disse Deus: Haja luz; e houve luz.';
+    const depois = versiculoParaFala(antes);
+    // As palavras continuam todas lá, na mesma ordem.
+    const palavras = (t: string) => t.toLowerCase().replace(/[^a-zà-ús]/g, ' ').split(/s+/).filter(Boolean);
+    expect(palavras(depois)).toEqual(palavras(antes));
+    // O que mudou foi o sinal: ponto e vírgula e dois-pontos viraram parada.
+    expect(depois).not.toContain(';');
+    expect(depois).not.toContain(':');
+  });
+
+  test('o número do versículo não é falado', () => {
+    const grupos = agrupar(['No princípio criou Deus os céus e a terra.'], 320);
+    expect(grupos[0].texto).not.toMatch(/^s*1/);
   });
 
   test('pausar é parar-e-lembrar, igual em toda plataforma', () => {

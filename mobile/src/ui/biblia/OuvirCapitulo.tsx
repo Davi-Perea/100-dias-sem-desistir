@@ -21,68 +21,34 @@ import { spacing, useTheme } from '@/ui/theme';
 export function OuvirCapitulo({
   versiculos,
   chaveDoCapitulo,
-  total,
 }: {
   /** SÓ texto bíblico. Nada escrito pela pessoa entra aqui. */
   versiculos: readonly string[];
-  /** Muda quando o capítulo muda: é o gatilho que cala a fala. */
   chaveDoCapitulo: string;
-  total: number;
+  total?: number;
 }) {
   const { colors } = useTheme();
   const leitura = useOuvirCapitulo(versiculos, chaveDoCapitulo);
 
-  if (leitura.estado === 'indisponivel' || leitura.estado === 'carregando') return null;
-
-  const tocando = leitura.estado === 'tocando';
-  const pausado = leitura.estado === 'pausado';
+  // Só faz sentido com mais de uma voz para comparar.
+  if (leitura.vozes.length < 2) return null;
 
   return (
-    <View
-      testID="ouvir-capitulo"
-      style={{
-        gap: spacing.sm,
-        padding: spacing.md,
-        borderWidth: 1,
-        borderColor: colors.border,
-        borderRadius: 14,
-      }}
-    >
-      <View style={{ flexDirection: 'row', gap: spacing.sm, flexWrap: 'wrap' }}>
-        {tocando ? (
-          <Button title="Pausar" variant="outline" onPress={leitura.pausar} testID="ouvir-pausar" />
-        ) : pausado ? (
-          <Button title="Continuar" onPress={leitura.continuar} testID="ouvir-continuar" />
-        ) : (
-          <Button title="Ouvir capítulo" onPress={leitura.tocar} testID="ouvir-tocar" />
-        )}
-        {tocando || pausado ? (
-          <Button title="Parar" variant="underline" onPress={leitura.parar} testID="ouvir-parar" />
-        ) : null}
-      </View>
-
-      <AppText variant="caption" testID="ouvir-diagnostico">
-        {`voz: ${leitura.vozEscolhida?.nome ?? '—'} (${leitura.vozEscolhida?.lang ?? '—'}, local)`}
-        {tocando || pausado ? ` · versículo ${leitura.versiculoAtual + 1} de ${total}` : ''}
+    <View testID="ouvir-capitulo" style={{ gap: spacing.xs }}>
+      <AppText variant="caption" style={{ color: colors.textMuted }} testID="ouvir-diagnostico">
+        {`experimento · voz: ${leitura.vozEscolhida?.nome ?? '—'} (local)`}
       </AppText>
-
-      {/* Mais de uma voz local: dá para comparar sem reinstalar nada. */}
-      {leitura.vozes.length > 1 ? (
-        <View style={{ gap: spacing.xs }}>
-          <AppText variant="caption">Outras vozes deste aparelho, para comparar:</AppText>
-          <View style={{ flexDirection: 'row', gap: spacing.sm, flexWrap: 'wrap' }}>
-            {leitura.vozes.map((v) => (
-              <Button
-                key={v.nome}
-                title={v.nome === leitura.vozEscolhida?.nome ? `• ${v.nome}` : v.nome}
-                variant="underline"
-                onPress={() => leitura.escolherVoz(v.nome)}
-                testID={`ouvir-voz-${v.nome}`}
-              />
-            ))}
-          </View>
-        </View>
-      ) : null}
+      <View style={{ flexDirection: 'row', gap: spacing.md, flexWrap: 'wrap' }}>
+        {leitura.vozes.map((v) => (
+          <Button
+            key={v.nome}
+            title={v.nome === leitura.vozEscolhida?.nome ? `• ${v.nome}` : v.nome}
+            variant="underline"
+            onPress={() => leitura.escolherVoz(v.nome)}
+            testID={`ouvir-voz-${v.nome}`}
+          />
+        ))}
+      </View>
     </View>
   );
 }

@@ -74,3 +74,11 @@ export const POC_OUVIR_ENABLED: boolean = process.env.EXPO_PUBLIC_POC_OUVIR === 
 /** Só este capítulo fala, na POC. Escopo dado pelo fundador. */
 export const POC_OUVIR_LIVRO = 'GEN';
 export const POC_OUVIR_CAPITULO = 1;
+
+/**
+ * Comparador de vozes da POC. Existe só para o fundador ouvir as vozes do
+ * aparelho dele lado a lado; NUNCA aparece no produto (decisão de 23/09/2026:
+ * "no visible technical voice selector in production"). Chave separada da POC
+ * justamente para o experimento poder rodar sem ele.
+ */
+export const POC_OUVIR_VOZES: boolean = process.env.EXPO_PUBLIC_POC_OUVIR_VOZES === 'true';
