@@ -10,6 +10,16 @@ import { PROPOSITO, flowSteps, publicSections } from '@/journey/proposito';
 import { _resetCompletionsCacheForTests } from '@/progress/completionsStore';
 import { _resetSettingsCacheForTests, SETTINGS_KEY } from '@/settings/settingsStore';
 
+/**
+ * A rota /juntos redireciona quando COMMUNITY_ENABLED é falso (auditoria de
+ * lançamento web, 23/09). Estes testes são sobre o CONTEÚDO do altar, não sobre
+ * o roteamento, então aqui a chave fica ligada para a tela desenhar.
+ */
+jest.mock('@/config/features', () => ({
+  ...jest.requireActual('@/config/features'),
+  COMMUNITY_ENABLED: true,
+}));
+
 jest.mock('expo-router', () => ({
   router: { push: jest.fn(), replace: jest.fn(), back: jest.fn() },
   useLocalSearchParams: () => ({}),

@@ -1,8 +1,9 @@
-import { router, useFocusEffect } from 'expo-router';
+import { Redirect, router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Pressable, View } from 'react-native';
 
 import { CloudError } from '@/cloud/errors';
+import { COMMUNITY_ENABLED } from '@/config/features';
 import { joinGroup, listActiveGroups } from '@/cloud/groups';
 import type { Group } from '@/cloud/types';
 import { useCloudSession } from '@/cloud/useSession';
@@ -124,7 +125,22 @@ function LinkRow({
   );
 }
 
-export default function CommunityScreen() {
+/**
+ * AUDITORIA DE LANÇAMENTO WEB, 2026-09-23: a aba já estava escondida
+ * (`href: null` no `(tabs)/_layout.tsx`, com `COMMUNITY_ENABLED = false`), mas
+ * na web toda rota é uma URL digitável — e `/juntos` respondia. Numa V1 pública
+ * isso é uma tela chamada "Comunidade" alcançável por quem não deveria chegar
+ * nela, num produto que não tem comunidade nesta versão.
+ *
+ * A guarda é a MESMA chave que esconde a aba: nada de interruptor novo,
+ * `COMMUNITY_ENABLED` não muda de valor. Mesmo padrão de `/dev` e `/componentes`.
+ */
+export default function CommunityRoute() {
+  if (!COMMUNITY_ENABLED) return <Redirect href="/" />;
+  return <CommunityScreen />;
+}
+
+function CommunityScreen() {
   const { colors } = useTheme();
   const journey = useJourney();
   const session = useCloudSession();
