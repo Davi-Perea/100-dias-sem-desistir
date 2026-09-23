@@ -30,3 +30,6 @@ content-pipeline/raw/
 
 # Saída do scripts/loja/capturas.mjs (capturas da loja, regeneráveis)
 mobile/capturas-loja/
+
+# Local Netlify folder
+.netlify
