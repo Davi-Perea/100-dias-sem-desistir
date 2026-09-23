@@ -2,6 +2,7 @@ import { router } from 'expo-router';
 import { Linking, View } from 'react-native';
 
 import { SUPPORT_EMAIL } from '@/config/contato';
+import { FUTURE_DAYS_OPEN } from '@/config/features';
 import { contentState } from '@/journey/datasetSource';
 import type { RightsStatus } from '@/journey/types';
 import { useDataset } from '@/journey/useJourney';
@@ -49,9 +50,17 @@ export default function HelpScreen() {
     >
       <View style={{ gap: spacing.md }}>
         <Cap>Como funciona</Cap>
+        {/*
+          A frase antiga dizia que o dia futuro "abre na data". Com
+          FUTURE_DAYS_OPEN ligado (decisão do fundador), os 100 dias abrem desde
+          o começo, e a pessoa derrubava a frase com um toque. O texto passa a
+          descrever o que o app faz de verdade, incluindo a parte que não é
+          óbvia: ler adiantado não empurra o progresso (auditoria de 2026-09-23).
+        */}
         <AppText variant="bodySm">
-          A igreja inteira segue o mesmo dia. O dia oficial não retrocede quando você falta: os dias que
-          passaram continuam abertos e os que ainda não chegaram abrem na data.
+          {FUTURE_DAYS_OPEN
+            ? 'A igreja inteira segue o mesmo dia. O dia oficial não retrocede quando você falta: os dias que passaram continuam abertos, e os que ainda não chegaram você pode ler adiantado — só que o progresso continua seguindo o dia da igreja.'
+            : 'A igreja inteira segue o mesmo dia. O dia oficial não retrocede quando você falta: os dias que passaram continuam abertos e os que ainda não chegaram abrem na data.'}
         </AppText>
         <SettingRow label="Sobre os 100 dias" onPress={() => router.push('/proposito')} first testID="help-proposito" />
       </View>

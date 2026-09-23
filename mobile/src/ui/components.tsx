@@ -1063,6 +1063,11 @@ export function StateLayout({
         <AppText
           variant="blockTitle"
           accessibilityRole="header"
+          // Erro é troca de estado, não tela nova: quem usa leitor de tela ouvia
+          // "Carregando" e depois nada — sem saber que na tela havia um "Tentar
+          // de novo". A região viva conta a virada (auditoria de 2026-09-23).
+          // Só no erro: um vazio é o repouso da tela e não interrompe ninguém.
+          accessibilityLiveRegion={kind === 'error' ? 'polite' : 'none'}
           // F6 (vazio) pede Schibsted 700 24/29; F5 (erro) pede 26/31.
           style={
             kind === 'error'
