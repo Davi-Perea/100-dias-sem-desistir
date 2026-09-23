@@ -24,11 +24,25 @@
  * módulo por um dublê com as duas constantes.
  */
 
-/** E-mail de suporte (ex.: "contato@igreja.org"). Preenchido pelo fundador antes do envio. */
-export const SUPPORT_EMAIL: string | null = null;
+/**
+ * E-mail de suporte. Autorizado pelo fundador como endereço PÚBLICO em
+ * 23/09/2026, e é o mesmo que consta como contato de privacidade no texto já
+ * publicado.
+ */
+export const SUPPORT_EMAIL: string | null = 'pereadavi12@gmail.com';
 
-/** URL https da política de privacidade completa. Preenchido pelo fundador antes do envio. */
-export const PRIVACY_URL: string | null = null;
+/**
+ * Política de privacidade completa, no domínio de produção.
+ *
+ * Ficou `null` enquanto a página não existia. Ela está no ar desde 23/09/2026, e
+ * manter `null` depois disso é pior que o estado inicial: a tela de Privacidade
+ * esconde a linha quando não há URL, então quem usa pelo navegador não tinha
+ * caminho nenhum até o texto — que é exigência da LGPD e das duas lojas.
+ *
+ * Com a barra no fim de propósito: sem ela o servidor responde 301 e o aparelho
+ * faz um salto a mais.
+ */
+export const PRIVACY_URL: string | null = 'https://100diassemdesistir.com.br/politica-de-privacidade/';
 
 /**
  * URL https da página web de exclusão de conta (exigência do Google Play para
@@ -38,4 +52,4 @@ export const PRIVACY_URL: string | null = null;
  * ACCOUNT_DELETION_AVAILABLE, em src/cloud/config.ts). Passa a ser obrigatória
  * no build de loja no mesmo dia em que a conta ligar em release.
  */
-export const ACCOUNT_DELETION_URL: string | null = null;
+export const ACCOUNT_DELETION_URL: string | null = 'https://100diassemdesistir.com.br/excluir-conta/';

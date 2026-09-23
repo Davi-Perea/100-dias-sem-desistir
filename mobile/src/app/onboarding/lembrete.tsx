@@ -1,10 +1,11 @@
-import { router } from 'expo-router';
+import { Redirect } from 'expo-router';
 import { useRef, useState } from 'react';
 
-import { track } from '@/analytics/analytics';
+import { REMINDERS_AVAILABLE } from '@/reminders/disponibilidade';
 import { cancelDailyReminder, scheduleDailyReminder } from '@/reminders/reminders';
 import { DEFAULT_SETTINGS, updateSettings, useSettings, type ReminderSlot } from '@/settings/settingsStore';
 import { AppText, Button, SAVE_ERROR_COPY } from '@/ui/components';
+import { concluirEntrada } from '@/ui/entrada/concluirEntrada';
 import { ReminderTimePicker } from '@/ui/lembrete/ReminderTimePicker';
 import { ONBOARDING_STEP, OnboardingStep, StepSupport } from '@/ui/OnboardingStep';
 
@@ -36,6 +37,10 @@ const DENIED_NOTICE = `Permissão de notificações negada. ${LATER}`;
 export default function ReminderOnboardingScreen() {
   const settings = useSettings();
   const [notice, setNotice] = useState<string | null>(null);
+  // Link direto ou histórico do navegador para um passo que não existe aqui: a
+  // entrada termina no passo anterior, e esta rota devolve para a casa em vez de
+  // mostrar uma escolha que não agenda nada.
+  const foraDeLugar = !REMINDERS_AVAILABLE;
   const [busy, setBusy] = useState(false);
   const [denied, setDenied] = useState(false);
   // Trava síncrona: dois toques seguidos não podem abrir dois diálogos do sistema.
@@ -77,24 +82,11 @@ export default function ReminderOnboardingScreen() {
   };
 
   const finish = async () => {
-    if (settings) {
-      // Jejum, nome e metas nunca entram em analytics (PER-06): prática
-      // religiosa é dado sensível pela LGPD art. 5º, II, e o nome é pessoal.
-      track({
-        name: 'onboarding_completed',
-        readingMode: settings.readingMode ?? 'unset',
-        reminder: settings.reminder.slot,
-      });
-    }
-    try {
-      await updateSettings((s) => ({ ...s, onboardingCompleted: true }));
-    } catch {
-      // PER-02: sem gravar, o portão traria a pessoa de volta; fica aqui com o aviso.
-      setNotice(SAVE_ERROR_COPY);
-      return;
-    }
-    router.replace('/');
+    // PER-02: sem gravar, o portão traria a pessoa de volta; fica aqui com o aviso.
+    if (!(await concluirEntrada(settings))) setNotice(SAVE_ERROR_COPY);
   };
+
+  if (foraDeLugar) return <Redirect href="/" />;
 
   return (
     <OnboardingStep

@@ -6,6 +6,7 @@ import { highlightColor, getHighlight } from '@/marks/colors';
 import { chapterMarks, useMarks, verseKey, type VerseRef } from '@/marks/marksStore';
 import type { Verse } from '@/reader/provider';
 import { readLineHeight } from '@/reader/readerFontSize';
+import { VerseHint, useVerseHint } from '@/ui/biblia/VerseHint';
 import { useFace } from '@/ui/components';
 import { Icon } from '@/ui/icons';
 import { VerseSheet } from '@/ui/leitor/VerseSheet';
@@ -54,12 +55,16 @@ export function ChapterText({
   const face = useFace();
   const marks = useMarks();
   const [open, setOpen] = useState<{ ref: VerseRef; text: string } | null>(null);
+  const hint = useVerseHint();
   const markable = typeof book === 'string' && typeof chapter === 'number';
   const byVerse = markable ? chapterMarks(marks, book, chapter) : {};
   const bookName = markable ? (getBook(book)?.name ?? book) : '';
 
   return (
     <View style={{ gap: spacing.lg }} testID="chapter-text">
+      {/* A dica vem antes do texto, no fluxo: empurra a leitura para baixo em
+          vez de cobrir qualquer parte dela, e só existe onde o toque existe. */}
+      {markable && hint.visible ? <VerseHint onDismiss={hint.dismiss} /> : null}
       {heading ? (
         // Itálico em `textSecondary` (10,85:1 no claro, 10,84:1 no escuro), do tamanho do texto.
         <Text
@@ -90,7 +95,11 @@ export function ChapterText({
             accessibilityHint={markable ? 'Abre marca-texto, anotação e copiar.' : undefined}
             onPress={
               markable
-                ? () => setOpen({ ref: { book, chapter, verse: verse.verse }, text: verse.text })
+                ? () => {
+                    // Tocou: a dica cumpriu o papel e não precisa mais aparecer.
+                    hint.dismiss();
+                    setOpen({ ref: { book, chapter, verse: verse.verse }, text: verse.text });
+                  }
                 : undefined
             }
             testID={`verse-${verse.verse}`}

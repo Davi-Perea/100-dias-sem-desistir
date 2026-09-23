@@ -8,6 +8,7 @@ import AppearanceScreen from '@/app/aparencia';
 import HelpScreen from '@/app/ajuda';
 import FastingScreen from '@/app/jejum';
 import ReminderScreen from '@/app/lembrete';
+import { SUPPORT_EMAIL } from '@/config/contato';
 import { _resetFastingCacheForTests, setFastingKept } from '@/fasting/fastingStore';
 import { BUNDLED_CONTENT, loadDataset, resetToBundledContent } from '@/journey/datasetSource';
 import { calendarDateInCampaignTz } from '@/journey/officialDay';
@@ -66,6 +67,12 @@ jest.mock('@/reminders/reminders', () => ({
 const mockRouter = jest.requireMock('expo-router').router as { push: jest.Mock };
 const reminders = jest.requireMock('@/reminders/reminders') as { scheduleDailyReminder: jest.Mock };
 const CAMPAIGN = BUNDLED_CONTENT.campaign.id;
+/**
+ * O rótulo da Ajuda depende de existir e-mail de suporte, e sai da MESMA fonte
+ * que as telas leem. Fixar "Ajuda" aqui amarrava o teste ao dia em que o e-mail
+ * ainda era null — e foi o que quebrou quando ele foi preenchido (23/09/2026).
+ */
+const ROTULO_AJUDA = SUPPORT_EMAIL?.trim() ? 'Ajuda e contato' : 'Ajuda';
 
 /** Conteúdo REAL da igreja, com "hoje" no dia pedido. */
 function loadCampaignOnDay(day: number) {
@@ -164,8 +171,9 @@ describe('D1 · Você', () => {
       await fireEvent.press(screen.getByTestId(id));
       expect(mockRouter.push).toHaveBeenLastCalledWith(route);
     }
-    // Sem e-mail de suporte preenchido, a linha não promete contato (1.5).
-    expect(within(screen.getByTestId('row-help')).getByText('Ajuda')).toBeTruthy();
+    // A REGRA, não o valor do dia: com e-mail de suporte a linha promete contato;
+    // sem ele, chama-se só "Ajuda" e não promete o que não existe (App Store 1.5).
+    expect(within(screen.getByTestId('row-help')).getByText(ROTULO_AJUDA)).toBeTruthy();
   });
 
   test('o lembrete escolhido aparece em HH:MM', async () => {
@@ -189,8 +197,7 @@ describe('telas que saem de Você', () => {
   test('Ajuda nunca mostra o valor técnico dos direitos', async () => {
     setBibleProvider(devBibleProvider);
     await render(<HelpScreen />);
-    expect(screen.getByText('Ajuda')).toBeTruthy();
-    expect(screen.queryByText('Ajuda e contato')).toBeNull();
+    expect(screen.getByText(ROTULO_AJUDA)).toBeTruthy();
     expect(screen.queryByText(/pending_authorization|dev_fixture|partially_authorized/)).toBeNull();
     expect(screen.getByTestId('help-rights').props.children.join('')).toMatch(
       // Autorizado pela igreja em 23/09/2026 (autorizacao-2026-09-23).

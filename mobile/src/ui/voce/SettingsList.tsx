@@ -5,6 +5,7 @@ import { SUPPORT_EMAIL } from '@/config/contato';
 import { countGoals } from '@/config/goals';
 import { fastingKeptCount, type FastingLog } from '@/fasting/fastingStore';
 import { reflectionCount, type Reflections } from '@/reflections/reflectionsStore';
+import { REMINDERS_AVAILABLE } from '@/reminders/disponibilidade';
 import type { Settings } from '@/settings/settingsStore';
 
 import { SettingRow } from '../components';
@@ -79,19 +80,24 @@ export function SettingsList({
       </RowGroup>
 
       <RowGroup title="Preferências">
-        <SettingRow
-          label="Lembretes"
-          value={reminderLabel(settings)}
-          onPress={() => router.push('/lembrete')}
-          first
-          testID="row-reminder"
-        />
+        {/* Sem lembrete no navegador: a linha sai inteira, em vez de abrir uma
+            tela que não tem o que fazer (23/09/2026). */}
+        {REMINDERS_AVAILABLE ? (
+          <SettingRow
+            label="Lembretes"
+            value={reminderLabel(settings)}
+            onPress={() => router.push('/lembrete')}
+            first
+            testID="row-reminder"
+          />
+        ) : null}
         {/* Tamanho da letra e modo de leitura moram na mesma tela. */}
         <SettingRow
           label="Leitura"
           value={settings.readingMode ? READING_MODE_LABEL[settings.readingMode] : undefined}
           // Abre com "Como eu leio" em primeiro (o valor da linha) e o tamanho logo abaixo.
           onPress={() => router.push({ pathname: '/aparencia', params: { secao: 'leitura' } })}
+          first={!REMINDERS_AVAILABLE}
           testID="row-reading"
         />
       </RowGroup>

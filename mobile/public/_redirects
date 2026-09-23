@@ -1,0 +1,14 @@
+# Rotas do app (/dia/5, /reader/12, /biblia/GEN/1) não têm HTML próprio: o
+# roteador resolve no navegador. Sem este fallback, link direto e F5 devolvem 404.
+#
+# O status 200 é obrigatório: um 301 mudaria a URL na barra e quebraria o roteador.
+#
+# Isto repete o [[redirects]] do netlify.toml de propósito. O arquivo vive em
+# public/, então sobrevive a todo `expo export` e vai junto num deploy por
+# diretório (`--dir mobile/dist`), sem depender de o netlify.toml ser lido.
+#
+# As páginas legais vêm ANTES: elas são HTML de verdade em public/ e não devem
+# cair no fallback do app.
+/politica-de-privacidade/*  /politica-de-privacidade/index.html  200
+/excluir-conta/*            /excluir-conta/index.html            200
+/*                          /index.html                          200

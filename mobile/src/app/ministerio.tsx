@@ -7,6 +7,7 @@ import { dateOfDay, formatDayDate } from '@/journey/officialDay';
 import { SPHERE_LABEL } from '@/journey/spheres';
 import type { Campaign } from '@/journey/types';
 import { useJourney } from '@/journey/useJourney';
+import { REMINDERS_AVAILABLE } from '@/reminders/disponibilidade';
 import { syncMinistryReminders } from '@/reminders/reminders';
 import { updateSettings, useSettings } from '@/settings/settingsStore';
 import { AppText, Block, Cap, ChoiceRow, DevContentBanner, SAVE_ERROR_COPY, Screen, StateView } from '@/ui/components';
@@ -102,9 +103,12 @@ export default function MinistryScreen() {
       // PROVISÓRIO (pergunta 5 ao designer): aviso de conteúdo compacto, abaixo do cabeçalho.
       banner={<DevContentBanner state={journey.contentState} compact />}
     >
+      {/* Pelo navegador não há aviso na véspera: prometer um é prometer o que
+          não vem (23/09/2026). Destacar os dias vale nos dois. */}
       <AppText variant="bodySm">
-        Fica só neste aparelho. Serve para destacar os dias em que o seu ministério conduz o altar das 12h30 e
-        avisar você na véspera, às 19h.
+        {REMINDERS_AVAILABLE
+          ? 'Fica só neste aparelho. Serve para destacar os dias em que o seu ministério conduz o altar das 12h30 e avisar você na véspera, às 19h.'
+          : 'Fica só neste aparelho. Serve para destacar os dias em que o seu ministério conduz o altar das 12h30.'}
       </AppText>
 
       {mine ? (

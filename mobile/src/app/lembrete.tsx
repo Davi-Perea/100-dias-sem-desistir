@@ -1,9 +1,11 @@
 import * as Device from 'expo-device';
+import { Redirect } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { View } from 'react-native';
 
 import { useJourney } from '@/journey/useJourney';
 import { absenceEnabled, absenceScheduled, withAbsencePreference } from '@/reminders/absencePref';
+import { REMINDERS_AVAILABLE } from '@/reminders/disponibilidade';
 import {
   cancelDailyReminder,
   formatTime,
@@ -157,6 +159,15 @@ export default function ReminderScreen() {
     await updateSettings((s) => withAbsencePreference(s, false));
   };
 
+  /*
+   * TESTE COM USUÁRIO REAL, 23/09/2026: no navegador esta tela inteira era um
+   * beco. Antes ela explicava por que o lembrete não chega; a decisão do
+   * fundador foi tirar o assunto da web, e não explicá-lo melhor. Nenhuma tela
+   * leva mais até aqui (a linha em Ajustes sai com REMINDERS_AVAILABLE); este
+   * desvio pega quem chega por link antigo ou pelo histórico do navegador.
+   */
+  if (!REMINDERS_AVAILABLE) return <Redirect href="/" />;
+
   return (
     <SubScreen title="Lembretes" gap={spacing.lg}>
       <View style={{ gap: spacing.xs }}>
@@ -166,19 +177,6 @@ export default function ReminderScreen() {
         </AppText>
       </View>
 
-      {!supported ? (
-        // AUDITORIA DE LANÇAMENTO WEB, 2026-09-23: este texto era de bancada
-        // ("Teste em um aparelho iOS ou Android") e ia ser lido por membro da
-        // igreja, não por quem desenvolve. Quem abre pelo navegador precisa
-        // saber duas coisas: que o lembrete não vem, e que isso não estraga
-        // nada do resto.
-        <Block tone="muted">
-          <AppText variant="caption">
-            Pelo navegador, o app não consegue te avisar na hora marcada — isso depende do aplicativo instalado no
-            celular. Sua leitura, suas marcações e o que você escrever continuam funcionando normalmente.
-          </AppText>
-        </Block>
-      ) : null}
       {supported && !Device.isDevice ? (
         <Block tone="muted">
           <AppText variant="caption">Emuladores podem não exibir notificações. Prefira um aparelho físico.</AppText>

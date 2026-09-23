@@ -3,6 +3,7 @@ import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
 import { hasAnyGoal } from '@/config/goals';
 import type { Marks } from '@/marks/marksStore';
+import { REMINDERS_AVAILABLE } from '@/reminders/disponibilidade';
 import type { Settings } from '@/settings/settingsStore';
 
 import { AppText, Block, Button, IconCircle } from '../components';
@@ -10,10 +11,11 @@ import type { IconName } from '../icons';
 import { spacing, useGutter, useReducedMotion } from '../theme';
 
 /**
- * F7 · "Complete seu perfil N/6" (substitui o "Comece por aqui"): seis cartões
- * num carrossel horizontal — nome, ministério, metas, lembrete, primeira leitura
- * concluída e primeira anotação. Cada um tem ícone, título, frase e UMA ação; o cartão some
- * quando o passo está feito e o carrossel some quando os seis estão.
+ * F7 · "Complete seu perfil N/6" (substitui o "Comece por aqui"): cartões num
+ * carrossel horizontal — nome, ministério, metas, lembrete, primeira leitura
+ * concluída e primeira anotação. Cada um tem ícone, título, frase e UMA ação; o
+ * cartão some quando o passo está feito e o carrossel some quando todos estão.
+ * São cinco no navegador, onde não há lembrete.
  *
  * Tudo sai de dados locais (`settings`, dias lidos, marcas): nada vai ao
  * servidor. O número é de passos feitos, nunca uma cobrança.
@@ -76,14 +78,22 @@ export function profileSteps({
       // Uma meta escrita pela pessoa fecha o passo igual a uma pronta.
       done: hasAnyGoal(settings.profile.goals, settings.profile.customGoal),
     },
-    {
-      id: 'reminder',
-      icon: 'bell',
-      title: 'Um lembrete',
-      phrase: 'Um aviso por dia, na hora que você escolher.',
-      action: 'Escolher horário',
-      done: settings.reminder.slot !== 'none',
-    },
+    // O lembrete só entra onde ele existe. No navegador, "Escolher horário"
+    // seria um passo impossível de concluir — nada é agendado —, e o cartão
+    // ficaria em aberto para sempre, cobrando algo que o produto não faz
+    // (23/09/2026). Com ele fora, a contagem vira N/5 sozinha.
+    ...(REMINDERS_AVAILABLE
+      ? [
+          {
+            id: 'reminder' as const,
+            icon: 'bell' as const,
+            title: 'Um lembrete',
+            phrase: 'Um aviso por dia, na hora que você escolher.',
+            action: 'Escolher horário',
+            done: settings.reminder.slot !== 'none',
+          },
+        ]
+      : []),
     {
       id: 'firstReading',
       icon: 'book',

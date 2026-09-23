@@ -16,6 +16,16 @@ import { faces } from '@/ui/theme';
  *
  * O container é invisível, fora do fluxo e escondido do leitor de tela. A
  * largura enorme do embrulho é só para o texto nunca quebrar enquanto é medido.
+ *
+ * O embrulho de 0×0 com `overflow: hidden` por fora NÃO é enfeite (achado no
+ * teste com usuário real em Android, 23/09/2026). Na web, os 100.000px eram
+ * largura de rolagem do DOCUMENTO: `document.scrollWidth` ia a 100.026px numa
+ * tela de 412px. O Chrome do Android trata um documento mais largo que a janela
+ * como área que se arrasta de lado, e o gesto de rolar para baixo passa a
+ * disputar com o de arrastar para o lado — era isso que deixava a leitura da
+ * Bíblia "difícil de rolar". Um elemento com `overflow: hidden` não empurra a
+ * rolagem de quem está acima dele, e o filho continua sendo medido normalmente:
+ * recortar muda só o que transborda, nunca o cálculo de layout.
  */
 
 /** Rótulo de botão cheio (TOKENS §5): Schibsted 700 17/22. */
@@ -40,18 +50,22 @@ export function LabelProbe({
       aria-hidden
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"
-      style={{ position: 'absolute', left: 0, top: 0, width: 100000, opacity: 0, flexDirection: 'row' }}
+      // Recorte: a régua de 100.000px existe para o texto não quebrar, e para
+      // por aqui. Nada dela pode virar área de rolagem da página.
+      style={{ position: 'absolute', left: 0, top: 0, width: 0, height: 0, overflow: 'hidden' }}
     >
-      <View
-        style={{ alignItems: 'flex-start' }}
-        testID={testID}
-        onLayout={(event) => onWidth(Math.ceil(event.nativeEvent.layout.width))}
-      >
-        {labels.map((label) => (
-          <Text key={label} numberOfLines={1} style={final}>
-            {label}
-          </Text>
-        ))}
+      <View style={{ position: 'absolute', left: 0, top: 0, width: 100000, opacity: 0, flexDirection: 'row' }}>
+        <View
+          style={{ alignItems: 'flex-start' }}
+          testID={testID}
+          onLayout={(event) => onWidth(Math.ceil(event.nativeEvent.layout.width))}
+        >
+          {labels.map((label) => (
+            <Text key={label} numberOfLines={1} style={final}>
+              {label}
+            </Text>
+          ))}
+        </View>
       </View>
     </View>
   );

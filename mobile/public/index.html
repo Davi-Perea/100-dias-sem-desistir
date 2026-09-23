@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<!--
+  A CASCA HTML DA VERSÃO WEB.
+
+  Por que este arquivo existe, e não um `+html.tsx`: com `web.output: "single"`
+  (obrigatório nesta branch, porque a pré-renderização estática quebra com
+  "window is not defined" quando o cliente do Supabase inicializa) o Expo NÃO usa
+  o `+html.tsx`. Ele procura `public/index.html` no projeto e, só na falta dele,
+  usa o modelo interno. Este arquivo é esse modelo interno, com três mudanças —
+  e nada além delas.
+
+  O Expo ainda acrescenta sozinho, na hora do export, o <link rel="icon"> e o
+  <script> do bundle. Não escreva nenhum dos dois aqui.
+
+  ------------------------------------------------------------------------------
+  MUDANÇA 1 — A ALTURA. Este é o conserto do P0 achado no teste com usuário real
+  em Android, 23/09/2026: a leitura da Bíblia rolava mal e a barra de "Concluir
+  leitura" ficava fora do alcance.
+
+  O reset padrão põe `height: 100%` em html, body e #root, e `overflow: hidden`
+  no body. No Chrome do Android isso combina mal:
+
+    1. `height: 100%` resolve contra a janela GRANDE — a altura que a página
+       teria com a barra de endereço escondida. Com a barra aparecendo, o app
+       fica mais alto do que o que se enxerga.
+    2. O Chrome só esconde a barra de endereço quando o DOCUMENTO rola. Aqui quem
+       rola é uma <div> interna, e o body é `overflow: hidden`. O documento nunca
+       rola, então a barra nunca some.
+    3. Resultado: a faixa de baixo — exatamente onde mora o rodapé do leitor, que
+       é `position: absolute; bottom: 0` — fica permanentemente abaixo da dobra, e
+       o pequeno arrasto elástico que o Chrome permite move o app inteiro enquanto
+       o texto também rola. Dois movimentos ao mesmo tempo: foi isso que a pessoa
+       sentiu como "rolagem quebrada".
+
+  `dvh` é a unidade feita para este problema: acompanha a altura realmente
+  visível. `vh` fica antes como reserva para navegador antigo (Chrome < 108,
+  Safari < 15.4), que ignora a linha seguinte e se comporta como antes — ninguém
+  fica pior do que está.
+
+  Não é remendo de Android: no iPhone `100dvh` é a mesma altura que o Safari já
+  usava na prática, e o comportamento que funciona lá continua igual. O
+  `<meta name="viewport">` fica intocado pelo mesmo motivo.
+
+  MUDANÇA 2 — O TÍTULO. Sem ele, o título vem do nome da variante do app.config,
+  e a web publicada dizia "100 dias (dev)" para membros da igreja: na aba do
+  navegador e no atalho salvo na tela inicial. Arrumar pela variante `production`
+  não serve — ela é o portão de LOJA, e hoje barra (com razão) um build de loja
+  com o Juntos ligado e o manifesto de privacidade da Apple vazio. Afrouxar um
+  portão de loja para consertar um título seria trocar um problema pequeno por um
+  grande.
+
+  MUDANÇA 3 — O IDIOMA. `lang="pt-BR"` em vez de "en": é assim que o leitor de
+  tela sabe como pronunciar o texto.
+-->
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+    <title>100 dias sem desistir</title>
+    <meta
+      name="description"
+      content="O guia diário dos 100 Dias da Lagoinha Brasília Capital: leitura, oração e intercessão, de 23 de setembro a 31 de dezembro de 2026."
+    />
+    <!-- The `react-native-web` recommended style reset: https://necolas.github.io/react-native-web/docs/setup/#root-element -->
+    <style id="expo-reset">
+      /* These styles make the body full-height */
+      html,
+      body {
+        height: 100%;
+      }
+      /* These styles disable body scrolling if you are using <ScrollView> */
+      body {
+        overflow: hidden;
+      }
+      /* These styles make the root element full-height */
+      #root {
+        display: flex;
+        height: 100%;
+        flex: 1;
+      }
+    </style>
+    <style id="altura-visivel">
+      /* MUDANÇA 1: a altura segue a janela realmente visível. Ver o comentário
+         no topo deste arquivo. Vem depois do reset acima, para corrigi-lo. */
+      html,
+      body,
+      #root {
+        height: 100vh;
+        height: 100dvh;
+      }
+    </style>
+  </head>
+
+  <body>
+    <!-- Use static rendering with Expo Router to support running without JavaScript. -->
+    <noscript>
+      You need to enable JavaScript to run this app.
+    </noscript>
+    <!-- The root element for your Expo app. -->
+    <div id="root"></div>
+  </body>
+</html>

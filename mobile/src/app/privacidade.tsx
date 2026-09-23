@@ -2,6 +2,7 @@ import { Linking, View } from 'react-native';
 
 import { isCloudConfigured } from '@/cloud/config';
 import { PRIVACY_URL } from '@/config/contato';
+import { REMINDERS_AVAILABLE } from '@/reminders/disponibilidade';
 import { wipeLocalData } from '@/settings/wipeLocalData';
 import { confirmar, avisar } from '@/ui/confirmar';
 import { AppText, Button, Cap, Rule, SettingRow } from '@/ui/components';
@@ -62,8 +63,10 @@ export default function PrivacyScreen() {
         */}
         {cloud ? null : (
           <AppText variant="bodySm" testID="privacy-no-send">
-            Nesta versão o app não envia seus dados a ninguém. Não há conta, anúncio nem rastreamento. Os
-            lembretes são avisos do próprio aparelho.
+            Nesta versão o app não envia seus dados a ninguém. Não há conta, anúncio nem rastreamento.
+            {/* A frase do lembrete só aparece onde o lembrete existe: no
+                navegador ela descreveria uma função que não está lá. */}
+            {REMINDERS_AVAILABLE ? ' Os lembretes são avisos do próprio aparelho.' : ''}
           </AppText>
         )}
       </View>

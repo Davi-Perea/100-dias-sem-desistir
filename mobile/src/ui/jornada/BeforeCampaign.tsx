@@ -5,6 +5,7 @@ import { isCloudConfigured } from '@/cloud/config';
 import type { ContentState } from '@/journey/datasetSource';
 import { formatDayDate } from '@/journey/officialDay';
 import type { Campaign } from '@/journey/types';
+import { REMINDERS_AVAILABLE } from '@/reminders/disponibilidade';
 
 import { AppText, Button, DevContentBanner, Highlight, Screen, ScreenScroll } from '../components';
 import { HundredDayRuler } from '../HundredDayRuler';
@@ -91,8 +92,11 @@ export function BeforeCampaign({
         <View style={{ gap: spacing.md }}>
           {/* PROVISÓRIO (sem pergunta própria ao designer — LACUNAS C27): o destino de
               "Ajustar meu lembrete" não foi definido; fica a tela de lembrete de hoje,
-              que só pede a permissão sob o gesto de escolher um horário. */}
-          <Button title="Ajustar meu lembrete" onPress={() => router.push('/lembrete')} testID="before-reminder" />
+              que só pede a permissão sob o gesto de escolher um horário.
+              No navegador o botão some: não há lembrete a ajustar (23/09/2026). */}
+          {REMINDERS_AVAILABLE ? (
+            <Button title="Ajustar meu lembrete" onPress={() => router.push('/lembrete')} testID="before-reminder" />
+          ) : null}
           {/* PROVISÓRIO (pergunta 12 ao designer — LACUNAS B25): o D2 ("Criar perfil")
               ainda não existe como rota. Com a nuvem ligada, vai para a conta de hoje,
               que entra por e-mail; sem nuvem, o botão some (decisão D-7). */}

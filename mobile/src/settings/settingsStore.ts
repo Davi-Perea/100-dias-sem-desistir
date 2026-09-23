@@ -43,6 +43,15 @@ export type Settings = {
    */
   milestonesKept: number[];
   /**
+   * A dica "toque em um versículo" já foi mostrada e dispensada.
+   *
+   * Existe porque marcar versículo e anotar não tinham sinal NENHUM na tela: no
+   * teste com usuário real (23/09/2026) a pessoa leu capítulos inteiros sem
+   * descobrir que o texto respondia ao toque. Aparece uma vez e some para
+   * sempre — é um aviso, não um tutorial.
+   */
+  verseHintSeen: boolean;
+  /**
    * Ministério da pessoa, escolhido localmente entre os da escala. Serve para
    * destacar os dias do ministério e avisar na véspera. Não vai para servidor.
    */
@@ -75,6 +84,7 @@ export const DEFAULT_SETTINGS: Settings = {
   analyticsEnabled: false,
   milestonesSeen: [],
   milestonesKept: [],
+  verseHintSeen: false,
   ministry: null,
   altarReminder: false,
   profile: { name: null, goals: [], customGoal: null },
@@ -150,6 +160,7 @@ export function normalizeSettings(raw: unknown): Settings {
     milestonesKept: Array.isArray(r.milestonesKept)
       ? r.milestonesKept.filter((day): day is number => typeof day === 'number' && Number.isInteger(day))
       : [],
+    verseHintSeen: bool(r.verseHintSeen, d.verseHintSeen),
     ministry: typeof r.ministry === 'string' && r.ministry.length > 0 ? r.ministry : null,
     altarReminder: bool(r.altarReminder, d.altarReminder),
     profile: normalizeProfile(r.profile),

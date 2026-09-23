@@ -3,18 +3,25 @@ import type { PropsWithChildren, ReactNode } from 'react';
 import { KeyboardAvoidingView, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { REMINDERS_AVAILABLE } from '@/reminders/disponibilidade';
+
 import { BackBar } from './BackBar';
 import { AppText, Screen, StepBar } from './components';
 import { MAX_CONTENT_WIDTH, spacing, useGutter, useTheme } from './theme';
 
 /**
- * Uma decisão por tela: nome, metas, leitura e lembrete (F2 e os passos no mesmo
- * molde). O jejum saiu da entrada em 2026-09-22 (feedback E3): a pessoa liga em
- * Meu jejum, onde fica também a nota de privacidade.
+ * Uma decisão por tela: nome, metas, leitura e — só onde o lembrete existe —
+ * lembrete (F2 e os passos no mesmo molde). O jejum saiu da entrada em
+ * 2026-09-22 (feedback E3): a pessoa liga em Meu jejum, onde fica também a nota
+ * de privacidade.
+ *
+ * No navegador são TRÊS: o lembrete é notificação local do celular e não existe
+ * lá (`REMINDERS_AVAILABLE`). O contador tem de acompanhar, senão a barra diria
+ * "Passo 3 de 4" e ficaria faltando um passo que nunca chega.
  */
-export const ONBOARDING_STEPS = 4;
+export const ONBOARDING_STEPS = REMINDERS_AVAILABLE ? 4 : 3;
 
-/** Número de cada passo, para a barra e o "Passo N de 4" não divergirem entre telas. */
+/** Número de cada passo, para a barra e o "Passo N de N" não divergirem entre telas. */
 export const ONBOARDING_STEP = { nome: 1, metas: 2, leitura: 3, lembrete: 4 } as const;
 
 /** Voltar do passo: na pilha, ou para as boas-vindas se não houver pilha (deep link, recarga). */
