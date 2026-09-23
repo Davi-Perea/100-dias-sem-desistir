@@ -208,11 +208,12 @@ describe('nenhuma tela da V1 depende do Alert.alert, que não existe na web', ()
  * sendo a do servidor.
  */
 describe('a V1 pública não expõe rota inacabada nem tela de administração', () => {
-  test('/juntos redireciona para a casa enquanto a Comunidade estiver desligada', () => {
+  test('/juntos só desenha o feed com a Comunidade ligada', () => {
+    // Na V1 (main) esta rota redireciona. NESTA branch ela é o feed, com a
+    // MESMA chave decidindo — nenhum interruptor novo.
     const fonte = readFileSync(join(__dirname, '..', 'app', '(tabs)', 'juntos.tsx'), 'utf8');
-    expect(fonte).toMatch(/if \(!COMMUNITY_ENABLED\) return <Redirect href="\/" \/>;/);
-    // A guarda é a MESMA chave que esconde a aba — não um valor novo.
-    expect(fonte).toMatch(/from '@\/config\/features'/);
+    expect(fonte).toContain("COMMUNITY_ENABLED ? <FeedScreen /> : <JuntosSemComunidade />");
+    expect(fonte).toContain("@/config/features");
   });
 
   test('/admin redireciona para a casa sem nuvem configurada', () => {
@@ -220,9 +221,11 @@ describe('a V1 pública não expõe rota inacabada nem tela de administração',
     expect(fonte).toMatch(/if \(!isCloudConfigured\(\)\) return <Redirect href="\/" \/>;/);
   });
 
-  test('COMMUNITY_ENABLED continua desligado na V1 — a guarda não é desculpa para ligar', () => {
+  test('COMMUNITY_ENABLED continua vindo do ambiente, nunca fixo em true', () => {
     const fonte = readFileSync(join(__dirname, '..', 'config', 'features.ts'), 'utf8');
-    expect(fonte).toMatch(/export const COMMUNITY_ENABLED = false;/);
+    // Na V1 (main) é 'false' fixo. Aqui vem do ambiente do build: nenhuma
+    // build liga a comunidade sozinha.
+    expect(fonte).toContain("COMMUNITY_ENABLED: boolean = process.env.EXPO_PUBLIC_COMMUNITY_ENABLED === 'true'");
   });
 
   test('a aba da Comunidade continua sem entrada na barra', () => {

@@ -1,7 +1,9 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 
-import TogetherScreen from '@/app/(tabs)/juntos';
+// Nesta branch /juntos é o FEED. Estes testes são sobre a tela de quem NÃO
+// tem comunidade (o que a V1 mostra), então montam esse componente direto.
+import { JuntosSemComunidade as TogetherScreen } from '@/ui/comunidade/feed/JuntosSemComunidade';
 import PropositoScreen from '@/app/proposito';
 import { BUNDLED_CONTENT, getCampaign, loadDataset } from '@/journey/datasetSource';
 import { devDataset } from '@/journey/fixtures/devCampaign';

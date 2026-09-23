@@ -1,9 +1,11 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { render, screen } from '@testing-library/react-native';
+import { render, screen, waitFor } from '@testing-library/react-native';
 import type { ReactElement, ReactNode } from 'react';
 
 import TabsLayout from '@/app/(tabs)/_layout';
-import TogetherScreen from '@/app/(tabs)/juntos';
+// Nesta branch /juntos é o FEED. Estes testes são sobre a tela de quem NÃO
+// tem comunidade (o que a V1 mostra), então montam esse componente direto.
+import { JuntosSemComunidade as TogetherScreen } from '@/ui/comunidade/feed/JuntosSemComunidade';
 import HelpScreen from '@/app/ajuda';
 import WelcomeScreen from '@/app/onboarding/index';
 import { _setCloudConfigForTests, isCloudConfigured } from '@/cloud/config';
@@ -151,18 +153,15 @@ describe('nenhuma tela alcançável em release diz "indisponível"', () => {
   });
 
   /**
-   * Mudou em 23/09, na auditoria de lançamento web: a rota não é mais alcançável
-   * por link. No aparelho, esconder a aba bastava; na web toda rota é uma URL
-   * digitável, e uma tela chamada "Comunidade" respondendo numa versão que não
-   * tem comunidade é confusão pública. Agora ela redireciona para a casa.
-   *
-   * O teste continua existindo para provar que NADA de indisponível aparece —
-   * só que agora por um motivo mais forte: a tela nem chega a desenhar.
+   * Na V1 (main) a rota /juntos redireciona e não desenha nada. NESTA branch a
+   * comunidade é o produto, e a rota é o feed — então o que este teste guarda
+   * aqui é a tela de quem não tem comunidade: ela existe, mostra o altar e o
+   * propósito, e não diz 'indisponível' em lugar nenhum.
    */
-  test('Comunidade: a rota redireciona e não desenha tela nenhuma', async () => {
+  test('Juntos sem comunidade: só o altar e o propósito, sem dizer indisponível', async () => {
     await render(<TogetherScreen />);
-    expect(screen.queryByTestId('altar-today')).toBeNull();
-    expect(screen.queryByTestId('join-cta')).toBeNull();
+    await waitFor(() => expect(screen.getByTestId('altar-today')).toBeTruthy());
+    expect(screen.getByTestId('open-proposito')).toBeTruthy();
     expect(allText()).not.toMatch(UNAVAILABLE);
   });
 
