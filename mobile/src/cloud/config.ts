@@ -36,7 +36,22 @@ let override: CloudConfig | null = null;
  * Só vira `true` no mesmo commit que entregar: Edge Function de exclusão + tela
  * "Sair"/"Excluir conta" em conta.tsx + página web de exclusão (SECURITY_V0.md).
  */
-export const ACCOUNT_DELETION_AVAILABLE = false;
+/*
+ * LIBERADO EM 23/09/2026, com as três condições cumpridas e verificadas:
+ *
+ *   1. Edge Function `delete-account` publicada no projeto real
+ *      (cjsynanolcgzadfinavh) e respondendo — 401 a chamada sem sessão, que é
+ *      o esperado; 404 seria "não existe".
+ *   2. Tela no app: AccountDeletionSection, em /conta e em
+ *      /comunidade/conta-e-privacidade, chamando requestServerAccountDeletion.
+ *   3. Página web de exclusão no ar, no domínio de produção:
+ *      https://100diassemdesistir.com.br/excluir-conta (HTTP 200, sem campos
+ *      em aberto).
+ *
+ * Isto vale na branch comunidade-v2. A V1 em `main` segue com a nuvem
+ * desligada, porque ela vai para a loja SEM o Juntos e sem conta nenhuma.
+ */
+export const ACCOUNT_DELETION_AVAILABLE = true;
 
 /** A nuvem pode existir nesta build? Desenvolvimento sim; release só com exclusão de conta pronta. */
 export function cloudAllowedInThisBuild(isDev: boolean = typeof __DEV__ === 'undefined' ? false : __DEV__): boolean {

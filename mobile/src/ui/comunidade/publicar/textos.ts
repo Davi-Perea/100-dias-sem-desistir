@@ -26,27 +26,43 @@
 /** Valor que o servidor devolve enquanto o texto não foi aprovado. */
 export const PENDING_VERSION = 'PENDENTE';
 
-/** Campos que só a igreja (ou o fundador e o advogado) podem preencher. null = ainda não veio. */
+/**
+ * Campos que só a igreja (ou o fundador e o advogado) podem preencher.
+ * null = ainda não veio.
+ *
+ * Enquanto qualquer campo for null, o texto sai com [COLCHETES], hasOpenFields
+ * devolve true e NINGUÉM aceita — logo ninguém publica. É o estado seguro.
+ *
+ * Os valores de TESTE usados na validação A/B de 23/09/2026 foram removidos
+ * depois do teste, de propósito: texto de teste não pode ir para produção nem
+ * por engano. Os reais entram quando a igreja der razão social, CNPJ, endereço,
+ * encarregado de dados, política publicada e os prazos — e depois de advogado.
+ */
 export const CAMPOS: Record<CampoId, string | null> = {
-  nomeIgreja: null,
+  nomeIgreja: 'Lagoinha Brasília Capital',
+  // Não aparece no texto atual (a frase "cerca de N pessoas" saiu em 22/09).
   pessoasNaComunidade: null,
-  razaoSocial: null,
-  cnpj: null,
-  emailPublicado: null,
-  encarregado: null,
+  razaoSocial: 'Primeira Igreja Batista da Lagoinha no Distrito Federal',
+  cnpj: '42.613.120/0001-04',
+  emailPublicado: 'pereadavi12@gmail.com',
+  encarregado: 'pereadavi12@gmail.com',
   links: null,
-  paginaRetirarConteudo: null,
-  paginaExclusao: null,
-  prazoDenuncia: null,
-  prazoPedirRevisao: null,
-  prazoRespostaRevisao: null,
+  paginaRetirarConteudo: 'https://100diassemdesistir.com.br/politica-de-privacidade',
+  paginaExclusao: 'https://100diassemdesistir.com.br/excluir-conta',
+  prazoDenuncia: '24 horas',
+  prazoPedirRevisao: '7 dias',
+  prazoRespostaRevisao: '7 dias',
+  // "Não se encerra" (fundador, 23/09): não há data de fim da publicação.
   dataFimPublicacao: null,
-  dataApagamento: null,
-  versaoRegras: null,
-  dataRegras: null,
-  versaoConsentimento: null,
-  dataConsentimento: null,
-  linkPolitica: null,
+  // Entra na frase "fica visível até você apagar, ou até ___, o que vier
+  // primeiro". O fundador respondeu que não há data: o conteúdo sai quando a
+  // pessoa apaga, quando exclui a conta, ou quando a moderação retira.
+  dataApagamento: 'a moderação retirar',
+  versaoRegras: 'v1-2026-09-23',
+  dataRegras: '23/09/2026',
+  versaoConsentimento: 'v1-2026-09-23',
+  dataConsentimento: '23/09/2026',
+  linkPolitica: 'https://100diassemdesistir.com.br/politica-de-privacidade',
 };
 
 export type CampoId =

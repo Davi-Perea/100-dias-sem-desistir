@@ -6,7 +6,7 @@ import TabsLayout from '@/app/(tabs)/_layout';
 import TogetherScreen from '@/app/(tabs)/juntos';
 import HelpScreen from '@/app/ajuda';
 import WelcomeScreen from '@/app/onboarding/index';
-import { _setCloudConfigForTests, cloudAllowedInThisBuild, isCloudConfigured } from '@/cloud/config';
+import { _setCloudConfigForTests, isCloudConfigured } from '@/cloud/config';
 import { COMMUNITY_ENABLED } from '@/config/features';
 import { isDevBuild } from '@/journey/devBuild';
 import { loadDataset } from '@/journey/datasetSource';
@@ -120,8 +120,7 @@ beforeEach(async () => {
 });
 
 describe('release: a nuvem fica desligada à força (D-6)', () => {
-  test('fora de desenvolvimento a nuvem nunca liga', () => {
-    expect(cloudAllowedInThisBuild(false)).toBe(false);
+  test('sem configuração de nuvem, ela não liga (é o caso da V1)', () => {
     expect(isCloudConfigured()).toBe(false);
   });
 });

@@ -6,6 +6,7 @@ import type { CommunityApi } from '@/community/api';
 import { authorLine, gapsSentence, isValidBio, isValidContactEmail, isValidOptionalName, profileGaps } from '@/community/profile';
 import type { CommunityStatus } from '@/community/types';
 import { cleanText } from '@/community/validation';
+import { COMMUNITY_PHOTOS_ENABLED } from '@/config/features';
 import { AppText, Block, Button, Rule, StateView } from '@/ui/components';
 import { ministryChoice } from '@/ui/comunidade/perfil/EntradaFlow';
 import {
@@ -168,24 +169,31 @@ function ProfileForm({ api, status }: { api: CommunityApi; status: CommunityStat
         </Block>
       ) : null}
 
-      <View style={{ gap: spacing.md }}>
-        {/* Foto OPCIONAL (2026-09-22): um passo do perfil, nunca um portão para
-            publicar. É a PRIMEIRA seção da tela, e o título muda quando já há
-            foto — "Coloque uma foto" para quem não tem, "Trocar a foto" para quem
-            veio justamente trocar. */}
-        <FieldHeader title={hasPhoto ? AVATAR_CHANGE_TITLE : AVATAR_STEP_TITLE}>{AVATAR_OPTIONAL_NOTE}</FieldHeader>
-        <AvatarField
-          api={api}
-          name={shownName ?? ''}
-          status={avatarStatus}
-          photoUrl={photoUrl}
-          onSaved={(uri, saved) => {
-            setPhotoUrl(uri);
-            setAvatarStatus(saved);
-          }}
-        />
-      </View>
-      <Rule />
+      {/* Foto de perfil segue a MESMA chave da foto no post: sem filtro
+          automático de imagem no ar, nenhuma imagem entra (Apple 1.2). Com a
+          chave desligada a seção inteira some — nada de campo que não funciona. */}
+      {COMMUNITY_PHOTOS_ENABLED ? (
+        <>
+          <View style={{ gap: spacing.md }}>
+            {/* Foto OPCIONAL (2026-09-22): um passo do perfil, nunca um portão para
+                publicar. É a PRIMEIRA seção da tela, e o título muda quando já há
+                foto — "Coloque uma foto" para quem não tem, "Trocar a foto" para quem
+                veio justamente trocar. */}
+            <FieldHeader title={hasPhoto ? AVATAR_CHANGE_TITLE : AVATAR_STEP_TITLE}>{AVATAR_OPTIONAL_NOTE}</FieldHeader>
+            <AvatarField
+              api={api}
+              name={shownName ?? ''}
+              status={avatarStatus}
+              photoUrl={photoUrl}
+              onSaved={(uri, saved) => {
+                setPhotoUrl(uri);
+                setAvatarStatus(saved);
+              }}
+            />
+          </View>
+          <Rule />
+        </>
+      ) : null}
       <View style={{ gap: spacing.md }}>
         <FieldHeader title="Nome">O primeiro nome já basta.</FieldHeader>
         <NameField value={name} onChange={setName} />

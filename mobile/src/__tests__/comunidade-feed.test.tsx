@@ -383,7 +383,7 @@ describe('C1: feed', () => {
      juntos-fluxo.test.tsx; aqui se prova que NINGUÉM é mandado para uma tela. */
   test('antes do primeiro Amém: a linha do aceite no topo, e nenhuma tela de aceite', async () => {
     setup({
-      my_community_status: { data: [{ ...READY_STATUS, needs_rules: true, needs_publish_consent: true }] },
+      my_community_status: { data: [{ ...READY_STATUS, rules_version: 'PENDENTE', publish_consent_version: 'PENDENTE', needs_rules: true, needs_publish_consent: true }] },
     });
     await render(<FeedScreen />);
     await waitFor(() => expect(screen.getByTestId(`post-amen-${POST(0)}`)).toBeTruthy());
@@ -411,7 +411,7 @@ describe('C1: feed', () => {
   test('texto do aceite ainda não liberado pela igreja: o Amém diz isso, e nada é enviado nem aceito', async () => {
     const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility').mockImplementation(() => {});
     const { rpc } = setup({
-      my_community_status: { data: [{ ...READY_STATUS, needs_rules: true, needs_publish_consent: true }] },
+      my_community_status: { data: [{ ...READY_STATUS, rules_version: 'PENDENTE', publish_consent_version: 'PENDENTE', needs_rules: true, needs_publish_consent: true }] },
       set_amen: (args) => ({ data: args?.amen === true }),
     });
     await render(<FeedScreen />);
@@ -705,7 +705,7 @@ describe('C6: comentários', () => {
   test('texto do aceite ainda não liberado: o Enviar diz isso e o comentário continua no campo', async () => {
     mockParams = { id: POST(0) };
     const { rpc } = setup({
-      my_community_status: { data: [{ ...READY_STATUS, needs_rules: true, needs_publish_consent: true }] },
+      my_community_status: { data: [{ ...READY_STATUS, rules_version: 'PENDENTE', publish_consent_version: 'PENDENTE', needs_rules: true, needs_publish_consent: true }] },
       community_post_comments: { data: [] },
     });
     await render(<PostCommentsRoute />);

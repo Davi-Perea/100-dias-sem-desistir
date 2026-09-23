@@ -417,7 +417,8 @@ describe('F4: comentários em folha', () => {
    * ninguém é mandado para tela nenhuma e o que foi escrito continua lá.
    */
   test('antes do primeiro comentário: nenhuma tela de aceite, a linha à vista e o texto intacto', async () => {
-    const { api } = fakeApi({ current: status({ needsPublishConsent: true }) });
+    // Servidor em PENDENTE = texto da igreja ainda em rascunho.
+    const { api } = fakeApi({ current: status({ needsPublishConsent: true, publishConsentVersion: 'PENDENTE' }) });
     await renderFeed();
     await fireEvent.press(screen.getByTestId(`post-comment-${POST(0)}`));
     await waitFor(() => expect(screen.getByTestId('comment-input')).toBeTruthy());

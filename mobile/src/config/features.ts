@@ -17,6 +17,27 @@
 export const COMMUNITY_ENABLED: boolean = process.env.EXPO_PUBLIC_COMMUNITY_ENABLED === 'true';
 
 /**
+ * Foto no Juntos (decisão do fundador, 2026-09-23: lançar hoje, texto primeiro).
+ *
+ * O filtro automático de imagem depende de uma conta AWS que não existe ainda.
+ * Sem ele, toda foto teria de esperar uma pessoa aprovar, uma a uma — e com a
+ * igreja inteira publicando isso não se sustenta num domingo.
+ *
+ * A Apple (1.2) e o Google exigem filtro ANTES de publicar conteúdo gerado por
+ * usuário. Texto tem filtro (lista de termos, link, telefone, e-mail, e a fila
+ * humana). Imagem não tem. Então imagem sai, e o Juntos nasce como texto +
+ * comentários — que é uma decisão de escopo, não uma regra afrouxada.
+ *
+ * O que NÃO muda com isto: denunciar, bloquear, moderar, o filtro de texto e a
+ * fila de moderação continuam iguais.
+ *
+ * Para religar: conta AWS, credenciais nos secrets das Edge Functions
+ * (MODERATION_PROVIDER, AWS_*), e este valor para `true`. O caminho de foto
+ * inteiro continua no código, testado — só não tem entrada na tela.
+ */
+export const COMMUNITY_PHOTOS_ENABLED = false;
+
+/**
  * J6 (feedback do fundador, 2026-09-22): TODOS os dias da campanha abrem, sem
  * "Em breve" nem cadeado. Decisão do fundador que substitui a REGRAS 7 (o dia
  * futuro trancado pela rota). CHAVE ÚNICA: voltar a `false` restaura o

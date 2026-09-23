@@ -40,6 +40,17 @@ import { AX5, resetViewport, setViewport } from './support/viewport';
 const mockRouter = { push: jest.fn(), replace: jest.fn(), back: jest.fn(), canGoBack: () => true };
 let mockParams: Record<string, string> = {};
 
+/**
+ * A entrada de foto está desligada em produção (COMMUNITY_PHOTOS_ENABLED=false,
+ * sem filtro automático de imagem). O CAMINHO da foto continua existindo e
+ * precisa continuar testado — quando a conta AWS existir, ele volta a aparecer
+ * sem ninguém reescrever nada. Por isso a chave é ligada aqui.
+ */
+jest.mock('@/config/features', () => ({
+  ...jest.requireActual('@/config/features'),
+  COMMUNITY_PHOTOS_ENABLED: true,
+}));
+
 jest.mock('expo-router', () => ({
   get router() {
     return mockRouter;

@@ -279,7 +279,13 @@ export default ({ config, projectRoot }: ConfigContext): ExpoConfig => {
       predictiveBackGestureEnabled: false,
     },
     web: {
-      output: 'static',
+      // TESTE DA COMUNIDADE (comunidade-v2, 23/09/2026): 'static' faz o Expo
+      // pré-renderizar cada rota em Node. Com a nuvem ligada, o cliente Supabase
+      // lê a sessão do armazenamento já na inicialização, e no Node não existe
+      // `window` — o build morre com "window is not defined". Este app é uma SPA:
+      // não há o que pré-renderizar que o cliente não monte de novo.
+      // A V1 (main) continua em 'static'; esta mudança é só desta branch.
+      output: 'single',
       favicon: './assets/images/favicon.png',
     },
     plugins: [

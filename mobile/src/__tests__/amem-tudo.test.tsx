@@ -21,7 +21,7 @@ import type { CommunityStatus, PostComment } from '@/community/types';
 import { commentAmenSpoken, withCommentAmen } from '@/ui/comunidade/feed/comentarios';
 import { Icon } from '@/ui/icons';
 import { CommentsSheet } from '@/ui/comunidade/sheets/CommentsSheet';
-import { ACEITE_LINE_SPOKEN, CAMPOS, PENDING_NOTICE, type CampoId } from '@/ui/comunidade/publicar/textos';
+import { ACEITE_LINE_SPOKEN, aceiteDocument, CAMPOS, PENDING_NOTICE, rulesDocument, type CampoId } from '@/ui/comunidade/publicar/textos';
 
 const mockRouter = { push: jest.fn(), replace: jest.fn(), back: jest.fn(), canGoBack: () => true };
 jest.mock('expo-router', () => ({
@@ -83,8 +83,8 @@ function status(extra: Partial<CommunityStatus> = {}): CommunityStatus {
     needsRules: false,
     needsPublishConsent: false,
     canPublish: true,
-    publishConsentVersion: '1.0',
-    rulesVersion: '1.0',
+    publishConsentVersion: aceiteDocument().version,
+    rulesVersion: rulesDocument().version,
     isModerator: false,
     ...extra,
   } as CommunityStatus;
@@ -269,7 +269,12 @@ describe('Amém na conversa', () => {
   test('primeiro Amém: a linha do aceite está à vista e o próprio toque registra; a folha não fecha', async () => {
     igrejaAprovou('1.0');
     const api = fakeApi([comment(C1)], async (_id, amen) => amen);
-    const gated = await renderSheet(api, status({ needsRules: true, needsPublishConsent: true }));
+    // O servidor ainda em PENDENTE é o que define 'texto em rascunho'. Antes de
+    // 23/09 o app também não tinha versão; agora tem, então o pendente vem do servidor.
+    const gated = await renderSheet(
+      api,
+      status({ needsRules: true, needsPublishConsent: true }),
+    );
     // A linha fica à vista ANTES do toque: ninguém aceita sem ler (e o link abre as regras).
     const linha = screen.getByTestId('comment-aceite-line');
     expect(linha.props.accessibilityLabel).toBe(ACEITE_LINE_SPOKEN);
@@ -301,7 +306,11 @@ describe('Amém na conversa', () => {
   test('Launch Gate: com o texto da igreja ainda em rascunho, o Amém diz isso e nada é registrado', async () => {
     // CAMPOS como vem de fábrica: versão null = texto não aprovado.
     const api = fakeApi([comment(C1)], async (_id, amen) => amen);
-    const gated = await renderSheet(api, status({ needsRules: true, needsPublishConsent: true }));
+    // Servidor em PENDENTE: é isso que significa 'texto da igreja em rascunho'.
+    const gated = await renderSheet(
+      api,
+      status({ needsRules: true, needsPublishConsent: true, rulesVersion: 'PENDENTE', publishConsentVersion: 'PENDENTE' }),
+    );
     await fireEvent.press(screen.getByTestId(`comment-amen-${C1}`));
     await waitFor(() => expect(screen.getByTestId('comment-notice').props.children).toBe(PENDING_NOTICE));
     expect(api.acceptTerms).not.toHaveBeenCalled();

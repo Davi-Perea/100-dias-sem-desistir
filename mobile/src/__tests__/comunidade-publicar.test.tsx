@@ -38,6 +38,17 @@ import {
 const mockRouter = { push: jest.fn(), replace: jest.fn(), back: jest.fn(), canGoBack: () => true };
 let mockParams: Record<string, string> = {};
 
+/**
+ * A entrada de foto está desligada em produção (COMMUNITY_PHOTOS_ENABLED=false,
+ * sem filtro automático de imagem). O CAMINHO da foto continua existindo e
+ * precisa continuar testado — quando a conta AWS existir, ele volta a aparecer
+ * sem ninguém reescrever nada. Por isso a chave é ligada aqui.
+ */
+jest.mock('@/config/features', () => ({
+  ...jest.requireActual('@/config/features'),
+  COMMUNITY_PHOTOS_ENABLED: true,
+}));
+
 jest.mock('expo-router', () => ({
   get router() {
     return mockRouter;
@@ -243,7 +254,9 @@ describe('textos', () => {
 
   test('versão PENDENTE, texto sem versão ou campo vazio: ninguém aceita', () => {
     expect(termsAvailability(consentDocument(), 'PENDENTE')).toBe('pending');
-    expect(termsAvailability(consentDocument(), '1.0')).toBe('pending'); // texto do app ainda sem versão
+    // Desde 23/09 o texto do app TEM versão (v1-2026-09-23). Para provar o caso
+    // 'app sem versão', o documento é construído com o campo vazio de propósito.
+    expect(termsAvailability({ ...consentDocument(), version: null }, '1.0')).toBe('pending');
     fillCampos('1.0');
     expect(hasOpenFields(termsDocumentText(consentDocument()))).toBe(false);
     expect(termsAvailability(consentDocument(), 'PENDENTE')).toBe('pending');

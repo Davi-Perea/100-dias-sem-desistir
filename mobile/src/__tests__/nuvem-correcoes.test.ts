@@ -19,7 +19,7 @@ import { createElement } from 'react';
 
 import appConfig, { assertCommunityForStore, assertContactForStore, assertRightsForStore } from '../../app.config';
 import { _setSupabaseClientForTests } from '@/cloud/client';
-import { _setCloudConfigForTests, cloudAllowedInThisBuild, getCloudConfig, isCloudConfigured } from '@/cloud/config';
+import { ACCOUNT_DELETION_AVAILABLE, _setCloudConfigForTests, cloudAllowedInThisBuild, getCloudConfig, isCloudConfigured } from '@/cloud/config';
 import { classifyError } from '@/cloud/errors';
 import { getEffectiveRole, getMyMembership } from '@/cloud/groups';
 import { decrypt, encrypt, secureKeyName, secureSessionStorage } from '@/cloud/secureStorage';
@@ -170,15 +170,27 @@ describe('SEC-04/D-6: nuvem desligada à força em build de release', () => {
     globals.__DEV__ = original;
   });
 
-  test('sem exclusão de conta, release não permite nuvem; desenvolvimento permite', () => {
-    expect(cloudAllowedInThisBuild(false)).toBe(false);
+  test('release só permite nuvem com exclusão de conta pronta; desenvolvimento sempre permite', () => {
+    // 23/09/2026: a exclusão ficou pronta, então release passa a poder ligar a
+    // nuvem. A REGRA não mudou; mudou a condição dela. O teste prova a regra.
+    expect(cloudAllowedInThisBuild(false)).toBe(ACCOUNT_DELETION_AVAILABLE);
     expect(cloudAllowedInThisBuild(true)).toBe(true);
   });
 
-  test('com __DEV__ falso, nem configuração válida liga a nuvem', () => {
+  /**
+   * Antes de 23/09 este teste provava que release NUNCA ligava a nuvem. Agora a
+   * exclusão de conta existe, então release PODE ligar — e o que segura a V1 é
+   * outra coisa: a ausência das variáveis EXPO_PUBLIC_SUPABASE_*. É isso que
+   * este teste passa a provar, que é a defesa que continua valendo.
+   */
+  test('com __DEV__ falso, a nuvem depende da configuração — sem ela, não liga', () => {
     _setCloudConfigForTests({ url: 'https://projeto.supabase.co', anonKey: 'anon-key' });
-    expect(isCloudConfigured()).toBe(true);
     globals.__DEV__ = false;
+    // Com exclusão de conta pronta E configuração, a nuvem liga.
+    expect(ACCOUNT_DELETION_AVAILABLE).toBe(true);
+    expect(isCloudConfigured()).toBe(true);
+    // Sem configuração — o caso da V1 na loja — não liga de jeito nenhum.
+    _setCloudConfigForTests(null);
     expect(getCloudConfig()).toBeNull();
     expect(isCloudConfigured()).toBe(false);
   });

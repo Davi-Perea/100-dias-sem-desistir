@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toCommunityError } from '@/community/errors';
 import { authorLine } from '@/community/profile';
 import { charLength, cleanText, LIMITS } from '@/community/validation';
+import { COMMUNITY_PHOTOS_ENABLED } from '@/config/features';
 import { getDay } from '@/journey/datasetSource';
 import { readingSummary } from '@/journey/readingSummary';
 import { useJourney } from '@/journey/useJourney';
@@ -349,19 +350,27 @@ export default function PublishScreen() {
       selected: hasAttachment(attachments, 'jejum'),
       onPress: () => toggle({ kind: 'jejum' }),
     },
-    {
-      id: 'galeria',
-      label: 'Galeria',
-      accessibilityLabel: `Galeria, até ${MAX_POST_PHOTOS} fotos`,
-      selected: photos.length > 0,
-      onPress: () => void openPhotos('galeria'),
-    },
-    {
-      id: 'camera',
-      label: 'Câmera',
-      accessibilityLabel: 'Câmera',
-      onPress: () => void openPhotos('camera'),
-    },
+    // Galeria e Câmera só existem com o filtro automático de imagem no ar
+    // (COMMUNITY_PHOTOS_ENABLED). Sem ele, publicar foto sem filtro prévio é o
+    // que a Apple 1.2 e o Google proíbem. Some a entrada, não a regra: o resto
+    // do caminho de foto continua no código, testado, esperando a conta AWS.
+    ...(COMMUNITY_PHOTOS_ENABLED
+      ? ([
+          {
+            id: 'galeria',
+            label: 'Galeria',
+            accessibilityLabel: `Galeria, até ${MAX_POST_PHOTOS} fotos`,
+            selected: photos.length > 0,
+            onPress: () => void openPhotos('galeria'),
+          },
+          {
+            id: 'camera',
+            label: 'Câmera',
+            accessibilityLabel: 'Câmera',
+            onPress: () => void openPhotos('camera'),
+          },
+        ] as AttachButton[])
+      : []),
   ];
 
   /* ------------------------------------------------------------- enviar */

@@ -68,7 +68,7 @@ jest.mock('expo-crypto', () => ({
 }));
 
 // Demonstração: Comunidade ligada, SEM nuvem (é isso que liga o demoApi).
-jest.mock('@/config/features', () => ({ COMMUNITY_ENABLED: true }));
+jest.mock('@/config/features', () => ({ COMMUNITY_ENABLED: true, COMMUNITY_PHOTOS_ENABLED: true }));
 jest.mock('@/cloud/config', () => ({ isCloudConfigured: () => false, ACCOUNT_DELETION_AVAILABLE: false }));
 jest.mock('@/cloud/client', () => ({ getSupabase: () => null, requireSupabase: () => null }));
 jest.mock('@/cloud/useSession', () => ({
