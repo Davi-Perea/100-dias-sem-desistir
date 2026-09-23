@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { AccessibilityInfo, Keyboard, Platform, Pressable, View } from 'react-native';
 
+import { quoteFrame } from '@/bible/quote';
 import { copyText } from '@/marks/clipboard';
 import { HIGHLIGHTS, highlightColor, type HighlightId } from '@/marks/colors';
 import { NOTE_MAX_LENGTH, getVerseMark, saveVerseMark, useMarks, type VerseRef } from '@/marks/marksStore';
@@ -68,7 +69,9 @@ export function VerseSheet({
   const copy = async () => {
     const translation = getBibleProvider().getMetadata().name;
     try {
-      await copyText(`“${verseText}” ${label} (${translation})`);
+      // Mesma regra do aviso do dia: a moldura some onde a tradução já tem aspa.
+      const frame = quoteFrame(verseText);
+      await copyText(`${frame.open}${verseText}${frame.close} ${label} (${translation})`);
       setCopied(true);
       AccessibilityInfo.announceForAccessibility('Versículo copiado.');
     } catch {

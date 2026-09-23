@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Modal, Pressable, ScrollView, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { quoteFrame } from '@/bible/quote';
 import { formatReference } from '@/bible/references';
 import { type KeyVerse, loadKeyVerse } from '@/journey/keyVerse';
 import type { JourneyDay } from '@/journey/types';
@@ -28,9 +29,7 @@ import { faces, floatShadow, glass, MIN_TOUCH, radius, spacing, useGutter, useRe
  *   como o X, porque prender a pessoa num aviso seria pior.
  * - Com "Reduzir movimento", aparece sem animação.
  */
-/** Aspas tipográficas do pt-BR. Escapadas para não dependerem do encoding do arquivo. */
-export const OPEN_QUOTE = '“';
-export const CLOSE_QUOTE = '”';
+export { CLOSE_QUOTE, OPEN_QUOTE } from '@/bible/quote';
 
 export function DailyVerseNotice({
   visible,
@@ -174,11 +173,11 @@ export function DailyVerseNotice({
                     accessibilityLabel={current.text}
                     style={{ fontSize: 19, lineHeight: 30 }}
                   >
-                    {OPEN_QUOTE}
+                    {quoteFrame(current.text).open}
                     <AppText variant="quote" style={{ fontSize: 19, lineHeight: 30 }} testID="daily-notice-verse-text">
                       {current.text}
                     </AppText>
-                    {CLOSE_QUOTE}
+                    {quoteFrame(current.text).close}
                   </AppText>
                 ) : null}
                 <AppText
