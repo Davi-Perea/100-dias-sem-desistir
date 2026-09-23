@@ -167,9 +167,15 @@ export default function ReminderScreen() {
       </View>
 
       {!supported ? (
+        // AUDITORIA DE LANÇAMENTO WEB, 2026-09-23: este texto era de bancada
+        // ("Teste em um aparelho iOS ou Android") e ia ser lido por membro da
+        // igreja, não por quem desenvolve. Quem abre pelo navegador precisa
+        // saber duas coisas: que o lembrete não vem, e que isso não estraga
+        // nada do resto.
         <Block tone="muted">
           <AppText variant="caption">
-            Notificações locais não são suportadas na web. Teste em um aparelho iOS ou Android.
+            Pelo navegador, o app não consegue te avisar na hora marcada — isso depende do aplicativo instalado no
+            celular. Sua leitura, suas marcações e o que você escrever continuam funcionando normalmente.
           </AppText>
         </Block>
       ) : null}

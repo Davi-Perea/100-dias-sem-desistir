@@ -1,8 +1,9 @@
-import { Alert, Linking, View } from 'react-native';
+import { Linking, View } from 'react-native';
 
 import { isCloudConfigured } from '@/cloud/config';
 import { PRIVACY_URL } from '@/config/contato';
 import { wipeLocalData } from '@/settings/wipeLocalData';
+import { confirmar, avisar } from '@/ui/confirmar';
 import { AppText, Button, Cap, Rule, SettingRow } from '@/ui/components';
 import { spacing } from '@/ui/theme';
 import { SubScreen } from '@/ui/voce/SubScreen';
@@ -27,23 +28,18 @@ export default function PrivacyScreen() {
   const privacyUrl = PRIVACY_URL?.trim() || null;
 
   const confirmWipe = () =>
-    Alert.alert(
-      'Apagar seus dados deste aparelho?',
-      'Progresso, reflexões, jejum e preferências serão apagados. Não dá para desfazer.',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Apagar',
-          style: 'destructive',
-          // Com as preferências no padrão, o portão do onboarding recomeça o app
-          // e os lembretes agendados são cancelados pela sincronização.
-          onPress: () => {
-            wipeLocalData().catch(() =>
-              Alert.alert('Não foi possível apagar', 'Tente de novo. Se continuar, reinicie o app.'),
-            );
-          },
-        },
-      ],
+    confirmar(
+      {
+        titulo: 'Apagar seus dados deste aparelho?',
+        mensagem: 'Progresso, reflexões, jejum e preferências serão apagados. Não dá para desfazer.',
+        confirmar: 'Apagar',
+        destrutivo: true,
+      },
+      // Com as preferências no padrão, o portão do onboarding recomeça o app
+      // e os lembretes agendados são cancelados pela sincronização.
+      () => {
+        wipeLocalData().catch(() => avisar('Não foi possível apagar', 'Tente de novo. Se continuar, reinicie o app.'));
+      },
     );
 
   return (

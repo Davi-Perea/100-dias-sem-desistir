@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { getCampaign, resetToBundledContent } from '@/journey/datasetSource';
@@ -150,5 +153,45 @@ describe('aviso do dia: uma vez por dia, e a marca sobrevive a fechar o navegado
     expect(await AsyncStorage.getItem(DAILY_NOTICE_KEY)).toBe(dailyNoticeMark(campaign().id, 1));
     // E a marca não conta nada sobre a fé de ninguém: é campanha:dia.
     expect(dailyNoticeMark(campaign().id, 1)).toMatch(/^[^:]+:1$/);
+  });
+});
+
+/* --------------------------------------------------- confirmação na web */
+
+/**
+ * AUDITORIA DE LANÇAMENTO WEB 2026-09-23 (P0): `Alert.alert` do react-native-web
+ * é `static alert() {}` — um no-op. Toda ação que dependia dele para confirmar
+ * simplesmente não acontecia no navegador, sem erro e sem aviso:
+ *
+ *   · "Apagar meus dados deste aparelho" — botão morto. Era o ÚNICO caminho de
+ *     exclusão dos dados sensíveis que a tela de Privacidade promete.
+ *   · "Excluir reflexão" — botão morto (confirmado clicando no app rodando).
+ *   · "Cancelar" com texto não salvo — a saída estava DENTRO do diálogo que
+ *     nunca abria, então a pessoa ficava presa na tela.
+ */
+describe('nenhuma tela da V1 depende do Alert.alert, que não existe na web', () => {
+  const TELAS = [
+    ['privacidade', join(__dirname, '..', 'app', 'privacidade.tsx')],
+    ['reflexão', join(__dirname, '..', 'app', 'reflexao', '[day].tsx')],
+    ['painel DEV', join(__dirname, '..', 'app', 'dev.tsx')],
+  ] as const;
+
+  test.each(TELAS)('a tela de %s usa o confirmar() de `ui/confirmar`', (_nome, caminho) => {
+    const fonte = readFileSync(caminho, 'utf8');
+    expect(fonte).not.toMatch(/Alert\.alert\(/);
+    expect(fonte).toMatch(/from '@\/ui\/confirmar'/);
+  });
+
+  test('a implementação web do Alert continua sendo um no-op (se mudar, este teste avisa)', () => {
+    const rnw = join(__dirname, '..', '..', 'node_modules', 'react-native-web', 'dist', 'exports', 'Alert', 'index.js');
+    expect(readFileSync(rnw, 'utf8')).toMatch(/static alert\(\)\s*\{\s*\}/);
+  });
+
+  test('sem poder perguntar, o confirmar não age: ninguém apaga nada por engano', () => {
+    const fonte = readFileSync(join(__dirname, '..', 'ui', 'confirmar.ts'), 'utf8');
+    // Se `confirm` não existir (pré-render estático) ou for bloqueado, a função
+    // volta sem chamar a ação destrutiva.
+    expect(fonte).toMatch(/if \(typeof perguntar !== 'function'\) return;/);
+    expect(fonte).toMatch(/if \(perguntar\(texto\)\) aoConfirmar\(\);/);
   });
 });

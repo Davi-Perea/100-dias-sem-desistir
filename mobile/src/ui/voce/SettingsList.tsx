@@ -1,4 +1,5 @@
 import { router } from 'expo-router';
+import { Platform } from 'react-native';
 
 import { SUPPORT_EMAIL } from '@/config/contato';
 import { countGoals } from '@/config/goals';
@@ -16,6 +17,10 @@ const READING_MODE_LABEL: Record<string, string> = {
 };
 
 export function reminderLabel(settings: Settings): string {
+  // Pelo navegador não existe notificação local: mostrar "07:00" ali seria
+  // prometer um aviso que nunca vai chegar (auditoria de lançamento web,
+  // 2026-09-23). A linha continua, porque a tela explica o porquê.
+  if (Platform.OS === 'web') return 'Só no celular';
   const reminder = settings.reminder;
   return reminder.slot === 'none'
     ? 'Desligado'
