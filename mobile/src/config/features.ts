@@ -55,3 +55,22 @@ export const COMMUNITY_PHOTOS_ENABLED = false;
  * intercessão dos dias futuros.
  */
 export const FUTURE_DAYS_OPEN = true;
+
+/**
+ * PROVA DE CONCEITO: "Ouvir capítulo" (autorizada pelo fundador em 23/09/2026).
+ *
+ * Lê em voz alta o texto da Bíblia Livre que já está no app, com a voz do
+ * próprio aparelho. Só Gênesis 1, só para avaliar se a qualidade da voz serve.
+ *
+ * DESLIGADA POR PADRÃO, e é assim que ela fica fora da produção: o build de
+ * produção não define a variável, então a chave é `false` e o botão não existe.
+ * Ligar exige `EXPO_PUBLIC_POC_OUVIR=true` no ambiente do build de rascunho —
+ * um ato explícito, que ninguém faz sem querer.
+ *
+ * Se a voz for aprovada, isto vira feature de verdade e esta chave morre.
+ */
+export const POC_OUVIR_ENABLED: boolean = process.env.EXPO_PUBLIC_POC_OUVIR === 'true';
+
+/** Só este capítulo fala, na POC. Escopo dado pelo fundador. */
+export const POC_OUVIR_LIVRO = 'GEN';
+export const POC_OUVIR_CAPITULO = 1;

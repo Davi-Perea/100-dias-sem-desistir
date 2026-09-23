@@ -3,12 +3,14 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { AccessibilityInfo, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { POC_OUVIR_CAPITULO, POC_OUVIR_ENABLED, POC_OUVIR_LIVRO } from '@/config/features';
 import { getBibleProvider, type Passage } from '@/reader/provider';
 import { normalizeReaderFontSize, stepReaderFontSize } from '@/reader/readerFontSize';
 import { updateSettings, useSettings } from '@/settings/settingsStore';
 import { BackBar } from '@/ui/BackBar';
 import { AppText, Button, Cap, Screen, StateView } from '@/ui/components';
 import { ChapterText } from '@/ui/biblia/ChapterText';
+import { OuvirCapitulo } from '@/ui/biblia/OuvirCapitulo';
 import { PlaceholderNotice } from '@/ui/biblia/PlaceholderNotice';
 import { TextSizeButton } from '@/ui/biblia/TextSizeButton';
 import {
@@ -182,6 +184,19 @@ export default function BibleChapterScreen() {
           <StateView kind="loading" />
         ) : (
           <>
+            {/* POC "Ouvir capítulo": só com a chave ligada (build de rascunho) e
+                só em Gênesis 1. Em produção a chave é false e isto não existe. */}
+            {POC_OUVIR_ENABLED &&
+            position.book === POC_OUVIR_LIVRO &&
+            position.chapter === POC_OUVIR_CAPITULO ? (
+              <OuvirCapitulo
+                // SÓ o texto bíblico. Nada escrito pela pessoa chega aqui.
+                versiculos={passage.verses.map((v) => v.text)}
+                chaveDoCapitulo={`${position.book} ${position.chapter}`}
+                total={passage.verses.length}
+              />
+            ) : null}
+
             <ChapterText
               verses={passage.verses}
               heading={passage.heading}
