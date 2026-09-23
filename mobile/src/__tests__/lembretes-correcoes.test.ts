@@ -14,6 +14,7 @@ import {
   campaignDateTimeForDay,
   cancelDailyReminder,
   DAILY_REMINDER_ID,
+  COVERAGE_REMINDER_ID,
   DAILY_REMINDER_PREFIX,
   dailyReminderPlan,
   IOS_PENDING_LIMIT,
@@ -109,8 +110,10 @@ describe('LEM-01: a leitura diária vive só dentro da campanha', () => {
 
     expect(plan[0].day).toBe(1);
     expect(plan[0].when.getTime()).toBe(localDateTimeForDay(1, campaign(), MORNING).getTime());
-    expect(plan).toHaveLength(reminderWindowDays());
-    for (const item of plan) {
+    // A janela + o aviso de retomada que a tapa no fim (auditoria de 23/09).
+    expect(plan).toHaveLength(reminderWindowDays() + 1);
+    expect(plan.filter((p) => p.id === COVERAGE_REMINDER_ID)).toHaveLength(1);
+    for (const item of plan.filter((p) => p.id !== COVERAGE_REMINDER_ID)) {
       expect(item.id).toBe(`${DAILY_REMINDER_PREFIX}${item.day}`);
       expect(item.when.getHours()).toBe(7);
       expect(item.when.getTime()).toBeGreaterThan(now.getTime());
@@ -143,7 +146,9 @@ describe('LEM-01: a leitura diária vive só dentro da campanha', () => {
     expect(result.ok).toBe(true);
     expect(mockPending.has(DAILY_REMINDER_ID)).toBe(false);
     const daily = pendingWith(DAILY_REMINDER_PREFIX);
-    expect(daily).toHaveLength(reminderWindowDays());
+    // A janela + a retomada: o aviso de retomada mora na mesma família, para ser
+    // cancelado e reagendado junto com ela a cada abertura do app.
+    expect(daily).toHaveLength(reminderWindowDays() + 1);
     for (const n of daily) expect(n.trigger.type).toBe('date');
     for (const call of notifications.scheduleNotificationAsync.mock.calls) {
       expect(call[0].trigger.type).not.toBe('daily');
@@ -183,7 +188,7 @@ describe('LEM-01/LEM-04: orçamento de 64 agendamentos do iOS', () => {
     await syncAltarReminders(true, campaign(), now);
 
     expect(pendingWith(MINISTRY_REMINDER_PREFIX)).toHaveLength(24);
-    expect(pendingWith(DAILY_REMINDER_PREFIX)).toHaveLength(reminderWindowDays('ios'));
+    expect(pendingWith(DAILY_REMINDER_PREFIX)).toHaveLength(reminderWindowDays('ios') + 1);
     expect(pendingWith(ALTAR_REMINDER_PREFIX)).toHaveLength(reminderWindowDays('ios'));
     expect(mockPending.size).toBeLessThan(IOS_PENDING_LIMIT);
   });

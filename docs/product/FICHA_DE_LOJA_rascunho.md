@@ -28,8 +28,9 @@ conta da igreja depois. Os textos prontos para colar estão em **`docs/product/L
    `PRIVACIDADE_NAS_LOJAS_rascunho.md` não existe no build de loja (nuvem desligada em release).
 4. **Privacidade:** "Dados não coletados". O interruptor "Enviar dados de uso anônimos" saiu do app.
 5. **Descrição (§3.3):** "Sua reflexão" saiu da lista do texto expresso até confirmarmos que a tela continua no build;
-   "Entrou depois" agora diz que os dias passados continuam abertos (é o comportamento do app); entrou a linha "cada
-   dia abre à meia-noite (horário de Brasília)". Palavras-chave iguais (93 bytes).
+   "Entrou depois" agora diz que os dias passados continuam abertos (é o comportamento do app). A linha sobre
+   abertura dos dias foi corrigida em 23/09: com FUTURE_DAYS_OPEN ligado, os 100 dias abrem a partir do Dia 1 e a
+   ficha não pode dizer que cada dia abre na data dele.
 6. **Notas para o revisor (§7):** substituídas pela versão em inglês do `LANCAMENTO_EXPRESSO_IOS.md` §4.10, que
    explica a contagem antes de 23/09 e oferece vídeo. A frase "publica na própria conta de organização" **não vale**
    no caminho expresso.

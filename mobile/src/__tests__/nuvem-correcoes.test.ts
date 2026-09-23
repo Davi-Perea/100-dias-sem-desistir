@@ -497,9 +497,26 @@ describe('DIR-04/05/06: o README diz a verdade', () => {
 
 /* ------------------------------------------------------------------ R1-5 */
 
-describe('R1-5: sem backup do Android para o que "fica neste aparelho"', () => {
+describe('R1-5: sem backup de sistema para o que "fica neste aparelho"', () => {
+  const config = () =>
+    appConfig({ config: {}, projectRoot: MOBILE, staticConfigPath: null, packageJsonPath: null } as never);
+
   test('android.allowBackup é false', () => {
-    const config = appConfig({ config: {}, projectRoot: MOBILE, staticConfigPath: null, packageJsonPath: null } as never);
-    expect(config.android?.allowBackup).toBe(false);
+    expect(config().android?.allowBackup).toBe(false);
+  });
+
+  /**
+   * Auditoria externa de 2026-09-23: a tela Privacidade promete que reflexão,
+   * jejum, marcações e progresso ficam só no aparelho, e o Android já era
+   * barrado — faltava o iPhone estar barrado por escrito.
+   *
+   * O AsyncStorage 2.2.0 exclui o próprio diretório do backup por padrão
+   * (ios/RNCAsyncStorage.mm: sem a chave no Info.plist, assume YES). Este teste
+   * existe porque a promessa de uma tela do app não pode depender do padrão de
+   * uma biblioteca de terceiro: se alguém remover a chave, a falha aparece aqui
+   * e não num aparelho de alguém.
+   */
+  test('ios.infoPlist exclui o AsyncStorage do backup do iCloud', () => {
+    expect(config().ios?.infoPlist?.RCTAsyncStorageExcludeFromBackup).toBe(true);
   });
 });

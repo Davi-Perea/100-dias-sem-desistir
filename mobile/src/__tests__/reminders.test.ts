@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { getCampaign, resetToBundledContent } from '@/journey/datasetSource';
-import { daysForMinistry } from '@/journey/ministries';
+import { daysForMinistry, listMinistries } from '@/journey/ministries';
 import {
   ALTAR_REMINDER_PREFIX,
   ALTAR_TIME,
@@ -15,6 +15,10 @@ import {
   reminderWindowDays,
   syncAltarReminders,
   syncMinistryReminders,
+  ABSENCE_DELAYS_DAYS,
+  COVERAGE_REMINDER_ID,
+  dailyReminderPlan,
+  IOS_PENDING_LIMIT,
 } from '@/reminders/reminders';
 
 jest.mock('expo-notifications', () => ({
@@ -291,5 +295,147 @@ describe('o hook de sincronização nunca pede permissão', () => {
     // As três famílias (leitura, ministério, altar) passam a opção de fundo.
     const calls = source.match(/sync(Daily|Ministry|Altar)Reminders?\([^;]*?BACKGROUND\)/gs) ?? [];
     expect(calls).toHaveLength(3);
+  });
+});
+
+/* ------------------------------------------------------------------ grupo D */
+
+/**
+ * AUDITORIA EXTERNA 2026-09-23: uma tentativa de agendamento tem de ser tudo ou
+ * nada. O defeito era: itens 1 e 2 agendados, item 3 recusado pelo sistema,
+ * `ok: false` devolvido — e os dois primeiros ficavam armados no celular, sem
+ * caminho de desligar, porque para o app o lembrete estava desligado.
+ */
+describe('agendar é tudo ou nada', () => {
+  const ministry = 'Intercessão/Bálsamo';
+  const beforeStart = () => localDateTimeForDay(1, campaign(), { hour: 8, minute: 0 }, -1);
+
+  /** Ids que o prefixo desta família criou durante a tentativa. */
+  const familyDays = () => daysForMinistry(ministry);
+
+  test('falha no terceiro item cancela os dois que ESTA tentativa criou, e só eles', async () => {
+    let calls = 0;
+    notifications.scheduleNotificationAsync.mockImplementation(async () => {
+      calls += 1;
+      if (calls === 3) throw new Error('iOS recusou');
+      return 'id';
+    });
+
+    const result = await syncMinistryReminders(ministry, familyDays(), campaign(), beforeStart(), {
+      requestPermission: false,
+    });
+
+    expect(result.ok).toBe(false);
+    expect(calls).toBe(3);
+
+    // Os ids agendados com sucesso nesta tentativa: o 1º e o 2º.
+    const agendados = notifications.scheduleNotificationAsync.mock.calls
+      .slice(0, 2)
+      .map(([input]: [{ identifier: string }]) => input.identifier);
+    expect(agendados).toHaveLength(2);
+
+    const cancelados = notifications.cancelScheduledNotificationAsync.mock.calls.map(([id]: [string]) => id);
+    for (const id of agendados) expect(cancelados).toContain(id);
+
+    // E nada além disso: o cancelamento por id não pode encostar em outra
+    // família. O único outro cancelamento permitido é o do prefixo desta mesma
+    // família, que o resync faz ANTES de agendar.
+    const forasteiros = cancelados.filter(
+      (id: string) => !agendados.includes(id) && !id.startsWith(MINISTRY_REMINDER_PREFIX),
+    );
+    expect(forasteiros).toEqual([]);
+    for (const prefixo of [ALTAR_REMINDER_PREFIX, 'daily-reminder-', 'absence-']) {
+      expect(cancelados.filter((id: string) => id.startsWith(prefixo))).toEqual([]);
+    }
+  });
+
+  test('falha já no primeiro item não cancela nada por id — não havia o que desfazer', async () => {
+    notifications.scheduleNotificationAsync.mockRejectedValue(new Error('iOS recusou'));
+
+    const result = await syncMinistryReminders(ministry, familyDays(), campaign(), beforeStart(), {
+      requestPermission: false,
+    });
+
+    expect(result.ok).toBe(false);
+    // Uma tentativa só: a primeira falha interrompe o laço.
+    expect(notifications.scheduleNotificationAsync).toHaveBeenCalledTimes(1);
+    const porId = notifications.cancelScheduledNotificationAsync.mock.calls.map(([id]: [string]) => id);
+    expect(porId.filter((id: string) => id.startsWith(MINISTRY_REMINDER_PREFIX))).toEqual([]);
+  });
+
+  test('sem falha nenhuma, nada é cancelado por id', async () => {
+    const result = await syncMinistryReminders(ministry, familyDays(), campaign(), beforeStart(), {
+      requestPermission: false,
+    });
+    expect(result.ok).toBe(true);
+    const porId = notifications.cancelScheduledNotificationAsync.mock.calls.map(([id]: [string]) => id);
+    expect(porId.filter((id: string) => id.startsWith(MINISTRY_REMINDER_PREFIX))).toEqual([]);
+  });
+});
+
+/* ------------------------------------------------------------------ grupo E */
+
+/**
+ * AUDITORIA EXTERNA 2026-09-23 (P1): a zona morta do iOS.
+ *
+ * Cenário: iPhone, lembrete diário LIGADO, a pessoa agenda e nunca mais abre o
+ * app. A janela rolante do iOS acaba, e o aviso de ausência não cobre esse caso
+ * porque só é agendado com o lembrete diário desligado. Antes, a pessoa que
+ * mais precisava do lembrete era a única que parava de receber, em silêncio.
+ */
+describe('iOS: quem liga o lembrete e some não cai num silêncio', () => {
+  const TIME = { hour: 7, minute: 0 };
+  const iosWindow = () => reminderWindowDays('ios');
+  /** Manhã do Dia 1, antes do horário do lembrete. */
+  const dia1 = () => localDateTimeForDay(1, campaign(), { hour: 6, minute: 0 });
+
+  test('o plano do iPhone não termina na janela: há um aviso depois dela', () => {
+    const plan = dailyReminderPlan(TIME, campaign(), dia1(), iosWindow());
+    const retomada = plan.filter((item) => item.id === COVERAGE_REMINDER_ID);
+    expect(retomada).toHaveLength(1);
+
+    // Ele cai UM dia depois do último aviso da janela — sem buraco entre os dois.
+    const diarios = plan.filter((item) => item.id !== COVERAGE_REMINDER_ID);
+    expect(diarios).toHaveLength(iosWindow());
+    expect(retomada[0].day).toBe(diarios[diarios.length - 1].day + 1);
+    expect(retomada[0].when.getTime()).toBeGreaterThan(diarios[diarios.length - 1].when.getTime());
+  });
+
+  test('a pessoa que some recebe algo depois do fim da janela', () => {
+    const now = dia1();
+    const plan = dailyReminderPlan(TIME, campaign(), now, iosWindow());
+    const ultimo = plan[plan.length - 1];
+    // Sem tocar no app, o último agendamento do sistema é o de retomada.
+    expect(ultimo.id).toBe(COVERAGE_REMINDER_ID);
+    // E ele não anuncia leitura de dia nenhum: dispara longe, e prometer "a
+    // leitura de hoje" seria mentira quando chegasse a hora.
+    expect(ultimo.body).not.toMatch(/Dia \d+/);
+  });
+
+  test('não insiste: um aviso de retomada, nunca uma fila deles', () => {
+    const plan = dailyReminderPlan(TIME, campaign(), dia1(), iosWindow());
+    expect(plan.filter((item) => item.id === COVERAGE_REMINDER_ID)).toHaveLength(1);
+  });
+
+  test('no Android não existe: a janela cobre a campanha inteira', () => {
+    const plan = dailyReminderPlan(TIME, campaign(), dia1(), reminderWindowDays('android'));
+    expect(plan.some((item) => item.id === COVERAGE_REMINDER_ID)).toBe(false);
+  });
+
+  test('perto do fim da campanha também não existe: não há dia depois do Dia 100', () => {
+    const quaseFim = localDateTimeForDay(campaign().total_days - 2, campaign(), { hour: 6, minute: 0 });
+    const plan = dailyReminderPlan(TIME, campaign(), quaseFim, iosWindow());
+    expect(plan.some((item) => item.id === COVERAGE_REMINDER_ID)).toBe(false);
+    expect(plan[plan.length - 1].day).toBeLessThanOrEqual(campaign().total_days);
+  });
+
+  test('o orçamento do iPhone continua cabendo nos 64 pendentes', () => {
+    const janela = iosWindow();
+    const maiorMinisterio = Math.max(
+      ...listMinistries().map((m) => m.days.length),
+    );
+    // leitura (janela + retomada) + altar (janela) + ministério + ausência
+    const total = janela + 1 + janela + maiorMinisterio + ABSENCE_DELAYS_DAYS.length;
+    expect(total).toBeLessThanOrEqual(IOS_PENDING_LIMIT);
   });
 });

@@ -212,6 +212,19 @@ export default ({ config, projectRoot }: ConfigContext): ExpoConfig => {
       // V1 só iPhone: sem iPad não há exigência de capturas de iPad nem layout de iPad não testado.
       // (O app ainda roda em iPad em modo de compatibilidade de iPhone; isso é da Apple, não daqui.)
       supportsTablet: false,
+      infoPlist: {
+        // Espelho do `android.allowBackup: false`, pelo mesmo motivo (R1-5, LGPD
+        // art. 5º, II): a tela Privacidade promete que reflexão, jejum, marcações
+        // e progresso ficam "só neste aparelho". Tudo isso mora no AsyncStorage.
+        //
+        // FATO (lido em node_modules/@react-native-async-storage/async-storage@2.2.0,
+        // ios/RNCAsyncStorage.mm:518-527, em 2026-09-23): sem esta chave a
+        // biblioteca JÁ exclui o diretório do backup — o padrão dela é excluir.
+        // A chave existe aqui para a promessa da tela não depender do padrão de
+        // um terceiro, que pode mudar numa atualização sem ninguém notar.
+        // O teste de app.config trava este valor.
+        RCTAsyncStorageExcludeFromBackup: true,
+      },
       config: {
         // Grava ITSAppUsesNonExemptEncryption = NO no Info.plist. Base: docs/product/PRIVACIDADE_NAS_LOJAS_rascunho.md
         // §5 (Criptografia), opção A, recomendada para a V1-A: o build de loja sai SEM as variáveis de nuvem, então o
