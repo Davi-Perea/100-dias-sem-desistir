@@ -157,6 +157,18 @@ function pontuar(voz: SpeechSynthesisVoice): number {
  * aparelho. O player não é desenhado e o leitor fica como sempre foi.
  */
 export function vozesLocaisPt(): VozLocal[] {
+  return vozesPtLocaisTodas().filter((v) => sexoDaVoz(v.nome.toLowerCase()) === 'masculina');
+}
+
+/**
+ * TODAS as vozes de português que rodam no aparelho, sem olhar o sexo.
+ *
+ * Não é o que o produto usa: é a base de `vozesLocaisPt` e o que a tela de
+ * identificação mostra, para alguém poder ouvir cada voz e dizer qual é
+ * masculina. A exigência de rodar no aparelho continua valendo aqui — voz de
+ * servidor não entra nem para teste.
+ */
+export function vozesPtLocaisTodas(): VozLocal[] {
   if (!sinteseDisponivel()) return [];
   let todas: SpeechSynthesisVoice[] = [];
   try {
@@ -165,7 +177,7 @@ export function vozesLocaisPt(): VozLocal[] {
     return [];
   }
   return todas
-    .filter((v) => PT.test(v.lang) && ehLocal(v) && sexoDaVoz(v.name.toLowerCase()) === 'masculina')
+    .filter((v) => PT.test(v.lang) && ehLocal(v))
     .map((voz) => ({ nome: voz.name, lang: voz.lang, voz, pontos: pontuar(voz) }))
     .sort((a, b) => b.pontos - a.pontos || a.nome.localeCompare(b.nome));
 }
@@ -190,7 +202,11 @@ export function vozesLocaisPt(): VozLocal[] {
 /** Momentos de nova tentativa, em ms. Curtos no começo, esparsos depois. */
 const RETENTATIVAS_MS = [0, 250, 600, 1200, 2500, 5000, 9000];
 
-export function observarVozes(aoMudar: (vozes: VozLocal[]) => void): () => void {
+export function observarVozes(
+  aoMudar: (vozes: VozLocal[]) => void,
+  /** Qual lista observar. O produto usa a filtrada; a tela de identificação, a completa. */
+  listar: () => VozLocal[] = vozesLocaisPt,
+): () => void {
   if (!sinteseDisponivel()) {
     aoMudar([]);
     return () => {};
@@ -198,7 +214,7 @@ export function observarVozes(aoMudar: (vozes: VozLocal[]) => void): () => void 
 
   let vivo = true;
   const avisar = () => {
-    if (vivo) aoMudar(vozesLocaisPt());
+    if (vivo) aoMudar(listar());
   };
 
   // A assinatura NÃO é removida depois do primeiro aviso: o evento dispara mais

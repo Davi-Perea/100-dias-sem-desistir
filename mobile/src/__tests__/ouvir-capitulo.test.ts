@@ -156,14 +156,29 @@ describe('a procura por vozes não desiste cedo', () => {
   });
 
   /**
-   * O diagnóstico temporário cumpriu o papel (confirmou que o conserto do ciclo
-   * de vida resolveu) e foi removido em 24/09/2026. Este teste existe para ele
-   * não voltar por descuido: era faixa de depuração, não tela de produto.
+   * A tela de identificação voltou em 24/09/2026: a regra de voz masculina virou
+   * filtro e escondeu o player no aparelho do fundador. Sem OUVIR não dá para
+   * saber qual voz é qual, porque a Web Speech API não informa o sexo.
+   *
+   * Ela relaxa o filtro de SEXO, e só ele.
    */
-  test('o diagnóstico temporário foi removido', () => {
+  test('a tela de identificação nasce desligada', () => {
+    expect(ler('config', 'features.ts')).toContain("process.env.EXPO_PUBLIC_DIAG_VOZ === 'true'");
+    expect(ler('ui', 'biblia', 'TesteDeVozes.tsx')).toContain('if (!DIAG_VOZ) return null;');
+    // A faixa antiga, essa sim, não voltou.
     expect(existsSync(join(SRC, 'ui', 'biblia', 'DiagnosticoVoz.tsx'))).toBe(false);
-    expect(ler('config', 'features.ts')).not.toContain('DIAG_VOZ');
-    expect(ler('app', 'biblia', '[livro]', '[capitulo].tsx')).not.toContain('DiagnosticoVoz');
+  });
+
+  test('a tela de identificação NÃO relaxa a regra de privacidade', () => {
+    // Só vozes locais, mesmo para testar: privacidade não tem exceção de depuração.
+    expect(ler('ui', 'biblia', 'TesteDeVozes.tsx')).toContain('vozesPtLocaisTodas');
+    expect(ler('reader', 'audio', 'vozPtBr.ts')).toContain('.filter((v) => PT.test(v.lang) && ehLocal(v))');
+  });
+
+  test('a tela de identificação não mexe no player', () => {
+    const diag = ler('ui', 'biblia', 'TesteDeVozes.tsx');
+    expect(diag).not.toContain('MiniPlayer');
+    expect(diag).not.toContain('useOuvirCapitulo');
   });
 });
 
@@ -292,9 +307,11 @@ describe('voz masculina', () => {
    * para a feminina quando não havia masculina. Ele inverteu — "se o áudio
    * aparecer, que seja voz masculina" vale mais que "que apareça".
    */
-  test('é FILTRO, não pontuação: só voz masculina entra na lista', () => {
+  test('é FILTRO, não pontuação: só voz masculina entra na lista do produto', () => {
     const fonte = ler('reader', 'audio', 'vozPtBr.ts');
-    expect(fonte).toContain("sexoDaVoz(v.name.toLowerCase()) === 'masculina'");
+    expect(fonte).toContain(
+      "vozesPtLocaisTodas().filter((v) => sexoDaVoz(v.nome.toLowerCase()) === 'masculina')",
+    );
     // O sexo não pontua mais: quem chega à nota já passou pelo filtro.
     expect(fonte).not.toContain("sexo === 'masculina') pontos");
   });

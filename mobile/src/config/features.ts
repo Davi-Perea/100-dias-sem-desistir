@@ -55,3 +55,15 @@ export const COMMUNITY_PHOTOS_ENABLED = false;
  * intercessão dos dias futuros.
  */
 export const FUTURE_DAYS_OPEN = true;
+
+/**
+ * Tela de identificação de vozes. TEMPORÁRIA e SÓ NO RASCUNHO.
+ *
+ * Criada em 24/09/2026: a regra de voz masculina virou filtro e o player sumiu
+ * do aparelho do fundador — nenhuma voz de lá foi reconhecida como masculina. A
+ * Web Speech API não informa o sexo da voz, então alguém precisa OUVIR e dizer.
+ *
+ * Nasce desligada: sem `EXPO_PUBLIC_DIAG_VOZ=true` o empacotador remove tudo.
+ * SAI do código quando a voz for identificada e classificada.
+ */
+export const DIAG_VOZ: boolean = process.env.EXPO_PUBLIC_DIAG_VOZ === 'true';
