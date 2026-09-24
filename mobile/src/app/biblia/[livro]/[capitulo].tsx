@@ -3,12 +3,14 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { AccessibilityInfo, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { useOuvirCapitulo } from '@/reader/audio/useOuvirCapitulo';
 import { getBibleProvider, type Passage } from '@/reader/provider';
 import { normalizeReaderFontSize, stepReaderFontSize } from '@/reader/readerFontSize';
 import { updateSettings, useSettings } from '@/settings/settingsStore';
 import { BackBar } from '@/ui/BackBar';
 import { AppText, Button, Cap, Screen, StateView } from '@/ui/components';
 import { ChapterText } from '@/ui/biblia/ChapterText';
+import { MiniPlayer } from '@/ui/biblia/MiniPlayer';
 import { PlaceholderNotice } from '@/ui/biblia/PlaceholderNotice';
 import { TextSizeButton } from '@/ui/biblia/TextSizeButton';
 import {
@@ -93,6 +95,19 @@ export default function BibleChapterScreen() {
     announcedRef.current = label;
   }, [reference]);
 
+  const fresh = result?.key === loadKey ? result : null;
+  const passage = fresh?.passage ?? null;
+  const failed = fresh?.error === true;
+
+  /*
+   * O texto que a voz recebe. Calculado ANTES do return antecipado abaixo: hook
+   * não pode ficar atrás de um `return`, e `useOuvirCapitulo` é um hook.
+   *
+   * Só o texto dos versículos entra. Nada escrito pela pessoa.
+   */
+  const versiculosFalados = useMemo(() => passage?.verses.map((v) => v.text) ?? [], [passage]);
+  const leitura = useOuvirCapitulo(versiculosFalados, positionKey);
+
   if (!position || !resolved) {
     return (
       <Screen>
@@ -108,9 +123,6 @@ export default function BibleChapterScreen() {
     );
   }
 
-  const fresh = result?.key === loadKey ? result : null;
-  const passage = fresh?.passage ?? null;
-  const failed = fresh?.error === true;
   const fontSize = normalizeReaderFontSize(settings?.readerFontSize);
   const label = chapterLabel(position);
   const previous = previousChapter(position);
@@ -129,6 +141,14 @@ export default function BibleChapterScreen() {
     ? { title: 'Próximo capítulo', icon: 'chevron-right', onPress: () => goTo(next), testID: 'bible-next' }
     : // Apocalipse 22: não há próximo; volta à lista de livros.
       { title: 'Voltar aos livros', onPress: () => router.navigate('/biblia' as Href), testID: 'bible-next' };
+
+  /*
+   * Leitura em voz alta, em QUALQUER capítulo. `ouvir` é null — e o rodapé
+   * normal do leitor fica — quando o aparelho não tem voz local em português.
+   * Nesse caso a tela é exatamente a de antes: sem botão morto, sem aviso
+   * técnico, sem nada faltando.
+   */
+  const ouvir = leitura.estado !== 'indisponivel' && leitura.estado !== 'carregando' ? leitura : null;
 
   return (
     <Screen edges={['top', 'left', 'right']}>
@@ -197,13 +217,46 @@ export default function BibleChapterScreen() {
         )}
       </ScrollView>
 
-      <ReaderFooter
-        primary={primary}
-        isFirstChapter={previous === null}
-        onPrevious={() => previous && goTo(previous)}
-        bottomPadding={Math.max(40, insets.bottom)}
-        onHeight={setFooterHeight}
-      />
+      {/*
+        Com a leitura em voz alta ligada, o mini-player SUBSTITUI o rodapé em vez
+        de empilhar: o rodapé daqui é só "capítulo anterior / próximo capítulo",
+        que é exatamente o que ⏮ e ⏭ fazem. Duas barras dariam dois jeitos de
+        fazer a mesma coisa e roubariam metade da tela de leitura.
+
+        O leitor do dia (/reader/[day]) não é tocado: lá o rodapé tem "Concluir
+        leitura" e "Prefiro ler na minha Bíblia", que não têm equivalente aqui.
+      */}
+      {ouvir ? (
+        <View
+          onLayout={(e) => setFooterHeight(Math.round(e.nativeEvent.layout.height))}
+          style={{ position: 'absolute', left: 0, right: 0, bottom: 0 }}
+        >
+          <MiniPlayer
+            recuoInferior={insets.bottom}
+            capitulo={chapterLabel(position)}
+            tocando={ouvir.estado === 'tocando'}
+            velocidade={ouvir.velocidade}
+            onVelocidade={ouvir.escolherVelocidade}
+            onTocarOuPausar={() => {
+              if (ouvir.estado === 'tocando') ouvir.pausar();
+              else if (ouvir.estado === 'pausado') ouvir.continuar();
+              else ouvir.tocar();
+            }}
+            onAnterior={() => previous && goTo(previous)}
+            onProximo={() => next && goTo(next)}
+            temAnterior={previous !== null}
+            temProximo={next !== null}
+          />
+        </View>
+      ) : (
+        <ReaderFooter
+          primary={primary}
+          isFirstChapter={previous === null}
+          onPrevious={() => previous && goTo(previous)}
+          bottomPadding={Math.max(40, insets.bottom)}
+          onHeight={setFooterHeight}
+        />
+      )}
 
       <TextSizeSheet visible={sizeSheet} onClose={() => setSizeSheet(false)} size={fontSize} onStep={stepFont} />
     </Screen>

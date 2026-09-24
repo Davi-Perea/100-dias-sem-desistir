@@ -29,6 +29,13 @@ export type IconName =
   | 'share'
   | 'flag-finish'
   | 'alert'
+  // Leitura em voz alta. PREENCHIDOS, ao contrário do resto do conjunto: num
+  // player o ícone é pequeno e precisa ser reconhecido de relance; o triângulo
+  // vazado de "play" some no tamanho em que ele aparece.
+  | 'play'
+  | 'pause'
+  | 'skip-back'
+  | 'skip-forward'
   // Barra de navegação do redesenho (TOKENS §5, "Ícones").
   | 'journey'
   | 'community'
@@ -171,6 +178,26 @@ export function Icon({ name, size = 22, color, strokeWidth = 2, cutout = 'transp
         <G>
           <Rect x={4.6} y={10.2} width={14.8} height={10.2} rx={2.4} {...common} strokeWidth={2.5} />
           <Path d="M8.2 10.2V7.6a3.8 3.8 0 0 1 7.6 0v2.6" {...common} strokeWidth={2.5} />
+        </G>
+      ) : null}
+      {/* Preenchidos e sem traço: ver o comentário em IconName. */}
+      {name === 'play' ? <Path d="M8 5.2v13.6L19 12z" fill={color} stroke="none" /> : null}
+      {name === 'pause' ? (
+        <G>
+          <Rect x={7} y={5.2} width={3.6} height={13.6} rx={1.1} fill={color} stroke="none" />
+          <Rect x={13.4} y={5.2} width={3.6} height={13.6} rx={1.1} fill={color} stroke="none" />
+        </G>
+      ) : null}
+      {name === 'skip-back' ? (
+        <G>
+          <Rect x={5.6} y={5.6} width={2.6} height={12.8} rx={1} fill={color} stroke="none" />
+          <Path d="M19 5.6v12.8L9.4 12z" fill={color} stroke="none" />
+        </G>
+      ) : null}
+      {name === 'skip-forward' ? (
+        <G>
+          <Path d="M5 5.6v12.8L14.6 12z" fill={color} stroke="none" />
+          <Rect x={15.8} y={5.6} width={2.6} height={12.8} rx={1} fill={color} stroke="none" />
         </G>
       ) : null}
       {name === 'check' ? <Polyline points="4.5,12.4 9.6,17.5 19.5,7" {...common} /> : null}

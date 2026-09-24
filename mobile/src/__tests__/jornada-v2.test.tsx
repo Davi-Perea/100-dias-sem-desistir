@@ -9,7 +9,7 @@ import IntercessionScreen from '@/app/intercessao/[day]';
 import ReaderScreen from '@/app/reader/[day]';
 import { parseReference } from '@/bible/references';
 import { holdMilestones, isHoldingMilestones, releaseMilestones } from '@/journey/celebration';
-import { loadDataset, resetToDevFixtures } from '@/journey/datasetSource';
+import { getCampaign, loadDataset, resetToDevFixtures } from '@/journey/datasetSource';
 import { devDataset } from '@/journey/fixtures/devCampaign';
 import { loadKeyVerse } from '@/journey/keyVerse';
 import { calendarDateInCampaignTz, formatDayDate } from '@/journey/officialDay';
@@ -230,7 +230,11 @@ describe('J6 · chave única FUTURE_DAYS_OPEN', () => {
     await render(<JourneyHome />);
     await waitFor(() => expect(screen.getByTestId('journey-day-18')).toBeTruthy());
     expect(screen.queryByText('Em breve')).toBeNull();
-    const date = formatDayDate(18, devDataset().campaign);
+    // Da campanha que o app REALMENTE carregou, e não da fixture original:
+    // `loadCampaignOnDay` desloca a data de início para o dia 17 cair hoje, e
+    // `devDataset().campaign` continua com a data de origem. As duas coincidiam
+    // por acaso, e deixaram de coincidir na virada de 23 para 24/09/2026.
+    const date = formatDayDate(18, getCampaign());
     expect(screen.getByLabelText(new RegExp(`^Dia 18, .*Dia de ${date.replace(/\//g, '\\/')}\\.`))).toBeTruthy();
     await fireEvent.press(screen.getByTestId('journey-day-18'));
     expect(mockRouter.push).toHaveBeenCalledWith({ pathname: '/dia/[day]', params: { day: '18' } });
