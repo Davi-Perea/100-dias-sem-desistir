@@ -200,12 +200,18 @@ describe('a velocidade que a pessoa escolhe', () => {
     expect(VELOCIDADE_PADRAO).toBe('1x');
   });
 
-  test('quatro degraus, em torno da baseline', () => {
+  /**
+   * As taxas NÃO são proporcionais aos rótulos, e é medição. O motor comprime a
+   * faixa: pedir de 0,7 a 1,3 rendia só 1,22× de diferença real, e o fundador
+   * disse — com razão — que a velocidade "não muda mesmo" (24/09/2026).
+   */
+  test('os degraus são afastados o bastante para serem audíveis', () => {
     expect(VELOCIDADES.map((v) => v.rotulo)).toEqual(['0,75x', '1x', '1,25x', '1,5x']);
     const taxas = VELOCIDADES.map((v) => v.taxa);
-    // Crescentes, e a do meio é a baseline.
+    // Crescentes: a única garantia que vale em todo motor.
     expect([...taxas].sort((a, b) => a - b)).toEqual(taxas);
-    expect(taxas).toEqual([0.7, 0.9, 1.1, 1.3]);
+    // E bem afastados: pelo menos 3× entre a ponta lenta e a rápida.
+    expect(taxas[taxas.length - 1] / taxas[0]).toBeGreaterThanOrEqual(3);
   });
 
   test('rótulo desconhecido volta ao padrão em vez de quebrar', () => {
@@ -221,14 +227,21 @@ describe('a velocidade que a pessoa escolhe', () => {
     expect(store).toContain('VELOCIDADES.some((v) => v.rotulo === r.audioVelocidade)');
   });
 
-  test('a troca vale no próximo trecho, sem reiniciar o capítulo', () => {
+  /**
+   * A troca recomeça o TRECHO em curso, não o capítulo. Antes ela só valia no
+   * trecho seguinte — uns 30 segundos depois —, e por isso parecia não funcionar.
+   */
+  test('a troca responde na hora, recomeçando só o trecho em curso', () => {
     const hook = ler('reader', 'audio', 'useOuvirCapitulo.ts');
-    // A taxa é lida na criação de CADA fala, de uma ref — nada de cancelar.
     expect(hook).toContain('fala.rate = taxaRef.current');
-    const escolher = hook.slice(hook.indexOf('const escolherVelocidade'), hook.indexOf('const escolherVelocidade') + 420);
+    const i = hook.indexOf('const escolherVelocidade');
+    const escolher = hook.slice(i, i + 700);
     expect(escolher).toContain('taxaRef.current = taxaDe(rotulo)');
-    expect(escolher).not.toContain('cancelar()');
-    expect(escolher).not.toContain('falarDe');
+    // Recomeça do índice ATUAL, e não do zero: o capítulo não reinicia.
+    expect(escolher).toContain('falarDe(indice.current)');
+    expect(escolher).not.toContain('falarDe(0)');
+    // E só se estiver tocando: parado ou pausado não começa a falar sozinho.
+    expect(escolher).toContain("estadoRef.current !== 'tocando'");
   });
 
   test('o player abre as opções sem modal', () => {

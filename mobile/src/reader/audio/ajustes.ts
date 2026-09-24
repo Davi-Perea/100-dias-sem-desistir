@@ -26,18 +26,33 @@ export const VELOCIDADE = 0.9;
  * "1x" virasse 1,0 do motor, quem nunca mexeu no controle passaria a ouvir mais
  * rápido do que ouvia, sem ter pedido nada.
  *
- * Os degraus são múltiplos da baseline, arredondados para números redondos:
- *   0,75x → 0,70   1x → 0,90   1,25x → 1,10   1,5x → 1,30
+ * AS TAXAS NÃO SÃO PROPORCIONAIS AOS RÓTULOS, e isso é medição, não descuido.
+ *
+ * A primeira versão usava 0,70 · 0,90 · 1,10 · 1,30 — proporcional e elegante no
+ * papel. O fundador testou e disse que a velocidade "não muda mesmo". Fui medir
+ * a mesma frase no motor (24/09/2026):
+ *
+ *   taxa 0,5 → 5487 ms    taxa 0,7 → 4434 ms
+ *   taxa 1,3 → 3637 ms    taxa 2,0 → 2972 ms
+ *
+ * O motor COMPRIME a faixa: pedir de 0,7 a 1,3 (86% a mais no papel) rende só
+ * 1,22× de diferença real. Quatro degraus dentro disso são imperceptíveis — ele
+ * estava certo.
+ *
+ * Então os pedidos se afastam, para os degraus voltarem a ser audíveis. Motores
+ * diferentes comprimem de formas diferentes, então os rótulos são aproximados
+ * por natureza: eles dizem "mais devagar" e "mais rápido", não uma razão exata.
+ * Ordem crescente é a única garantia que vale em todo aparelho.
  *
  * Só quatro. Uma lista maior é um menu; isto é um toque.
  */
 export type Velocidade = { rotulo: string; taxa: number };
 
 export const VELOCIDADES: readonly Velocidade[] = [
-  { rotulo: '0,75x', taxa: 0.7 },
+  { rotulo: '0,75x', taxa: 0.55 },
   { rotulo: '1x', taxa: VELOCIDADE },
-  { rotulo: '1,25x', taxa: 1.1 },
-  { rotulo: '1,5x', taxa: 1.3 },
+  { rotulo: '1,25x', taxa: 1.4 },
+  { rotulo: '1,5x', taxa: 1.95 },
 ];
 
 export const VELOCIDADE_PADRAO = '1x';

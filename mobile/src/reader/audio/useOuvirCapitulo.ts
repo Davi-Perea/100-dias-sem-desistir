@@ -98,6 +98,11 @@ export function useOuvirCapitulo(versiculos: readonly string[], chaveDoCapitulo:
    * nova valer no PRÓXIMO trecho sem reiniciar o capítulo.
    */
   const taxaRef = useRef(taxaDe(VELOCIDADE_PADRAO));
+  /**
+   * Espelho do estado. `escolherVelocidade` precisa saber se está tocando para
+   * decidir se recomeça o trecho, e ela é chamada de fora do render.
+   */
+  const estadoRef = useRef(estado);
 
   /* ------------------------------------------------------------ as vozes */
 
@@ -152,6 +157,10 @@ export function useOuvirCapitulo(versiculos: readonly string[], chaveDoCapitulo:
     vozRef.current = vozEscolhida?.voz ?? null;
   }, [vozEscolhida]);
 
+  useEffect(() => {
+    estadoRef.current = estado;
+  }, [estado]);
+
   /*
    * VELOCIDADE. Vem das preferências gravadas, então atravessa recarga e vale em
    * todo capítulo. A ref é atualizada na hora: a fala que já está no ar termina
@@ -162,13 +171,6 @@ export function useOuvirCapitulo(versiculos: readonly string[], chaveDoCapitulo:
   useEffect(() => {
     taxaRef.current = taxaDe(velocidade);
   }, [velocidade]);
-
-  const escolherVelocidade = useCallback((rotulo: string) => {
-    // A ref muda já; o disco é consequência. Se a gravação falhar, a leitura em
-    // curso continua na velocidade certa e só a memória entre sessões se perde.
-    taxaRef.current = taxaDe(rotulo);
-    void updateSettings((s) => ({ ...s, audioVelocidade: rotulo })).catch(() => undefined);
-  }, []);
 
   /* -------------------------------------------------------------- falar */
 
@@ -241,6 +243,32 @@ export function useOuvirCapitulo(versiculos: readonly string[], chaveDoCapitulo:
       dizer(inicio);
     },
     [],
+  );
+
+  /**
+   * Trocar a velocidade RECOMEÇA O TRECHO EM CURSO, na taxa nova.
+   *
+   * A primeira versão só aplicava no trecho seguinte. Como cada trecho tem ~320
+   * caracteres (uns 30 segundos), a pessoa tocava em "1,5x" e não ouvia nada
+   * mudar por meia mina — e concluía, com razão, que o controle não funcionava
+   * (relato do fundador, 24/09/2026).
+   *
+   * Recomeçar o TRECHO não é recomeçar o capítulo: perde-se no máximo o que já
+   * foi falado do parágrafo atual, e o comando responde na hora. Parado ou
+   * pausado, só guarda a taxa — não começa a falar sozinho.
+   */
+  const escolherVelocidade = useCallback(
+    (rotulo: string) => {
+      taxaRef.current = taxaDe(rotulo);
+      // O disco é consequência: se a gravação falhar, a leitura em curso já está
+      // na velocidade certa e só a memória entre sessões se perde.
+      void updateSettings((s) => ({ ...s, audioVelocidade: rotulo })).catch(() => undefined);
+      if (estadoRef.current !== 'tocando') return;
+      cancelar();
+      // Um tique de folga: cancel() e speak() no mesmo tique se atropelam no Chrome.
+      setTimeout(() => falarDe(indice.current), 0);
+    },
+    [cancelar, falarDe],
   );
 
   /* ------------------------------------------------------------ comandos */
