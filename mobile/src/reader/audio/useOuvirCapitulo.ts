@@ -49,10 +49,12 @@ export type Leitura = {
   estado: EstadoDaLeitura;
   /** Versículo (base 0) em que a leitura está. Derivado do trecho em curso. */
   versiculoAtual: number;
-  /** Vozes locais em português encontradas neste aparelho, da melhor para a pior. */
-  vozes: VozLocal[];
+  /**
+   * A voz em uso. SÓ DE LEITURA: não existe seletor de voz, por decisão do
+   * fundador (24/09/2026). Quem escolhe é a pontuação em `vozPtBr.ts`, e o app
+   * não oferece a troca a ninguém.
+   */
   vozEscolhida: VozLocal | null;
-  escolherVoz: (nome: string) => void;
   /** Rótulo da velocidade em uso ("1x"). */
   velocidade: string;
   escolherVelocidade: (rotulo: string) => void;
@@ -65,7 +67,6 @@ export type Leitura = {
 export function useOuvirCapitulo(versiculos: readonly string[], chaveDoCapitulo: string): Leitura {
   const [estado, setEstado] = useState<EstadoDaLeitura>(sinteseDisponivel() ? 'carregando' : 'indisponivel');
   const [vozes, setVozes] = useState<VozLocal[]>([]);
-  const [nomeEscolhido, setNomeEscolhido] = useState<string | null>(null);
   const [versiculoAtual, setVersiculoAtual] = useState(0);
   const settings = useSettings();
 
@@ -138,7 +139,9 @@ export function useOuvirCapitulo(versiculos: readonly string[], chaveDoCapitulo:
     };
   }, []);
 
-  const vozEscolhida = vozes.find((v) => v.nome === nomeEscolhido) ?? vozes[0] ?? null;
+  // A primeira da lista, que já vem ordenada pela pontuação: idioma, depois
+  // sexo, depois camada de qualidade. Não há escolha manual a considerar.
+  const vozEscolhida = vozes[0] ?? null;
 
   /**
    * As duas refs acompanham o que veio por props/estado. Ficam em efeito, e não
@@ -321,24 +324,10 @@ export function useOuvirCapitulo(versiculos: readonly string[], chaveDoCapitulo:
     };
   }, [chaveDoCapitulo]);
 
-  const escolherVoz = useCallback(
-    (nome: string) => {
-      // Trocar de voz no meio da leitura interrompe: o motor é outro.
-      cancelar();
-      indice.current = 0;
-      setVersiculoAtual(0);
-      setNomeEscolhido(nome);
-      setEstado((atual) => (atual === 'indisponivel' || atual === 'carregando' ? atual : 'parado'));
-    },
-    [cancelar],
-  );
-
   return {
     estado,
     versiculoAtual,
-    vozes,
     vozEscolhida,
-    escolherVoz,
     velocidade,
     escolherVelocidade,
     tocar,

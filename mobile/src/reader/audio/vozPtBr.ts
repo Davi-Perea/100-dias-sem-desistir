@@ -68,19 +68,70 @@ const PT_BR = /^pt(-|_)br$/i;
  */
 /**
  * Vozes que o fundador ouviu e aprovou na comparação de 23/09/2026.
- *
- * É DESEMPATE, não exigência. Valem 10 pontos: menos que qualquer camada de
- * qualidade (40, 30, 20). Num aparelho com voz neural em português, a neural
- * ganha — o gosto aprovado não trava o app numa voz pior só porque tem o nome
- * certo. Num aparelho sem nenhuma delas, a lista continua funcionando por
- * camada, como sempre.
+ * Desempate, nunca exigência: o app não depende de nenhuma delas existir.
  */
 const APROVADAS = /\bdaniel\b/;
 
+/**
+ * VOZ MASCULINA — decisão do fundador, 24/09/2026.
+ *
+ * Motivo dele, e é de produto: as vozes femininas disponíveis ficam
+ * inutilizáveis nas velocidades altas, e o app oferece até 2x. A masculina
+ * aguenta. Não havendo masculina, é melhor uma feminina do que recurso nenhum
+ * (a regra 3 do pedido) — por isso isto é PONTUAÇÃO, e não filtro.
+ *
+ * O PROBLEMA: a Web Speech API NÃO informa o sexo da voz. Não existe campo.
+ * Então só dá para ler os sinais que os sistemas realmente deixam no nome:
+ *
+ *  - Android/Chrome: os identificadores trazem "#male_1-local" / "#female_2-local".
+ *    É o sinal mais confiável que existe, e vem do próprio motor;
+ *  - as palavras "male"/"masculino" e "female"/"feminino", quando aparecem;
+ *  - por último, os nomes próprios que já vimos nestes aparelhos. Lista curta e
+ *    assumidamente incompleta: existe para não errar no que conhecemos, não
+ *    para cobrir o mundo.
+ *
+ * O que não se encaixa em nada disso fica DESCONHECIDO — e desconhecido vale
+ * mais que feminino conhecido, porque pode muito bem ser masculino. Chutar
+ * "feminino" por não saber tiraria vozes boas da disputa sem motivo.
+ */
+export type Sexo = 'masculina' | 'feminina' | 'desconhecida';
+
+export function sexoDaVoz(nome: string): Sexo {
+  // 1. O marcador do próprio motor (Android). Vem antes de qualquer nome.
+  if (/#male[_\d]/.test(nome)) return 'masculina';
+  if (/#female[_\d]/.test(nome)) return 'feminina';
+  // 2. A palavra, quando o sistema a escreve.
+  if (/\b(male|masculin[oa])\b/.test(nome)) return 'masculina';
+  if (/\b(female|feminin[oa])\b/.test(nome)) return 'feminina';
+  // 3. Nomes próprios já observados. Incompleto de propósito.
+  if (/\b(daniel|felipe|ricardo|joaquim|duarte|eddy)\b/.test(nome)) return 'masculina';
+  if (/\b(maria|luciana|joana|francisca|fernanda|catarina|ines|helena)\b/.test(nome)) return 'feminina';
+  return 'desconhecida';
+}
+
+/**
+ * Nota da voz. A ordem das parcelas É a ordem das prioridades:
+ *
+ *   idioma (100) > sexo (60) > camada de qualidade (40/30/20) > gosto (10)
+ *
+ * O sexo vale MAIS que a camada de propósito: uma masculina simples é melhor
+ * para este produto que uma feminina neural, porque é a que sobrevive ao 2x.
+ * Foi a decisão do fundador, e a pontuação tem de dizer a mesma coisa.
+ *
+ * Tier por MARCADOR, nunca por nome: "natural", "neural", "enhanced" e "premium"
+ * são como os sistemas rotulam a síntese nova, e "compact" é como a Apple marca
+ * a antiga e mais robótica. Assim a escolha funciona num aparelho que nunca vimos.
+ *
+ * pt-BR vale mais que pt-PT: o sotaque importa para quem vai ouvir.
+ */
 function pontuar(voz: SpeechSynthesisVoice): number {
   const nome = voz.name.toLowerCase();
   let pontos = 0;
   if (PT_BR.test(voz.lang)) pontos += 100;
+  const sexo = sexoDaVoz(nome);
+  if (sexo === 'masculina') pontos += 60;
+  // Desconhecida fica no meio: pode ser masculina, e não há por que descartá-la.
+  else if (sexo === 'desconhecida') pontos += 20;
   if (/neural|natural/.test(nome)) pontos += 40;
   if (/enhanced|premium|eloquence/.test(nome)) pontos += 30;
   if (/siri/.test(nome)) pontos += 20;

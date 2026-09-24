@@ -3,7 +3,7 @@ import { join } from 'node:path';
 
 import { ALTURA, taxaDe, VELOCIDADE, VELOCIDADE_PADRAO, VELOCIDADES } from '@/reader/audio/ajustes';
 import { agrupar, versiculoParaFala } from '@/reader/audio/textoParaFala';
-import { ehLocal, sinteseDisponivel } from '@/reader/audio/vozPtBr';
+import { ehLocal, sexoDaVoz, sinteseDisponivel } from '@/reader/audio/vozPtBr';
 
 /**
  * OUVIR A BÍBLIA — aprovado para produção em 23/09/2026.
@@ -69,15 +69,16 @@ describe('só voz local', () => {
   });
 
   /**
-   * Nenhuma voz é EXIGIDA pelo nome. Desde 23/09/2026 existe UMA preferência por
-   * nome (Daniel, que o fundador aprovou), e ela é só desempate — está provada
-   * em "a preferência de voz do fundador". O que continua proibido é o app
-   * depender de uma voz existir.
+   * Nomes próprios entram na NOTA (para reconhecer o sexo da voz e o gosto
+   * aprovado), nunca em descartar voz. O app não pode depender de uma voz
+   * específica existir.
    */
-  test('nenhuma outra voz é fixada pelo nome', () => {
-    const fonte = ler('reader', 'audio', 'vozPtBr.ts').toLowerCase();
-    for (const nome of ['luciana', 'joana', 'maria', 'francisca', 'fernanda', 'zira']) {
-      expect(fonte).not.toContain(nome);
+  test('nome de voz nunca é filtro, só pontuação', () => {
+    const fonte = ler('reader', 'audio', 'vozPtBr.ts');
+    // A lista é filtrada por idioma e por localService, e mais nada.
+    expect(fonte).toContain('.filter((v) => PT.test(v.lang) && ehLocal(v))');
+    for (const linha of fonte.split('\n').filter((l) => l.includes('.filter('))) {
+      expect(linha.toLowerCase()).not.toMatch(/daniel|maria|masculin/);
     }
   });
 
@@ -252,6 +253,73 @@ describe('a velocidade que a pessoa escolhe', () => {
     expect(player).toContain('mini-player-velocidades');
     expect(player).not.toContain('Modal');
     expect(player).not.toContain('Sheet');
+  });
+});
+
+describe('voz masculina', () => {
+  /**
+   * Decisão do fundador (24/09/2026): as vozes femininas ficam inutilizáveis nas
+   * velocidades altas, e o app vai até 2x.
+   *
+   * A Web Speech API NÃO informa o sexo da voz — não existe campo. Só dá para
+   * ler os sinais que os sistemas deixam no nome.
+   */
+  test('lê o marcador que o próprio motor do Android deixa', () => {
+    expect(sexoDaVoz('pt-br-x-afs#male_1-local')).toBe('masculina');
+    expect(sexoDaVoz('pt-br-x-afs#female_2-local')).toBe('feminina');
+  });
+
+  test('lê a palavra, quando o sistema a escreve', () => {
+    expect(sexoDaVoz('português (brasil) male')).toBe('masculina');
+    expect(sexoDaVoz('voz feminina brasileira')).toBe('feminina');
+  });
+
+  test('conhece os nomes próprios que já vimos', () => {
+    expect(sexoDaVoz('microsoft daniel - portuguese (brazil)')).toBe('masculina');
+    expect(sexoDaVoz('microsoft maria - portuguese (brazil)')).toBe('feminina');
+    expect(sexoDaVoz('luciana')).toBe('feminina');
+  });
+
+  /** Chutar "feminina" por não saber tiraria vozes boas da disputa sem motivo. */
+  test('o que não se reconhece fica DESCONHECIDO, não feminino', () => {
+    expect(sexoDaVoz('google português do brasil')).toBe('desconhecida');
+    expect(sexoDaVoz('voz 3')).toBe('desconhecida');
+  });
+
+  test('o sexo pesa MAIS que a camada de qualidade', () => {
+    // Uma masculina simples vence uma feminina neural: é a que sobrevive ao 2x.
+    const fonte = ler('reader', 'audio', 'vozPtBr.ts');
+    expect(fonte).toContain("sexo === 'masculina') pontos += 60");
+    expect(fonte).toContain('/neural|natural/.test(nome)) pontos += 40');
+  });
+
+  /**
+   * Regra 3 do pedido: sem masculina, é melhor uma feminina do que recurso
+   * nenhum. Por isso é pontuação e não filtro.
+   */
+  test('sem voz masculina, a feminina ainda é usada', () => {
+    const fonte = ler('reader', 'audio', 'vozPtBr.ts');
+    // Feminina não perde pontos nem é excluída: só não ganha o bônus.
+    expect(fonte).not.toContain("sexo === 'feminina') pontos -=");
+    expect(fonte).not.toContain("sexo !== 'feminina'");
+  });
+});
+
+describe('sem seletor de voz', () => {
+  test('o hook não expõe troca de voz', () => {
+    const hook = ler('reader', 'audio', 'useOuvirCapitulo.ts');
+    expect(hook).not.toContain('escolherVoz');
+    // Nem a lista, que só serviria para montar um seletor.
+    expect(hook).not.toContain('vozes: VozLocal[];');
+    expect(hook).toContain('const vozEscolhida = vozes[0] ?? null;');
+  });
+
+  test('o player não tem controle de voz nenhum', () => {
+    const player = ler('ui', 'biblia', 'MiniPlayer.tsx');
+    // O que importa é a API e os controles, não a palavra "voz" nos comentários.
+    expect(player).not.toContain('escolherVoz');
+    expect(player).not.toContain('vozes');
+    expect(player).not.toContain('onVoz');
   });
 });
 
