@@ -19,6 +19,7 @@ import { updateSettings, useSettings } from '@/settings/settingsStore';
 import { goBackOrHome } from '@/ui/BackBar';
 import { LockedDayScreen } from '@/ui/LockSheet';
 import { ChapterText } from '@/ui/biblia/ChapterText';
+import { DiagnosticoDeVozes } from '@/ui/biblia/DiagnosticoDeVozes';
 import { MiniPlayer } from '@/ui/biblia/MiniPlayer';
 import { AppText, Button, Cap, DevContentBanner, Screen, StateView } from '@/ui/components';
 import { ErrorState } from '@/ui/entrada/States';
@@ -395,6 +396,8 @@ export default function ReaderScreen() {
           }}
         >
           <DevContentBanner state={journey.contentState} compact />
+          {/* Temporário, só no rascunho (EXPO_PUBLIC_DIAG_VOZ). Sai depois. */}
+          <DiagnosticoDeVozes />
           <OwnBiblePlan
             reference={summary?.label ?? chapterLabel}
             detail={summary?.detail ?? null}
@@ -461,6 +464,8 @@ export default function ReaderScreen() {
             de capítulos do dia é material da igreja; enquanto ela não autorizar,
             a faixa compacta fica logo abaixo do cabeçalho. */}
         <DevContentBanner state={journey.contentState} compact />
+          {/* Temporário, só no rascunho (EXPO_PUBLIC_DIAG_VOZ). Sai depois. */}
+          <DiagnosticoDeVozes />
 
         {hasLicensedText ? (
           <>

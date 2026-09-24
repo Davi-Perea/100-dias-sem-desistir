@@ -238,12 +238,39 @@ describe('a procura por vozes não desiste cedo', () => {
    * não informa o sexo da voz e alguém precisava OUVIR). As duas cumpriram o
    * papel e saíram. Este teste existe para que a terceira não fique.
    */
-  test('nenhuma tela de depuração de voz sobrou no código', () => {
+  test('o diagnóstico de voz nasce desligado', () => {
+    // Sem a variável no ambiente do build, o empacotador tira tudo do bundle.
+    expect(ler('config', 'features.ts')).toContain("process.env.EXPO_PUBLIC_DIAG_VOZ === 'true'");
+    expect(ler('ui', 'biblia', 'DiagnosticoDeVozes.tsx')).toContain('if (!DIAG_VOZ) return null;');
+    // As duas gerações anteriores saíram e não voltaram.
     expect(existsSync(join(SRC, 'ui', 'biblia', 'TesteDeVozes.tsx'))).toBe(false);
     expect(existsSync(join(SRC, 'ui', 'biblia', 'DiagnosticoVoz.tsx'))).toBe(false);
-    // Nem a chave que a ligava, nem desligada.
-    expect(ler('config', 'features.ts')).not.toContain('EXPO_PUBLIC_DIAG_VOZ');
-    expect(ler('app', 'biblia', '[livro]', '[capitulo].tsx')).not.toContain('TesteDeVozes');
+  });
+
+  test('o diagnóstico fica onde o fundador está: no leitor do dia', () => {
+    // As duas versões anteriores viviam em /biblia. Ele usa /reader/<dia>.
+    expect(ler('app', 'reader', '[day].tsx')).toContain('<DiagnosticoDeVozes />');
+    expect(ler('app', 'biblia', '[livro]', '[capitulo].tsx')).not.toContain('DiagnosticoDeVozes');
+  });
+
+  test('o diagnóstico mostra tudo, mas só deixa FALAR voz local', () => {
+    const diag = ler('ui', 'biblia', 'DiagnosticoDeVozes.tsx');
+    // Lista também a voz de servidor: distinguir "não há voz" de "há, mas é
+    // remota" é metade do diagnóstico.
+    expect(diag).toContain('localService: ${v.local');
+    // E ela não fala. Guarda dupla: botão não desenhado + recusa na função.
+    expect(diag).toContain('if (!linha.local) return;');
+    expect(diag).toContain('{v.local ? (');
+  });
+
+  test('o diagnóstico não mexe no player nem no filtro do produto', () => {
+    const diag = ler('ui', 'biblia', 'DiagnosticoDeVozes.tsx');
+    expect(diag).not.toContain('MiniPlayer');
+    expect(diag).not.toContain('useOuvirCapitulo');
+    // O produto continua usando a lista filtrada por sexo.
+    expect(ler('reader', 'audio', 'vozPtBr.ts')).toContain(
+      "sexoDaVoz(v.nome.toLowerCase()) === 'masculina'",
+    );
   });
 
   test('a regra de privacidade continua no lugar sem ela', () => {

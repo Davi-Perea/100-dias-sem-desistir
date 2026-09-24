@@ -56,12 +56,18 @@ export const COMMUNITY_PHOTOS_ENABLED = false;
  */
 export const FUTURE_DAYS_OPEN = true;
 
-/*
- * NÃO existe aqui uma chave de diagnóstico de voz, e isso é de propósito.
+/**
+ * Diagnóstico de vozes. TEMPORÁRIO e SÓ NO RASCUNHO.
  *
- * Existiu uma (`DIAG_VOZ`, com uma tela que listava as vozes do aparelho para
- * alguém ouvir e identificar), em 24/09/2026. Cumpriu o papel e saiu antes de
- * ir à produção: ferramenta de depuração não fica de pé "por garantia" num app
- * que a igreja inteira vai abrir, nem desligada. Se a pergunta voltar, ela
- * volta — num rascunho, e sai de novo.
+ * A pergunta em aberto desde 24/09/2026: o app fala com voz masculina local, a
+ * Web Speech API NÃO informa o sexo da voz, e no aparelho do fundador nenhuma
+ * voz é reconhecida — então o player não aparece. Sem alguém OUVIR as vozes
+ * daquele aparelho, não há como classificar; e sem classificar, não há áudio.
+ *
+ * O produto não muda por causa disto: o diagnóstico só LISTA e deixa ouvir.
+ *
+ * Nasce desligado: sem `EXPO_PUBLIC_DIAG_VOZ=true` o empacotador tira tudo do
+ * bundle. Já saiu do código duas vezes (DiagnosticoVoz, TesteDeVozes) e sai de
+ * novo assim que a voz for identificada — não vai para a produção nem desligado.
  */
+export const DIAG_VOZ: boolean = process.env.EXPO_PUBLIC_DIAG_VOZ === 'true';
