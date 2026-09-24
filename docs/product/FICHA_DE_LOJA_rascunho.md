@@ -15,50 +15,61 @@
 
 ---
 
-## DECISÃO DO FUNDADOR — 2026-09-24 (identidade e descoberta)
+## DECISÃO DO FUNDADOR — 2026-09-24 (identidade e descoberta) — FECHADA
 
 Esta seção **prevalece** sobre as propostas de nome, subtítulo e palavras-chave do resto do documento.
-O que já está aplicado no código está em `mobile/store.config.json` (Apple) e em `mobile/public/index.html` (web).
+Todos os valores abaixo estão **decididos** — não há campo pendente aqui.
 
-| Campo | Valor decidido | Medida | Onde já está aplicado |
+| Campo | Valor final | Medida | Onde está aplicado |
 |---|---|---|---|
-| Nome (marca) | **100 Dias Sem Desistir** | 21 de 30 | `store.config.json`, título da web |
-| Identificação curta / subtítulo | **Jornada de leitura bíblica** | 26 de 30 | `store.config.json`, título da web |
-| Descrição curta | **Uma jornada de 100 dias para ler a Bíblia, fortalecer sua fé e caminhar em comunidade.** | 86 caracteres | `meta description` e `og:` da web |
-| Nome sob o ícone | **100 dias** (inalterado) | — | `app.config.ts`, `NAMES.production` |
-| Ícone | `assets/icone/icone-ios.png` — o "100" preto sobre amarelo que já existia | — | iOS, Android adaptativo, favicon e atalho da web |
+| Nome na loja (marca) | **100 Dias Sem Desistir** | 21 de 30 | `store.config.json`, título da web |
+| Nome sob o ícone, no celular | **100 dias** | — | `app.config.ts`, `NAMES.production` |
+| Subtítulo / identificação curta | **Jornada de leitura bíblica** | 26 de 30 | `store.config.json`, título da web |
+| Descrição da web | **Uma jornada de 100 dias para ler a Bíblia, fortalecer sua fé e caminhar em comunidade.** | 86 | `meta description` e `og:` |
+| Descrição curta — 1º envio iOS | **100 dias para ler a Bíblia, fortalecer sua fé e caminhar com a sua igreja.** | 73 | ver nota 1 |
+| Descrição curta — Google Play | **100 dias para ler a Bíblia, fortalecer sua fé e caminhar em comunidade.** | 71 de 80 | ver nota 2 |
+| Palavras-chave (Apple) | `biblia,devocional,fe,cristao,oracao,igreja,comunidade,crista,plano,intercessao,guia,diario,adoracao` | 99 de 100 bytes | `store.config.json` |
+| Ícone | `assets/icone/icone-ios.png` — o "100" preto sobre `#FFD100` que já existia | — | iOS, Android adaptativo, favicon, atalho e cartão de link da web |
 
-**A marca continua sendo "100 Dias Sem Desistir".** "Jornada de leitura bíblica" é identificação descritiva:
-existe para a pessoa entender o que o app é. Não é nome novo e não substitui a marca em lugar nenhum.
+**A marca é "100 Dias Sem Desistir".** "Jornada de leitura bíblica" é identificação descritiva: existe para a
+pessoa entender o que o app é. Não é nome novo e não substitui a marca em lugar nenhum.
 
-### Três coisas que NÃO couberam como vieram
+### Por que a descrição curta tem DUAS versões
 
-**1. Descrição curta da Google Play: 86 caracteres, e o limite são 80.**
+**Nota 1 — iOS, primeiro envio: "com a sua igreja".** "Caminhar em comunidade" descreve o Juntos, que está
+ligado na web mas **escondido no build de loja**. Descrever função ausente é reprovação pela regra 2.3.1
+(metadados precisos). "Com a sua igreja" descreve a campanha coletiva, que existe no build, sem prometer feed.
 
-O texto de 86 está na web, onde não há limite. Para a Play, a versão medida que preserva o sentido é
-`100 dias para ler a Bíblia, fortalecer sua fé e caminhar em comunidade.` (71). Sai só "Uma jornada de",
-que já está no subtítulo. **Pendente de decisão do fundador.**
+A App Store não tem campo de "descrição curta": esta frase é a linha de abertura / texto promocional. O
+`promoText` que já estava no `store.config.json` continua valendo — ele fala da campanha, não do Juntos.
+Quando o Juntos entrar num build de loja, esta linha pode voltar a terminar em "e caminhar em comunidade".
 
-**2. Palavras-chave da Apple: a lista pedida dá 118 bytes, e o limite são 100.**
+**Nota 2 — Google Play: "em comunidade".** Cabe em 71 de 80 caracteres. O Android sai depois do iPhone
+(meados de outubro), e a intenção é que o Juntos já esteja no build. **Reconferir na véspera do envio:** se
+o Juntos ainda estiver escondido, usar a versão "com a sua igreja", pelo mesmo motivo da nota 1.
 
-A Apple indexa nome + subtítulo + palavras-chave juntos, então repetir "jornada", "leitura", "bíblica" e
-"100 dias" — que já estão no nome e no subtítulo — gastaria bytes sem ganhar alcance. Aplicado (99 bytes,
-sem acento: é assim que a pessoa digita, e acento custa 2 bytes):
+### Palavras-chave: por que não são as dez que o fundador listou, ao pé da letra
 
-```
-biblia,devocional,fe,cristao,oracao,igreja,comunidade,crista,plano,intercessao,guia,diario,adoracao
-```
+A lista pedida (`Bíblia, leitura bíblica, devocional, 100 dias, fé, cristão, jornada bíblica, oração, igreja,
+comunidade cristã`) dá **118 bytes**, e o limite da Apple são **100**. Além disso a Apple indexa
+nome + subtítulo + palavras-chave juntos: repetir "jornada", "leitura", "bíblica" e "100 dias" gastaria bytes
+sem ganhar alcance. O campo aplicado tem os oito termos restantes do fundador mais cinco que já estavam aqui
+e couberam. Sem acento: é como a pessoa digita, e acento custa 2 bytes.
 
-Os oito primeiros são os termos do fundador. Os cinco últimos são os que já estavam aqui e couberam.
+---
 
-**3. "caminhar em comunidade" descreve o Juntos, que NÃO está no build de loja.**
+## Valores prontos para colar no Google Play Console
 
-Na web o Juntos está ligado e a frase é verdadeira. No primeiro envio à Apple a aba fica escondida, e
-descrever função que não existe é reprovação pela regra 2.3.1 (metadados precisos). **Enquanto o Juntos
-não entrar no build da loja, a descrição curta da loja não pode terminar em "e caminhar em comunidade".**
+Ainda **não existe** arquivo de metadados da Play no projeto (o `store.config.json` do Expo só cobre a Apple).
+Até existir, estes são os valores finais:
 
-Alternativa medida: `100 dias para ler a Bíblia, fortalecer sua fé e caminhar com a sua igreja.` (73).
-"Com a sua igreja" descreve a campanha coletiva, que existe no build, sem prometer feed.
+| Campo do Play Console | Limite | Valor |
+|---|---|---|
+| Nome do app | 30 | `100 Dias Sem Desistir` |
+| Descrição curta | 80 | `100 dias para ler a Bíblia, fortalecer sua fé e caminhar em comunidade.` |
+| Descrição completa | 4.000 | a mesma do `store.config.json` (`apple.info.pt-BR.description`), com os `[PREENCHER]` resolvidos |
+| Categoria | — | Livros e referências |
+| Ícone | 512×512 PNG | derivado de `assets/icone/icone-ios.png` — mesmo desenho, sem redesenhar |
 
 ---
 
