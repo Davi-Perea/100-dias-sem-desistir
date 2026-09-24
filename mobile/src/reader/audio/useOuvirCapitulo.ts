@@ -62,9 +62,29 @@ export type Leitura = {
   pausar: () => void;
   continuar: () => void;
   parar: () => void;
+  /**
+   * "Quando chegar texto novo, comece a falar sozinho."
+   *
+   * É o que faz a leitura atravessar capítulos: a tela troca o capítulo e avisa
+   * aqui; quando os versículos novos chegam do provedor, a fala recomeça do
+   * começo deles. Serve tanto para a continuação automática no fim do capítulo
+   * quanto para o ⏭ tocado no meio da leitura.
+   *
+   * Fica no motor, e não nas telas, para as duas se comportarem igual sem
+   * duplicar a lógica.
+   */
+  tocarAoTrocarDeTexto: () => void;
 };
 
-export function useOuvirCapitulo(versiculos: readonly string[], chaveDoCapitulo: string): Leitura {
+export function useOuvirCapitulo(
+  versiculos: readonly string[],
+  chaveDoCapitulo: string,
+  /**
+   * Chamado quando o capítulo TERMINA sozinho — nunca em parar, pausar ou trocar
+   * de capítulo. É a deixa para a tela decidir se há próximo capítulo e seguir.
+   */
+  aoTerminar?: () => void,
+): Leitura {
   const [estado, setEstado] = useState<EstadoDaLeitura>(sinteseDisponivel() ? 'carregando' : 'indisponivel');
   const [vozes, setVozes] = useState<VozLocal[]>([]);
   const [versiculoAtual, setVersiculoAtual] = useState(0);
@@ -104,6 +124,10 @@ export function useOuvirCapitulo(versiculos: readonly string[], chaveDoCapitulo:
    * decidir se recomeça o trecho, e ela é chamada de fora do render.
    */
   const estadoRef = useRef(estado);
+  /** Pedido de "toque quando chegar texto novo". Ver `tocarAoTrocarDeTexto`. */
+  const autoTocar = useRef(false);
+  /** A callback de fim de capítulo, espelhada: quem a dispara é uma fala antiga. */
+  const aoTerminarRef = useRef(aoTerminar);
 
   /* ------------------------------------------------------------ as vozes */
 
@@ -233,6 +257,9 @@ export function useOuvirCapitulo(versiculos: readonly string[], chaveDoCapitulo:
           indice.current = 0;
           setVersiculoAtual(0);
           setEstado('parado');
+          // Só aqui: o capítulo acabou de verdade. Parar, pausar e trocar de
+          // capítulo passam por `cancelar()`, que invalida esta corrida antes.
+          aoTerminarRef.current?.();
           return;
         }
         indice.current = proximo;
@@ -247,6 +274,27 @@ export function useOuvirCapitulo(versiculos: readonly string[], chaveDoCapitulo:
     },
     [],
   );
+
+  /**
+   * A CONTINUAÇÃO ENTRE CAPÍTULOS, e por que ela mora aqui.
+   *
+   * A tela troca o capítulo e o texto novo demora a chegar (o provedor lê do
+   * disco). Quem espera esse texto é este efeito: se alguém pediu a continuação,
+   * a fala recomeça do início do capítulo novo assim que ele existe.
+   *
+   * Está no motor porque as duas telas — /biblia e /reader — precisam do mesmo
+   * comportamento, e duplicar isso seria duplicar o áudio.
+   *
+   * O `setTimeout(0)` não é superstição: a limpeza que cala o capítulo anterior
+   * roda no mesmo tique, e `cancel()` seguido de `speak()` sem folga se atropela
+   * no Chrome (medido em 23/09/2026).
+   */
+  useEffect(() => {
+    if (!autoTocar.current || trechos.length === 0) return;
+    autoTocar.current = false;
+    const t = setTimeout(() => falarDe(0), 0);
+    return () => clearTimeout(t);
+  }, [trechos, falarDe]);
 
   /**
    * Trocar a velocidade RECOMEÇA O TRECHO EM CURSO, na taxa nova.
@@ -296,8 +344,15 @@ export function useOuvirCapitulo(versiculos: readonly string[], chaveDoCapitulo:
     setTimeout(() => falarDe(indice.current), 0);
   }, [cancelar, falarDe]);
 
+  const tocarAoTrocarDeTexto = useCallback(() => {
+    autoTocar.current = true;
+  }, []);
+
   const parar = useCallback(() => {
     cancelar();
+    // Parar vale mais que uma continuação pendente: se o texto novo chegar
+    // depois, ele chega calado.
+    autoTocar.current = false;
     indice.current = 0;
     setVersiculoAtual(0);
     setEstado((atual) => (atual === 'indisponivel' || atual === 'carregando' ? atual : 'parado'));
@@ -334,5 +389,6 @@ export function useOuvirCapitulo(versiculos: readonly string[], chaveDoCapitulo:
     pausar,
     continuar,
     parar,
+    tocarAoTrocarDeTexto,
   };
 }

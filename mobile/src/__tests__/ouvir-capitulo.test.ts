@@ -39,9 +39,84 @@ describe('o recurso vale em toda a Bíblia', () => {
     expect(tela).not.toMatch(/position.book === '[A-Z]{3}'/);
   });
 
-  test('o leitor do dia continua sem player', () => {
-    // Lá o rodapé tem "Concluir leitura", que não tem equivalente no player.
-    expect(ler('app', 'reader', '[day].tsx')).not.toContain('MiniPlayer');
+  test('o leitor do dia TEM o mesmo player', () => {
+    // Defeito real: o fundador abriu /reader/1, que é por onde a jornada passa
+    // todo dia, e não havia áudio nenhum (24/09/2026).
+    const tela = ler('app', 'reader', '[day].tsx');
+    expect(tela).toContain('MiniPlayer');
+    expect(tela).toContain('useOuvirCapitulo');
+  });
+
+  test('existe UM motor de áudio, e as duas telas chamam ele', () => {
+    const dia = ler('app', 'reader', '[day].tsx');
+    const biblia = ler('app', 'biblia', '[livro]', '[capitulo].tsx');
+    for (const tela of [dia, biblia]) {
+      expect(tela).toContain("from '@/reader/audio/useOuvirCapitulo'");
+      expect(tela).toContain("from '@/ui/biblia/MiniPlayer'");
+      // Nenhuma tela fala por conta própria: quem toca é só o motor.
+      expect(tela).not.toContain('SpeechSynthesisUtterance');
+      expect(tela).not.toContain('speechSynthesis');
+    }
+  });
+
+  test('lá o player EMPILHA com o rodapé em vez de substituí-lo', () => {
+    // "Concluir leitura" e "Prefiro ler na minha Bíblia" não têm equivalente no
+    // player: ligar o áudio não pode custar a conclusão do dia.
+    const tela = ler('app', 'reader', '[day].tsx');
+    expect(tela).toContain('<ReaderFooter');
+    expect(tela).toContain('bottom: footerHeight');
+    // E o fim do capítulo tem de passar dos dois.
+    expect(tela).toContain('+ playerHeight');
+  });
+
+  test('a fala atravessa os capítulos do dia, e para no último', () => {
+    const tela = ler('app', 'reader', '[day].tsx');
+    expect(tela).toContain('aoTerminarCapitulo');
+    expect(tela).toContain('if (proximo >= totalRef.current) return;');
+    expect(tela).toContain('tocarAoTrocarDeTexto()');
+    // O áudio nunca conclui o dia por conta própria.
+    const fim = tela.slice(tela.indexOf('const aoTerminarCapitulo'), tela.indexOf('const leitura ='));
+    expect(fim).not.toContain('setDayCompleted');
+    expect(fim).not.toContain('completeDay');
+  });
+
+  test('a continuação é decidida no motor, não copiada nas telas', () => {
+    const hook = ler('reader', 'audio', 'useOuvirCapitulo.ts');
+    // O fim natural do capítulo é o ÚNICO ponto que avisa a tela: parar, pausar e
+    // trocar de capítulo passam por cancelar(), que invalida a corrida antes.
+    expect(hook).toContain('aoTerminarRef.current?.()');
+    expect(hook).toContain('autoTocar.current = false');
+    const seguir = hook.slice(hook.indexOf('const seguir ='), hook.indexOf('indice.current = inicio'));
+    expect(seguir).toContain('if (!atual()) return;');
+  });
+
+  test('parar cancela uma continuação pendente', () => {
+    const hook = ler('reader', 'audio', 'useOuvirCapitulo.ts');
+    const parar = hook.slice(hook.indexOf('const parar ='), hook.indexOf('const parar =') + 400);
+    expect(parar).toContain('autoTocar.current = false');
+  });
+
+  test('⏮/⏭ e o rodapé andam pelo mesmo caminho', () => {
+    const tela = ler('app', 'reader', '[day].tsx');
+    // Um caminho só: senão o rodapé mudaria de capítulo calando a voz e o ⏭ não.
+    expect(tela).not.toContain('setChapterIndex((i) => Math.min');
+    expect(tela).not.toContain('setChapterIndex((i) => Math.max');
+    expect(tela).toContain('irParaCapitulo(chapterIndex + 1)');
+    expect(tela).toContain('irParaCapitulo(chapterIndex - 1)');
+  });
+
+  test('na aba Bíblia andar de capítulo também segue tocando', () => {
+    const biblia = ler('app', 'biblia', '[livro]', '[capitulo].tsx');
+    const goTo = biblia.slice(biblia.indexOf('const goTo ='), biblia.indexOf('const goTo =') + 320);
+    expect(goTo).toContain("leitura.estado === 'tocando'");
+    expect(goTo).toContain('tocarAoTrocarDeTexto()');
+  });
+
+  test('sem texto na tela, o player do dia não aparece', () => {
+    // Guia (sem tradução licenciada) e tela enxuta da própria Bíblia não têm
+    // versículo nenhum: um player ali seria um controle morto.
+    const tela = ler('app', 'reader', '[day].tsx');
+    expect(tela).toContain('hasLicensedText && passage && leitura.estado');
   });
 });
 
@@ -448,5 +523,20 @@ describe('o desenho da leitura', () => {
     expect(cancelar).toContain('geracao.current += 1');
     // Quem decide o estado é quem chamou (pausar, parar, tocar) — não o cancelar.
     expect(cancelar).not.toContain('setEstado');
+  });
+});
+
+describe('empilhar o player não cria dois botões com o mesmo nome', () => {
+  const ler2 = (...p: string[]) => readFileSync(join(__dirname, '..', ...p), 'utf8');
+
+  test('o ⏮/⏭ do player diz que é de ÁUDIO', () => {
+    // No leitor do dia o rodapé logo abaixo tem o seu próprio "Capítulo
+    // anterior". Dois botões com o mesmo nome deixam quem usa leitor de tela
+    // sem saber em qual está.
+    const player = ler2('ui', 'biblia', 'MiniPlayer.tsx');
+    expect(player).toContain('rotulo="Ouvir o capítulo anterior"');
+    expect(player).toContain('rotulo="Ouvir o próximo capítulo"');
+    expect(player).not.toContain('rotulo="Capítulo anterior"');
+    expect(player).not.toContain('rotulo="Próximo capítulo"');
   });
 });

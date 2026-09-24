@@ -129,8 +129,15 @@ export default function BibleChapterScreen() {
   const previous = previousChapter(position);
   const next = nextChapter(position);
 
-  const goTo = (target: BiblePosition) =>
+  /**
+   * Andar de capítulo. Se a voz estava tocando, ela SEGUE no capítulo novo — o
+   * mesmo comportamento do leitor do dia, porque é o mesmo motor decidindo.
+   * Calada, continua calada: mudar de capítulo não começa a falar sozinho.
+   */
+  const goTo = (target: BiblePosition) => {
+    if (leitura.estado === 'tocando') leitura.tocarAoTrocarDeTexto();
     router.setParams({ livro: target.book, capitulo: String(target.chapter) });
+  };
 
   // Se o disco recusar, o store não muda e o texto fica no tamanho salvo.
   const stepFont = (direction: 1 | -1) =>

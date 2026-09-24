@@ -190,7 +190,11 @@ export function MiniPlayer({
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xl }}>
         <Botao
           icone="skip-back"
-          rotulo="Capítulo anterior"
+          // "Ouvir o..." e não só "Capítulo anterior": no leitor do dia o rodapé
+          // ABAIXO deste player tem o seu próprio "Capítulo anterior", e dois
+          // botões com o mesmo nome deixam quem usa leitor de tela sem saber em
+          // qual está. O nome diz o que o botão faz AQUI: andar ouvindo.
+          rotulo="Ouvir o capítulo anterior"
           onPress={onAnterior}
           desabilitado={!temAnterior}
           testID="mini-player-anterior"
@@ -204,7 +208,7 @@ export function MiniPlayer({
         />
         <Botao
           icone="skip-forward"
-          rotulo="Próximo capítulo"
+          rotulo="Ouvir o próximo capítulo"
           onPress={onProximo}
           desabilitado={!temProximo}
           testID="mini-player-proximo"

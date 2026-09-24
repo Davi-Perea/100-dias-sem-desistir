@@ -1,6 +1,6 @@
 import * as Haptics from 'expo-haptics';
 import { router, useLocalSearchParams, type Href } from 'expo-router';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AccessibilityInfo, Platform, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -11,6 +11,7 @@ import { formatDayDate } from '@/journey/officialDay';
 import { readingSummary } from '@/journey/readingSummary';
 import { useJourney } from '@/journey/useJourney';
 import { isDayCompleted, setDayCompleted } from '@/progress/completionsStore';
+import { useOuvirCapitulo, type Leitura } from '@/reader/audio/useOuvirCapitulo';
 import { getBibleProvider, type Passage } from '@/reader/provider';
 import { normalizeReaderFontSize, stepReaderFontSize } from '@/reader/readerFontSize';
 import { loadReaderPosition, saveReaderPosition } from '@/reader/readerPosition';
@@ -18,6 +19,7 @@ import { updateSettings, useSettings } from '@/settings/settingsStore';
 import { goBackOrHome } from '@/ui/BackBar';
 import { LockedDayScreen } from '@/ui/LockSheet';
 import { ChapterText } from '@/ui/biblia/ChapterText';
+import { MiniPlayer } from '@/ui/biblia/MiniPlayer';
 import { AppText, Button, Cap, DevContentBanner, Screen, StateView } from '@/ui/components';
 import { ErrorState } from '@/ui/entrada/States';
 import { OwnBiblePlan } from '@/ui/leitor/OwnBiblePlan';
@@ -85,6 +87,8 @@ export default function ReaderScreen() {
    */
   const [barHeight, setBarHeight] = useState(0);
   const [footerHeight, setFooterHeight] = useState(0);
+  /** Altura do mini-player, que fica EM CIMA do rodapé. Medida pelo mesmo motivo. */
+  const [playerHeight, setPlayerHeight] = useState(0);
 
   const dayData = getDay(dayNumber);
   const unlocked = journey.isDayUnlocked(dayNumber);
@@ -211,6 +215,65 @@ export default function ReaderScreen() {
   const passage = fresh?.passage ?? null;
   const error = fresh?.error ?? (current && !reference ? new Error('Referência inválida.') : null);
 
+  /* -------------------------------------------- ouvir o capítulo (o MESMO motor)
+   *
+   * É literalmente o mesmo `useOuvirCapitulo` da aba Bíblia — mesma escolha de
+   * voz local masculina, mesmo agrupamento, mesma pausa, mesma velocidade
+   * gravada nas preferências. Não existe um segundo sistema de áudio no app, e
+   * é isto que garante que as duas telas soem igual.
+   *
+   * O QUE ENTRA NA FALA: só `passage.verses`, o texto bíblico que já está na
+   * tela. Nunca a reflexão do dia, a oração, o jejum, a anotação ou o nome de
+   * quem quer que seja.
+   *
+   * Os hooks ficam ACIMA de todos os `return` adiantados desta tela (dia
+   * trancado, dia sem leitura, preferências ainda no disco): a ordem dos hooks
+   * não pode depender de nada disso.
+   */
+  const versiculosFalados = useMemo(() => passage?.verses.map((v) => v.text) ?? [], [passage]);
+
+  /*
+   * A CONTINUAÇÃO ENTRE OS CAPÍTULOS DO DIA.
+   *
+   * Quem avisa que o capítulo terminou é a callback de uma fala já em curso: ela
+   * não enxerga o render atual. Daí os espelhos — sem eles, o dia 1 terminaria
+   * Gênesis 1 e tentaria avançar a partir de um índice velho.
+   */
+  const indiceRef = useRef(chapterIndex);
+  const totalRef = useRef(chapters.length);
+  const leituraRef = useRef<Leitura | null>(null);
+
+  const aoTerminarCapitulo = useCallback(() => {
+    const proximo = indiceRef.current + 1;
+    // Último capítulo do dia: a leitura acaba aqui. Concluir o dia continua
+    // sendo um gesto da pessoa — o áudio nunca marca nada como lido.
+    if (proximo >= totalRef.current) return;
+    leituraRef.current?.tocarAoTrocarDeTexto();
+    setChapterIndex(proximo);
+  }, []);
+
+  const leitura = useOuvirCapitulo(versiculosFalados, chapterKey, aoTerminarCapitulo);
+
+  useEffect(() => {
+    indiceRef.current = chapterIndex;
+    totalRef.current = chapters.length;
+    leituraRef.current = leitura;
+  });
+
+  /**
+   * Trocar de capítulo pelo ⏮/⏭ OU pelo rodapé. Se a voz estava tocando, ela
+   * segue no capítulo novo; se estava calada, continua calada. Um caminho só,
+   * para os dois controles não discordarem.
+   */
+  const irParaCapitulo = useCallback(
+    (destino: number) => {
+      if (destino < 0 || destino >= totalRef.current || destino === indiceRef.current) return;
+      if (leituraRef.current?.estado === 'tocando') leituraRef.current.tocarAoTrocarDeTexto();
+      setChapterIndex(destino);
+    },
+    [],
+  );
+
   // PER-02: se o disco recusar, o store não muda e o texto fica no tamanho salvo.
   const stepFont = (direction: 1 | -1) =>
     updateSettings((s) => ({ ...s, readerFontSize: stepReaderFontSize(s.readerFontSize, direction) })).catch(() => undefined);
@@ -240,6 +303,16 @@ export default function ReaderScreen() {
   const fontSize = normalizeReaderFontSize(settings?.readerFontSize);
   const isLastChapter = chapterIndex >= chapters.length - 1;
   const chapterLabel = `${current.bookName} ${current.chapter}`;
+
+  /**
+   * O player só existe quando há o que falar: texto licenciado na tela E uma voz
+   * masculina local neste aparelho. Sem qualquer uma das duas coisas, `ouvir` é
+   * null e a tela fica exatamente como sempre foi — nenhum controle morto.
+   */
+  const ouvir: Leitura | null =
+    hasLicensedText && passage && leitura.estado !== 'indisponivel' && leitura.estado !== 'carregando'
+      ? leitura
+      : null;
 
   const completeDay = async () => {
     setBusy(true);
@@ -274,7 +347,7 @@ export default function ReaderScreen() {
   const nextChapter: ReaderPrimary = {
     title: 'Próximo capítulo',
     icon: 'chevron-right',
-    onPress: () => setChapterIndex((i) => Math.min(chapters.length - 1, i + 1)),
+    onPress: () => irParaCapitulo(chapterIndex + 1),
     testID: 'reader-next',
   };
   // R1-7: com o dia concluído a releitura continua capítulo a capítulo, e
@@ -376,7 +449,8 @@ export default function ReaderScreen() {
         contentContainerStyle={{
           paddingHorizontal: READER_GUTTER,
           paddingTop: (barHeight || insets.top + MIN_TOUCH + 3) + spacing.xl,
-          paddingBottom: (footerHeight || insets.bottom + 180) + spacing.lg,
+          // O player fica ACIMA do rodapé: o fim do capítulo precisa passar dos dois.
+          paddingBottom: (footerHeight || insets.bottom + 180) + playerHeight + spacing.lg,
           gap: spacing.lg,
           width: '100%',
           maxWidth: MAX_CONTENT_WIDTH + READER_GUTTER * 2,
@@ -466,10 +540,43 @@ export default function ReaderScreen() {
         onHeight={setBarHeight}
       />
 
+      {/*
+        AQUI O PLAYER EMPILHA, e na aba Bíblia ele SUBSTITUI o rodapé. A diferença
+        não é de desenho, é do que cada rodapé faz: o da aba Bíblia só anda entre
+        capítulos — exatamente o que ⏮ e ⏭ fazem, então duas barras seriam dois
+        jeitos da mesma coisa. Este rodapé tem "Concluir leitura" e "Prefiro ler
+        na minha Bíblia", que o player não sabe fazer e que a pessoa não pode
+        perder por ter ligado o áudio.
+      */}
+      {ouvir ? (
+        <View
+          onLayout={(e) => setPlayerHeight(Math.round(e.nativeEvent.layout.height))}
+          style={{ position: 'absolute', left: 0, right: 0, bottom: footerHeight }}
+        >
+          <MiniPlayer
+            // Zero: quem encosta na borda do aparelho é o rodapé, logo abaixo.
+            recuoInferior={0}
+            capitulo={chapterLabel}
+            tocando={ouvir.estado === 'tocando'}
+            velocidade={ouvir.velocidade}
+            onVelocidade={ouvir.escolherVelocidade}
+            onTocarOuPausar={() => {
+              if (ouvir.estado === 'tocando') ouvir.pausar();
+              else if (ouvir.estado === 'pausado') ouvir.continuar();
+              else ouvir.tocar();
+            }}
+            onAnterior={() => irParaCapitulo(chapterIndex - 1)}
+            onProximo={() => irParaCapitulo(chapterIndex + 1)}
+            temAnterior={chapterIndex > 0}
+            temProximo={!isLastChapter}
+          />
+        </View>
+      ) : null}
+
       <ReaderFooter
         primary={primary}
         isFirstChapter={chapterIndex === 0}
-        onPrevious={() => setChapterIndex((i) => Math.max(0, i - 1))}
+        onPrevious={() => irParaCapitulo(chapterIndex - 1)}
         ownBible={done || !hasLicensedText ? undefined : readOwnBible}
         bottomPadding={Math.max(40, insets.bottom)}
         onHeight={setFooterHeight}
