@@ -1,51 +1,47 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { POC_OUVIR_CAPITULO, POC_OUVIR_ENABLED, POC_OUVIR_LIVRO } from '@/config/features';
-import { ALTURA, VELOCIDADE } from '@/reader/audio/ajustes';
+import { ALTURA, taxaDe, VELOCIDADE, VELOCIDADE_PADRAO, VELOCIDADES } from '@/reader/audio/ajustes';
 import { agrupar, versiculoParaFala } from '@/reader/audio/textoParaFala';
 import { ehLocal, sinteseDisponivel } from '@/reader/audio/vozPtBr';
 
 /**
- * POC "Ouvir capítulo" (23/09/2026).
+ * OUVIR A BÍBLIA — aprovado para produção em 23/09/2026.
  *
- * O que estes testes defendem não é a funcionalidade — é o CERCO dela:
- * a POC não pode escapar para produção, e nenhuma voz remota pode receber texto
- * sem decisão consciente. O resto (a fala em si) só se prova em aparelho, e é o
- * que o fundador vai fazer.
+ * Estes testes defendem as três promessas que não podem quebrar sem alguém
+ * perceber: nenhuma voz remota recebe texto, nada além da Escritura é falado, e
+ * o desenho de narração que a comparação cega aprovou continua de pé.
+ *
+ * A qualidade da fala em si só se prova em aparelho — isso é do fundador.
  */
 
 const SRC = join(__dirname, '..');
 const ler = (...p: string[]) => readFileSync(join(SRC, ...p), 'utf8');
 
-describe('a POC não escapa para produção', () => {
-  test('nasce desligada: sem a variável de ambiente, não existe', () => {
-    // Nos testes (e no build de produção) EXPO_PUBLIC_POC_OUVIR não está definida.
-    expect(process.env.EXPO_PUBLIC_POC_OUVIR).not.toBe('true');
-    expect(POC_OUVIR_ENABLED).toBe(false);
-  });
-
-  test('a chave é comparação estrita com "true"', () => {
-    // Nada de valor "solto" ligando a POC por acidente (um "1", um "yes").
-    expect(ler('config', 'features.ts')).toContain("process.env.EXPO_PUBLIC_POC_OUVIR === 'true'");
-  });
-
-  test('o escopo é Gênesis 1, e está declarado como dado', () => {
-    expect(POC_OUVIR_LIVRO).toBe('GEN');
-    expect(POC_OUVIR_CAPITULO).toBe(1);
-  });
-
-  test('a tela exige a chave E o capítulo certo', () => {
+describe('o recurso vale em toda a Bíblia', () => {
+  test('nenhuma chave de POC sobrou', () => {
+    const features = ler('config', 'features.ts');
+    expect(features).not.toContain('POC_OUVIR');
     const tela = ler('app', 'biblia', '[livro]', '[capitulo].tsx');
-    expect(tela).toContain('POC_OUVIR_ENABLED &&');
-    expect(tela).toContain('POC_OUVIR_LIVRO');
-    expect(tela).toContain('POC_OUVIR_CAPITULO');
+    expect(tela).not.toContain('POC_OUVIR');
   });
 
-  test('nenhuma outra tela ganhou o botão', () => {
-    for (const tela of [['app', 'reader', '[day].tsx'], ['ui', 'biblia', 'ChapterText.tsx']]) {
-      expect(ler(...tela)).not.toContain('OuvirCapitulo');
-    }
+  test('o comparador de vozes do experimento não existe mais', () => {
+    // Exigência do fundador: "the experimental voice comparison UI must NOT ship".
+    expect(existsSync(join(SRC, 'ui', 'biblia', 'OuvirCapitulo.tsx'))).toBe(false);
+    // Sem o '<': 'useOuvirCapitulo' (o hook, legítimo) casaria também.
+    expect(ler('app', 'biblia', '[livro]', '[capitulo].tsx')).not.toContain('<OuvirCapitulo');
+  });
+
+  test('nenhum capítulo é privilegiado: o player só depende de haver voz', () => {
+    const tela = ler('app', 'biblia', '[livro]', '[capitulo].tsx');
+    expect(tela).toContain("const ouvir = leitura.estado !== 'indisponivel'");
+    expect(tela).not.toMatch(/position.book === '[A-Z]{3}'/);
+  });
+
+  test('o leitor do dia continua sem player', () => {
+    // Lá o rodapé tem "Concluir leitura", que não tem equivalente no player.
+    expect(ler('app', 'reader', '[day].tsx')).not.toContain('MiniPlayer');
   });
 });
 
@@ -72,12 +68,26 @@ describe('só voz local', () => {
     expect(fonte).not.toMatch(/name.*includes.*(Google|Microsoft|Apple)/);
   });
 
-  /** Nenhuma voz específica de aparelho fica escrita no código (pedido do fundador). */
-  test('nenhuma voz é fixada pelo nome', () => {
-    const fonte = ler('reader', 'audio', 'vozPtBr.ts');
-    for (const nome of ['Luciana', 'Joana', 'Maria', 'Daniel', 'Francisca', 'Fernanda']) {
+  /**
+   * Nenhuma voz é EXIGIDA pelo nome. Desde 23/09/2026 existe UMA preferência por
+   * nome (Daniel, que o fundador aprovou), e ela é só desempate — está provada
+   * em "a preferência de voz do fundador". O que continua proibido é o app
+   * depender de uma voz existir.
+   */
+  test('nenhuma outra voz é fixada pelo nome', () => {
+    const fonte = ler('reader', 'audio', 'vozPtBr.ts').toLowerCase();
+    for (const nome of ['luciana', 'joana', 'maria', 'francisca', 'fernanda', 'zira']) {
       expect(fonte).not.toContain(nome);
     }
+  });
+
+  test('a escolha funciona num aparelho sem nenhuma voz conhecida', () => {
+    const fonte = ler('reader', 'audio', 'vozPtBr.ts');
+    // A ordenação é por pontos, e a pontuação existe sem depender de nome algum:
+    // idioma, camada de qualidade e o padrão do sistema já ordenam sozinhos.
+    expect(fonte).toContain('PT_BR.test(voz.lang)) pontos += 100');
+    expect(fonte).toContain('voz.default) pontos += 5');
+    expect(fonte).toContain('.sort((a, b) => b.pontos - a.pontos');
   });
 
   test('a nota de qualidade usa marcadores de tier, que valem em qualquer aparelho', () => {
@@ -105,12 +115,15 @@ describe('só voz local', () => {
 });
 
 describe('só o texto da Bíblia é falado', () => {
-  test('o controle recebe string[] e nada mais', () => {
-    const controle = ler('ui', 'biblia', 'OuvirCapitulo.tsx');
-    expect(controle).toContain('versiculos: readonly string[]');
-    // Nada do que a pessoa escreve tem como chegar aqui.
-    for (const proibido of ['reflex', 'jejum', 'fasting', 'marks', 'anota', 'note']) {
-      expect(controle.toLowerCase()).not.toContain(proibido);
+  test('o motor recebe string[] de versículos e nada mais', () => {
+    const hook = ler('reader', 'audio', 'useOuvirCapitulo.ts');
+    expect(hook).toContain('versiculos: readonly string[]');
+  });
+
+  test('o player não conhece conteúdo do usuário', () => {
+    const player = ler('ui', 'biblia', 'MiniPlayer.tsx');
+    for (const proibido of ['reflex', 'jejum', 'fasting', 'marks', 'anota']) {
+      expect(player.toLowerCase()).not.toContain(proibido);
     }
   });
 
@@ -123,9 +136,68 @@ describe('só o texto da Bíblia é falado', () => {
 
   test('o motor da fala não importa nenhuma store de conteúdo do usuário', () => {
     const hook = ler('reader', 'audio', 'useOuvirCapitulo.ts');
-    for (const store of ['reflectionsStore', 'fastingStore', 'marksStore', 'completionsStore', 'settingsStore']) {
+    // settingsStore entra: é de lá que vem a velocidade escolhida. As outras,
+    // que guardam o que a pessoa ESCREVE, não têm o que fazer aqui.
+    for (const store of ['reflectionsStore', 'fastingStore', 'marksStore', 'completionsStore']) {
       expect(hook).not.toContain(store);
     }
+  });
+});
+
+describe('a velocidade que a pessoa escolhe', () => {
+  test('"1x" é a baseline do app, não 100% do motor', () => {
+    // Quem nunca tocou no controle não pode passar a ouvir mais rápido.
+    expect(taxaDe('1x')).toBe(VELOCIDADE);
+    expect(VELOCIDADE_PADRAO).toBe('1x');
+  });
+
+  test('quatro degraus, em torno da baseline', () => {
+    expect(VELOCIDADES.map((v) => v.rotulo)).toEqual(['0,75x', '1x', '1,25x', '1,5x']);
+    const taxas = VELOCIDADES.map((v) => v.taxa);
+    // Crescentes, e a do meio é a baseline.
+    expect([...taxas].sort((a, b) => a - b)).toEqual(taxas);
+    expect(taxas).toEqual([0.7, 0.9, 1.1, 1.3]);
+  });
+
+  test('rótulo desconhecido volta ao padrão em vez de quebrar', () => {
+    expect(taxaDe('9x')).toBe(VELOCIDADE);
+    expect(taxaDe('')).toBe(VELOCIDADE);
+  });
+
+  test('a escolha é guardada pelo RÓTULO, não pela taxa', () => {
+    // Guardar 1,10 congelaria a decisão de hoje; o rótulo acompanha a baseline.
+    const store = ler('settings', 'settingsStore.ts');
+    expect(store).toContain('audioVelocidade: string');
+    expect(store).toContain('audioVelocidade: VELOCIDADE_PADRAO');
+    expect(store).toContain('VELOCIDADES.some((v) => v.rotulo === r.audioVelocidade)');
+  });
+
+  test('a troca vale no próximo trecho, sem reiniciar o capítulo', () => {
+    const hook = ler('reader', 'audio', 'useOuvirCapitulo.ts');
+    // A taxa é lida na criação de CADA fala, de uma ref — nada de cancelar.
+    expect(hook).toContain('fala.rate = taxaRef.current');
+    const escolher = hook.slice(hook.indexOf('const escolherVelocidade'), hook.indexOf('const escolherVelocidade') + 420);
+    expect(escolher).toContain('taxaRef.current = taxaDe(rotulo)');
+    expect(escolher).not.toContain('cancelar()');
+    expect(escolher).not.toContain('falarDe');
+  });
+
+  test('o player abre as opções sem modal', () => {
+    const player = ler('ui', 'biblia', 'MiniPlayer.tsx');
+    expect(player).toContain('mini-player-velocidades');
+    expect(player).not.toContain('Modal');
+    expect(player).not.toContain('Sheet');
+  });
+});
+
+describe('a preferência de voz do fundador', () => {
+  test('Daniel é desempate, nunca exigência', () => {
+    const fonte = ler('reader', 'audio', 'vozPtBr.ts');
+    // Vale menos que qualquer camada de qualidade: 10 contra 40, 30 e 20.
+    expect(fonte).toContain('APROVADAS.test(nome)) pontos += 10');
+    expect(fonte).toContain('/neural|natural/.test(nome)) pontos += 40');
+    // E não é filtro: a lista de vozes nunca é restrita por nome.
+    expect(fonte).not.toContain('filter((v) => APROVADAS');
   });
 });
 
@@ -155,7 +227,7 @@ describe('o desenho da leitura', () => {
 
   test('velocidade e altura saem das constantes medidas', () => {
     const hook = ler('reader', 'audio', 'useOuvirCapitulo.ts');
-    expect(hook).toContain('fala.rate = VELOCIDADE');
+    expect(hook).toContain('fala.rate = taxaRef.current');
     expect(hook).toContain('fala.pitch = ALTURA');
     expect(VELOCIDADE).toBe(0.9);
     expect(ALTURA).toBe(1.0);

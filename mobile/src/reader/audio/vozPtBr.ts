@@ -66,6 +66,17 @@ const PT_BR = /^pt(-|_)br$/i;
  *
  * pt-BR vale mais que pt-PT: o sotaque importa para quem vai ouvir.
  */
+/**
+ * Vozes que o fundador ouviu e aprovou na comparação de 23/09/2026.
+ *
+ * É DESEMPATE, não exigência. Valem 10 pontos: menos que qualquer camada de
+ * qualidade (40, 30, 20). Num aparelho com voz neural em português, a neural
+ * ganha — o gosto aprovado não trava o app numa voz pior só porque tem o nome
+ * certo. Num aparelho sem nenhuma delas, a lista continua funcionando por
+ * camada, como sempre.
+ */
+const APROVADAS = /\bdaniel\b/;
+
 function pontuar(voz: SpeechSynthesisVoice): number {
   const nome = voz.name.toLowerCase();
   let pontos = 0;
@@ -73,6 +84,7 @@ function pontuar(voz: SpeechSynthesisVoice): number {
   if (/neural|natural/.test(nome)) pontos += 40;
   if (/enhanced|premium|eloquence/.test(nome)) pontos += 30;
   if (/siri/.test(nome)) pontos += 20;
+  if (APROVADAS.test(nome)) pontos += 10;
   if (voz.default) pontos += 5;
   // A Apple chama de "Compact" a voz antiga, baixada por padrão: funciona, mas
   // é a mais robótica das disponíveis. Fica por último entre as locais.

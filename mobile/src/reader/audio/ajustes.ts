@@ -19,6 +19,35 @@
 export const VELOCIDADE = 0.9;
 
 /**
+ * AS VELOCIDADES QUE A PESSOA ESCOLHE.
+ *
+ * O rótulo não é a taxa do motor, e isso é deliberado. "1x" quer dizer "a
+ * velocidade normal DESTE app", que é 0,90 — a que ficou boa na comparação. Se
+ * "1x" virasse 1,0 do motor, quem nunca mexeu no controle passaria a ouvir mais
+ * rápido do que ouvia, sem ter pedido nada.
+ *
+ * Os degraus são múltiplos da baseline, arredondados para números redondos:
+ *   0,75x → 0,70   1x → 0,90   1,25x → 1,10   1,5x → 1,30
+ *
+ * Só quatro. Uma lista maior é um menu; isto é um toque.
+ */
+export type Velocidade = { rotulo: string; taxa: number };
+
+export const VELOCIDADES: readonly Velocidade[] = [
+  { rotulo: '0,75x', taxa: 0.7 },
+  { rotulo: '1x', taxa: VELOCIDADE },
+  { rotulo: '1,25x', taxa: 1.1 },
+  { rotulo: '1,5x', taxa: 1.3 },
+];
+
+export const VELOCIDADE_PADRAO = '1x';
+
+/** A taxa de um rótulo. Rótulo desconhecido (preferência antiga) volta ao padrão. */
+export function taxaDe(rotulo: string): number {
+  return VELOCIDADES.find((v) => v.rotulo === rotulo)?.taxa ?? VELOCIDADE;
+}
+
+/**
  * Altura da voz: a padrão.
  *
  * As vozes locais de português são concatenativas, não neurais. Mexer no pitch

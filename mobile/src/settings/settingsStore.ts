@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { isGoalId, normalizeCustomGoal, type GoalId } from '@/config/goals';
 import { isDevBuild } from '@/journey/devBuild';
 import { createWriteQueue } from '@/progress/writeQueue';
+import { VELOCIDADE_PADRAO, VELOCIDADES } from '@/reader/audio/ajustes';
 import { READER_FONT_DEFAULT, normalizeReaderFontSize } from '@/reader/readerFontSize';
 
 /** Preferências e estado de onboarding. LOCAL-ONLY (spec §21). */
@@ -52,6 +53,14 @@ export type Settings = {
    */
   verseHintSeen: boolean;
   /**
+   * Velocidade escolhida para ouvir a Bíblia, pelo RÓTULO ("1x", "1,25x"…).
+   *
+   * Guardamos o rótulo, e não a taxa: se um dia a baseline mudar, quem escolheu
+   * "1,25x" continua ouvindo um quarto mais rápido que o normal do app, que é o
+   * que a pessoa quis dizer. Guardar 1,10 congelaria a decisão de hoje.
+   */
+  audioVelocidade: string;
+  /**
    * Ministério da pessoa, escolhido localmente entre os da escala. Serve para
    * destacar os dias do ministério e avisar na véspera. Não vai para servidor.
    */
@@ -85,6 +94,7 @@ export const DEFAULT_SETTINGS: Settings = {
   milestonesSeen: [],
   milestonesKept: [],
   verseHintSeen: false,
+  audioVelocidade: VELOCIDADE_PADRAO,
   ministry: null,
   altarReminder: false,
   profile: { name: null, goals: [], customGoal: null },
@@ -161,6 +171,10 @@ export function normalizeSettings(raw: unknown): Settings {
       ? r.milestonesKept.filter((day): day is number => typeof day === 'number' && Number.isInteger(day))
       : [],
     verseHintSeen: bool(r.verseHintSeen, d.verseHintSeen),
+    // Rótulo desconhecido (versão antiga, disco adulterado) volta ao padrão.
+    audioVelocidade: VELOCIDADES.some((v) => v.rotulo === r.audioVelocidade)
+      ? (r.audioVelocidade as string)
+      : d.audioVelocidade,
     ministry: typeof r.ministry === 'string' && r.ministry.length > 0 ? r.ministry : null,
     altarReminder: bool(r.altarReminder, d.altarReminder),
     profile: normalizeProfile(r.profile),

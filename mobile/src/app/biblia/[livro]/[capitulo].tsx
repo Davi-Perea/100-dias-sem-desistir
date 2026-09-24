@@ -3,7 +3,6 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { AccessibilityInfo, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { POC_OUVIR_CAPITULO, POC_OUVIR_ENABLED, POC_OUVIR_LIVRO, POC_OUVIR_VOZES } from '@/config/features';
 import { useOuvirCapitulo } from '@/reader/audio/useOuvirCapitulo';
 import { getBibleProvider, type Passage } from '@/reader/provider';
 import { normalizeReaderFontSize, stepReaderFontSize } from '@/reader/readerFontSize';
@@ -12,7 +11,6 @@ import { BackBar } from '@/ui/BackBar';
 import { AppText, Button, Cap, Screen, StateView } from '@/ui/components';
 import { ChapterText } from '@/ui/biblia/ChapterText';
 import { MiniPlayer } from '@/ui/biblia/MiniPlayer';
-import { OuvirCapitulo } from '@/ui/biblia/OuvirCapitulo';
 import { PlaceholderNotice } from '@/ui/biblia/PlaceholderNotice';
 import { TextSizeButton } from '@/ui/biblia/TextSizeButton';
 import {
@@ -145,14 +143,12 @@ export default function BibleChapterScreen() {
       { title: 'Voltar aos livros', onPress: () => router.navigate('/biblia' as Href), testID: 'bible-next' };
 
   /*
-   * Leitura em voz alta. `ouvir` é null — e o rodapé normal fica — quando a POC
-   * está desligada, quando o capítulo não é o do escopo, ou quando o aparelho
-   * não tem voz local em português. Nesses casos a tela é exatamente a de antes.
+   * Leitura em voz alta, em QUALQUER capítulo. `ouvir` é null — e o rodapé
+   * normal do leitor fica — quando o aparelho não tem voz local em português.
+   * Nesse caso a tela é exatamente a de antes: sem botão morto, sem aviso
+   * técnico, sem nada faltando.
    */
-  const noEscopoDaPoc =
-    POC_OUVIR_ENABLED && position.book === POC_OUVIR_LIVRO && position.chapter === POC_OUVIR_CAPITULO;
-  const ouvir =
-    noEscopoDaPoc && leitura.estado !== 'indisponivel' && leitura.estado !== 'carregando' ? leitura : null;
+  const ouvir = leitura.estado !== 'indisponivel' && leitura.estado !== 'carregando' ? leitura : null;
 
   return (
     <Screen edges={['top', 'left', 'right']}>
@@ -206,17 +202,6 @@ export default function BibleChapterScreen() {
           <StateView kind="loading" />
         ) : (
           <>
-            {/* Comparador de vozes: só no EXPERIMENTO, com a chave própria.
-                No produto o player não tem seletor de voz nenhum. */}
-            {ouvir && POC_OUVIR_VOZES ? (
-              <OuvirCapitulo
-                // SÓ o texto bíblico. Nada escrito pela pessoa chega aqui.
-                versiculos={versiculosFalados}
-                chaveDoCapitulo={positionKey}
-                total={passage.verses.length}
-              />
-            ) : null}
-
             <ChapterText
               verses={passage.verses}
               heading={passage.heading}
@@ -250,7 +235,8 @@ export default function BibleChapterScreen() {
             recuoInferior={insets.bottom}
             capitulo={chapterLabel(position)}
             tocando={ouvir.estado === 'tocando'}
-            velocidade="1x"
+            velocidade={ouvir.velocidade}
+            onVelocidade={ouvir.escolherVelocidade}
             onTocarOuPausar={() => {
               if (ouvir.estado === 'tocando') ouvir.pausar();
               else if (ouvir.estado === 'pausado') ouvir.continuar();

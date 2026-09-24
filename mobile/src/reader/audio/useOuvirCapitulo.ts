@@ -1,23 +1,29 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { ALTURA, ALVO_DE_CARACTERES, PAUSA_ENTRE_TRECHOS_MS, VELOCIDADE } from './ajustes';
+import { useSettings, updateSettings } from '@/settings/settingsStore';
+
+import { ALTURA, ALVO_DE_CARACTERES, PAUSA_ENTRE_TRECHOS_MS, taxaDe, VELOCIDADE_PADRAO } from './ajustes';
 import { agrupar, type Trecho } from './textoParaFala';
 import { aguardarVozes, sinteseDisponivel, type VozLocal } from './vozPtBr';
 
 /**
- * OUVIR O CAPÍTULO — prova de conceito (23/09/2026).
+ * OUVIR O CAPÍTULO (aprovado pelo fundador em 23/09/2026).
  *
- * Fala o texto da Bíblia Livre que JÁ está na tela, versículo por versículo, com
- * a voz do próprio aparelho. Nada é gerado, gravado, armazenado ou enviado.
+ * Fala o texto da Bíblia Livre que JÁ está na tela, com a voz do próprio
+ * aparelho. Nada é gerado, gravado, armazenado ou enviado: sem TTS pago, sem
+ * servidor de voz, sem uma letra saindo do celular.
  *
- * POR QUE VERSÍCULO A VERSÍCULO, e não o capítulo inteiro numa string:
+ * POR QUE EM GRUPOS, e não versículo a versículo nem o capítulo numa string:
  *
- *  1. `maxSpeechInputLength` existe: capítulo inteiro estoura em muitos motores;
- *  2. o Chrome interrompe falas longas por conta própria depois de alguns
- *     segundos. Frases curtas passam longe desse defeito;
- *  3. é o que dá o índice do versículo atual — sem timestamp nenhum. É ele que
- *     faz "Continuar" voltar ao lugar certo, e é o que um dia permitirá destacar
- *     o versículo que está sendo lido (fora do escopo desta POC).
+ *  1. `maxSpeechInputLength` existe: capítulo inteiro estoura em muitos motores,
+ *     e o Chrome ainda interrompe falas longas por conta própria;
+ *  2. versículo a versículo foi o primeiro desenho e soava picado. Medi: a borda
+ *     entre falas custa só ~98 ms, então o problema NÃO era silêncio — era o
+ *     reinício de entonação a cada fala, que faz um versículo de continuação
+ *     soar como afirmação encerrada;
+ *  3. grupos de ~320 caracteres (`agrupar`) deixam o motor carregar a entonação
+ *     pela oração inteira, e ainda dão o índice do versículo — sem timestamp
+ *     nenhum — para o "Continuar" voltar ao lugar certo.
  *
  * POR QUE "PAUSAR" É SEMPRE PARAR-E-LEMBRAR:
  *
@@ -25,12 +31,12 @@ import { aguardarVozes, sinteseDisponivel, type VozLocal } from './vozPtBr';
  * Chrome do Android são notoriamente inertes — chamar `pause()` e continuar
  * ouvindo a frase é o comportamento mais comum. Em vez de ramificar por
  * plataforma (e entregar um botão que funciona num celular e mente no outro),
- * a POC usa UM caminho só: pausar cancela a fala e guarda o índice; continuar
- * recomeça DAQUELE versículo.
+ * existe UM caminho só: pausar cancela a fala e guarda o índice; continuar
+ * recomeça DAQUELE grupo.
  *
- * O preço é honesto e pequeno: continuar repete o versículo em curso desde o
- * começo, em vez de retomar no meio da frase. O ganho é comportamento idêntico
- * em todo lugar — que foi o que o fundador pediu.
+ * O preço é honesto e pequeno: continuar repete o grupo em curso desde o começo,
+ * em vez de retomar no meio da frase. O ganho é comportamento idêntico em todo
+ * lugar — que foi o que o fundador pediu.
  *
  * O QUE NUNCA É FALADO: só entra aqui o texto bíblico que a tela recebeu. Nem
  * reflexão, nem jejum, nem anotação, nem marcação, nem nada escrito pela pessoa.
@@ -47,6 +53,9 @@ export type Leitura = {
   vozes: VozLocal[];
   vozEscolhida: VozLocal | null;
   escolherVoz: (nome: string) => void;
+  /** Rótulo da velocidade em uso ("1x"). */
+  velocidade: string;
+  escolherVelocidade: (rotulo: string) => void;
   tocar: () => void;
   pausar: () => void;
   continuar: () => void;
@@ -58,6 +67,7 @@ export function useOuvirCapitulo(versiculos: readonly string[], chaveDoCapitulo:
   const [vozes, setVozes] = useState<VozLocal[]>([]);
   const [nomeEscolhido, setNomeEscolhido] = useState<string | null>(null);
   const [versiculoAtual, setVersiculoAtual] = useState(0);
+  const settings = useSettings();
 
   /**
    * O índice também vive numa ref porque quem avança a leitura é a callback
@@ -82,6 +92,12 @@ export function useOuvirCapitulo(versiculos: readonly string[], chaveDoCapitulo:
   const geracao = useRef(0);
   const trechosRef = useRef<Trecho[]>([]);
   const vozRef = useRef<SpeechSynthesisVoice | null>(null);
+  /**
+   * A taxa fica numa ref porque quem cria a próxima fala é a callback `onend` da
+   * fala anterior: ela não enxerga o render atual. É isto que faz a velocidade
+   * nova valer no PRÓXIMO trecho sem reiniciar o capítulo.
+   */
+  const taxaRef = useRef(taxaDe(VELOCIDADE_PADRAO));
 
   /* ------------------------------------------------------------ as vozes */
 
@@ -120,6 +136,24 @@ export function useOuvirCapitulo(versiculos: readonly string[], chaveDoCapitulo:
     vozRef.current = vozEscolhida?.voz ?? null;
   }, [vozEscolhida]);
 
+  /*
+   * VELOCIDADE. Vem das preferências gravadas, então atravessa recarga e vale em
+   * todo capítulo. A ref é atualizada na hora: a fala que já está no ar termina
+   * na taxa antiga, e a próxima já sai na nova — que é exatamente "aplica no
+   * próximo trecho, sem reiniciar o capítulo".
+   */
+  const velocidade = settings?.audioVelocidade ?? VELOCIDADE_PADRAO;
+  useEffect(() => {
+    taxaRef.current = taxaDe(velocidade);
+  }, [velocidade]);
+
+  const escolherVelocidade = useCallback((rotulo: string) => {
+    // A ref muda já; o disco é consequência. Se a gravação falhar, a leitura em
+    // curso continua na velocidade certa e só a memória entre sessões se perde.
+    taxaRef.current = taxaDe(rotulo);
+    void updateSettings((s) => ({ ...s, audioVelocidade: rotulo })).catch(() => undefined);
+  }, []);
+
   /* -------------------------------------------------------------- falar */
 
   /** Cala a fala e aposenta tudo o que estava pendente. Não mexe no estado. */
@@ -157,7 +191,7 @@ export function useOuvirCapitulo(versiculos: readonly string[], chaveDoCapitulo:
         const fala = new SpeechSynthesisUtterance(trecho.texto);
         fala.voice = voz;
         fala.lang = voz.lang;
-        fala.rate = VELOCIDADE;
+        fala.rate = taxaRef.current;
         fala.pitch = ALTURA;
         // A pausa entre trechos é um tempo de espera nosso, e não um silêncio
         // no texto: o motor não respeita pontuação inventada para isso, e SSML
@@ -261,6 +295,8 @@ export function useOuvirCapitulo(versiculos: readonly string[], chaveDoCapitulo:
     vozes,
     vozEscolhida,
     escolherVoz,
+    velocidade,
+    escolherVelocidade,
     tocar,
     pausar,
     continuar,
