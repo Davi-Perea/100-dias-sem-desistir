@@ -32,19 +32,21 @@ export const VELOCIDADE = 0.9;
  * papel. O fundador testou e disse que a velocidade "não muda mesmo". Fui medir
  * a mesma frase no motor (24/09/2026):
  *
- *   taxa 0,5 → 5487 ms    taxa 0,7 → 4434 ms
- *   taxa 1,3 → 3637 ms    taxa 2,0 → 2972 ms
+ *   taxa 0,55 → 4889 ms    taxa 0,90 → ~4168 ms   taxa 1,95 → 3265 ms
+ *   taxa 2,50 → 2969 ms    taxa 3,00 → 2536 ms    taxa 4,00 → 2234 ms
  *
- * O motor COMPRIME a faixa: pedir de 0,7 a 1,3 (86% a mais no papel) rende só
- * 1,22× de diferença real. Quatro degraus dentro disso são imperceptíveis — ele
+ * O motor COMPRIME a faixa: a primeira versão pedia de 0,7 a 1,3 — 86% a mais no
+ * papel, 1,22× na prática. Quatro degraus dentro disso são imperceptíveis, e ele
  * estava certo.
  *
- * Então os pedidos se afastam, para os degraus voltarem a ser audíveis. Motores
- * diferentes comprimem de formas diferentes, então os rótulos são aproximados
- * por natureza: eles dizem "mais devagar" e "mais rápido", não uma razão exata.
- * Ordem crescente é a única garantia que vale em todo aparelho.
+ * Então os pedidos se afastam, na proporção que a curva medida exige para cada
+ * rótulo entregar mais ou menos o que promete. Motores comprimem de formas
+ * diferentes, então os rótulos são aproximados POR NATUREZA: dizem "mais
+ * devagar" e "mais rápido", não uma razão exata. Ordem crescente é a única
+ * garantia que vale em todo aparelho.
  *
- * Só quatro. Uma lista maior é um menu; isto é um toque.
+ * 1,75x e 2x entraram a pedido do fundador em 24/09/2026, depois de confirmar
+ * que a escala funcionava.
  */
 export type Velocidade = { rotulo: string; taxa: number };
 
@@ -53,6 +55,8 @@ export const VELOCIDADES: readonly Velocidade[] = [
   { rotulo: '1x', taxa: VELOCIDADE },
   { rotulo: '1,25x', taxa: 1.4 },
   { rotulo: '1,5x', taxa: 1.95 },
+  { rotulo: '1,75x', taxa: 3.0 },
+  { rotulo: '2x', taxa: 4.0 },
 ];
 
 export const VELOCIDADE_PADRAO = '1x';

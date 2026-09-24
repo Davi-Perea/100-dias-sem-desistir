@@ -206,12 +206,13 @@ describe('a velocidade que a pessoa escolhe', () => {
    * disse — com razão — que a velocidade "não muda mesmo" (24/09/2026).
    */
   test('os degraus são afastados o bastante para serem audíveis', () => {
-    expect(VELOCIDADES.map((v) => v.rotulo)).toEqual(['0,75x', '1x', '1,25x', '1,5x']);
+    expect(VELOCIDADES.map((v) => v.rotulo)).toEqual(['0,75x', '1x', '1,25x', '1,5x', '1,75x', '2x']);
     const taxas = VELOCIDADES.map((v) => v.taxa);
     // Crescentes: a única garantia que vale em todo motor.
     expect([...taxas].sort((a, b) => a - b)).toEqual(taxas);
-    // E bem afastados: pelo menos 3× entre a ponta lenta e a rápida.
-    expect(taxas[taxas.length - 1] / taxas[0]).toBeGreaterThanOrEqual(3);
+    // E bem afastados: pelo menos 5× entre a ponta lenta e a rápida, porque o
+    // motor come boa parte da diferença pedida.
+    expect(taxas[taxas.length - 1] / taxas[0]).toBeGreaterThanOrEqual(5);
   });
 
   test('rótulo desconhecido volta ao padrão em vez de quebrar', () => {

@@ -143,12 +143,15 @@ export function MiniPlayer({
         </Pressable>
       </View>
 
-      {/* Sem modal: quatro rótulos numa fileira, no próprio player. Um modal
-          para trocar velocidade seria mais tela do que decisão. */}
+      {/* Sem modal: os rótulos no próprio player. Um modal para trocar
+          velocidade seria mais tela do que decisão.
+
+          `flexWrap`: com seis opções, uma fileira só estoura a largura de um
+          celular estreito. Envolver é melhor que cortar ou rolar de lado. */}
       {abrindoVelocidade ? (
         <View
           accessibilityRole="radiogroup"
-          style={{ flexDirection: 'row', justifyContent: 'center', gap: spacing.xs }}
+          style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: spacing.xs }}
           testID="mini-player-velocidades"
         >
           {VELOCIDADES.map((v) => {
