@@ -69,17 +69,18 @@ describe('só voz local', () => {
   });
 
   /**
-   * Nomes próprios entram na NOTA (para reconhecer o sexo da voz e o gosto
-   * aprovado), nunca em descartar voz. O app não pode depender de uma voz
-   * específica existir.
+   * O filtro usa idioma, localService e SEXO — e o sexo vem de classificação por
+   * nome, porque a Web Speech API não tem esse campo. O que continua proibido é
+   * o app EXIGIR uma voz específica: Daniel é preferência na nota, não porta.
    */
-  test('nome de voz nunca é filtro, só pontuação', () => {
+  test('nenhuma voz específica é exigida para o recurso existir', () => {
     const fonte = ler('reader', 'audio', 'vozPtBr.ts');
-    // A lista é filtrada por idioma e por localService, e mais nada.
-    expect(fonte).toContain('.filter((v) => PT.test(v.lang) && ehLocal(v))');
     for (const linha of fonte.split('\n').filter((l) => l.includes('.filter('))) {
-      expect(linha.toLowerCase()).not.toMatch(/daniel|maria|masculin/);
+      expect(linha).not.toContain('APROVADAS');
+      expect(linha.toLowerCase()).not.toContain('daniel');
     }
+    // Daniel só soma pontos entre as vozes que já passaram pelo filtro.
+    expect(fonte).toContain('APROVADAS.test(nome)) pontos += 10');
   });
 
   test('a escolha funciona num aparelho sem nenhuma voz conhecida', () => {
@@ -286,11 +287,16 @@ describe('voz masculina', () => {
     expect(sexoDaVoz('voz 3')).toBe('desconhecida');
   });
 
-  test('o sexo pesa MAIS que a camada de qualidade', () => {
-    // Uma masculina simples vence uma feminina neural: é a que sobrevive ao 2x.
+  /**
+   * CORREÇÃO do fundador, no mesmo dia: a primeira versão pontuava o sexo e caía
+   * para a feminina quando não havia masculina. Ele inverteu — "se o áudio
+   * aparecer, que seja voz masculina" vale mais que "que apareça".
+   */
+  test('é FILTRO, não pontuação: só voz masculina entra na lista', () => {
     const fonte = ler('reader', 'audio', 'vozPtBr.ts');
-    expect(fonte).toContain("sexo === 'masculina') pontos += 60");
-    expect(fonte).toContain('/neural|natural/.test(nome)) pontos += 40');
+    expect(fonte).toContain("sexoDaVoz(v.name.toLowerCase()) === 'masculina'");
+    // O sexo não pontua mais: quem chega à nota já passou pelo filtro.
+    expect(fonte).not.toContain("sexo === 'masculina') pontos");
   });
 
   /**

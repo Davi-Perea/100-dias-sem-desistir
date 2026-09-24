@@ -73,12 +73,16 @@ const PT_BR = /^pt(-|_)br$/i;
 const APROVADAS = /\bdaniel\b/;
 
 /**
- * VOZ MASCULINA — decisão do fundador, 24/09/2026.
+ * VOZ MASCULINA, E SÓ ELA — decisão do fundador, 24/09/2026.
  *
  * Motivo dele, e é de produto: as vozes femininas disponíveis ficam
  * inutilizáveis nas velocidades altas, e o app oferece até 2x. A masculina
- * aguenta. Não havendo masculina, é melhor uma feminina do que recurso nenhum
- * (a regra 3 do pedido) — por isso isto é PONTUAÇÃO, e não filtro.
+ * aguenta.
+ *
+ * É FILTRO, e não preferência: sem voz masculina reconhecida, o app prefere NÃO
+ * TER ÁUDIO a ter um áudio inconsistente. A primeira versão desta regra caía
+ * para a feminina quando não havia masculina; o fundador corrigiu no mesmo dia.
+ * "Se o áudio aparecer, que seja voz masculina" vale mais que "que apareça".
  *
  * O PROBLEMA: a Web Speech API NÃO informa o sexo da voz. Não existe campo.
  * Então só dá para ler os sinais que os sistemas realmente deixam no nome:
@@ -90,9 +94,11 @@ const APROVADAS = /\bdaniel\b/;
  *    assumidamente incompleta: existe para não errar no que conhecemos, não
  *    para cobrir o mundo.
  *
- * O que não se encaixa em nada disso fica DESCONHECIDO — e desconhecido vale
- * mais que feminino conhecido, porque pode muito bem ser masculino. Chutar
- * "feminino" por não saber tiraria vozes boas da disputa sem motivo.
+ * O que não se encaixa em nada disso fica DESCONHECIDO, e desconhecido FICA DE
+ * FORA. Não se supõe masculino por não saber: uma voz genérica de Android pode
+ * ser feminina, e aí o app entregaria justamente o que a decisão evita. Voz
+ * genérica só entra depois de alguém identificá-la num aparelho de verdade e
+ * acrescentar o sinal aqui.
  */
 export type Sexo = 'masculina' | 'feminina' | 'desconhecida';
 
@@ -110,13 +116,13 @@ export function sexoDaVoz(nome: string): Sexo {
 }
 
 /**
- * Nota da voz. A ordem das parcelas É a ordem das prioridades:
+ * Nota da voz, entre as que JÁ passaram pelo filtro (local, português,
+ * masculina). A ordem das parcelas é a ordem das prioridades:
  *
- *   idioma (100) > sexo (60) > camada de qualidade (40/30/20) > gosto (10)
+ *   idioma (100) > camada de qualidade (40/30/20) > gosto aprovado (10)
  *
- * O sexo vale MAIS que a camada de propósito: uma masculina simples é melhor
- * para este produto que uma feminina neural, porque é a que sobrevive ao 2x.
- * Foi a decisão do fundador, e a pontuação tem de dizer a mesma coisa.
+ * O sexo não pontua aqui porque já não há o que decidir: o que chegou a esta
+ * função é masculino.
  *
  * Tier por MARCADOR, nunca por nome: "natural", "neural", "enhanced" e "premium"
  * são como os sistemas rotulam a síntese nova, e "compact" é como a Apple marca
@@ -128,10 +134,6 @@ function pontuar(voz: SpeechSynthesisVoice): number {
   const nome = voz.name.toLowerCase();
   let pontos = 0;
   if (PT_BR.test(voz.lang)) pontos += 100;
-  const sexo = sexoDaVoz(nome);
-  if (sexo === 'masculina') pontos += 60;
-  // Desconhecida fica no meio: pode ser masculina, e não há por que descartá-la.
-  else if (sexo === 'desconhecida') pontos += 20;
   if (/neural|natural/.test(nome)) pontos += 40;
   if (/enhanced|premium|eloquence/.test(nome)) pontos += 30;
   if (/siri/.test(nome)) pontos += 20;
@@ -144,10 +146,15 @@ function pontuar(voz: SpeechSynthesisVoice): number {
 }
 
 /**
- * As vozes em português que rodam NO APARELHO, da melhor para a pior.
+ * As vozes que este app aceita usar, da melhor para a pior. Três exigências, e
+ * todas as três são obrigatórias:
  *
- * Lista vazia significa uma coisa só, e é a que interessa: esta POC não pode
- * falar aqui.
+ *   1. em português;
+ *   2. que rodem NO APARELHO (privacidade: nada de texto indo para servidor);
+ *   3. reconhecidamente MASCULINAS (decisão do fundador, 24/09/2026).
+ *
+ * Lista vazia significa uma coisa só, e é a que interessa: o app não fala neste
+ * aparelho. O player não é desenhado e o leitor fica como sempre foi.
  */
 export function vozesLocaisPt(): VozLocal[] {
   if (!sinteseDisponivel()) return [];
@@ -158,12 +165,11 @@ export function vozesLocaisPt(): VozLocal[] {
     return [];
   }
   return todas
-    .filter((v) => PT.test(v.lang) && ehLocal(v))
+    .filter((v) => PT.test(v.lang) && ehLocal(v) && sexoDaVoz(v.name.toLowerCase()) === 'masculina')
     .map((voz) => ({ nome: voz.name, lang: voz.lang, voz, pontos: pontuar(voz) }))
     .sort((a, b) => b.pontos - a.pontos || a.nome.localeCompare(b.nome));
 }
 
-/**
 /**
  * OBSERVA a lista de vozes enquanto a tela viver, em vez de perguntar uma vez.
  *
@@ -213,15 +219,3 @@ export function observarVozes(aoMudar: (vozes: VozLocal[]) => void): () => void 
 /** Quanto tempo depois da abertura ainda é cedo para dizer "não há voz". */
 export const ESPERA_MAXIMA_MS = RETENTATIVAS_MS[RETENTATIVAS_MS.length - 1] + 1000;
 
-/** Diagnóstico da POC: o que este aparelho tem, local ou não. Só para o relatório. */
-export function diagnosticoDeVozes(): { total: number; pt: number; ptLocais: number; naoLocais: string[] } {
-  if (!sinteseDisponivel()) return { total: 0, pt: 0, ptLocais: 0, naoLocais: [] };
-  const todas = globalThis.speechSynthesis.getVoices() ?? [];
-  const pt = todas.filter((v) => PT.test(v.lang));
-  return {
-    total: todas.length,
-    pt: pt.length,
-    ptLocais: pt.filter(ehLocal).length,
-    naoLocais: pt.filter((v) => !ehLocal(v)).map((v) => `${v.name} (${v.lang})`),
-  };
-}
