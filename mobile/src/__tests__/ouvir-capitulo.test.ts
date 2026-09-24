@@ -153,13 +153,15 @@ describe('a procura por vozes não desiste cedo', () => {
     expect(hook).toContain("atual === 'carregando' || atual === 'indisponivel' ? 'parado' : atual");
   });
 
-  test('o diagnóstico é temporário e nasce desligado', () => {
-    expect(ler('config', 'features.ts')).toContain("process.env.EXPO_PUBLIC_DIAG_VOZ === 'true'");
-    const diag = ler('ui', 'biblia', 'DiagnosticoVoz.tsx');
-    expect(diag).toContain('if (!DIAG_VOZ');
-    // Só lê e mostra: não fala, não cancela, não escolhe.
-    expect(diag).not.toContain('speak(');
-    expect(diag).not.toContain('cancel()');
+  /**
+   * O diagnóstico temporário cumpriu o papel (confirmou que o conserto do ciclo
+   * de vida resolveu) e foi removido em 24/09/2026. Este teste existe para ele
+   * não voltar por descuido: era faixa de depuração, não tela de produto.
+   */
+  test('o diagnóstico temporário foi removido', () => {
+    expect(existsSync(join(SRC, 'ui', 'biblia', 'DiagnosticoVoz.tsx'))).toBe(false);
+    expect(ler('config', 'features.ts')).not.toContain('DIAG_VOZ');
+    expect(ler('app', 'biblia', '[livro]', '[capitulo].tsx')).not.toContain('DiagnosticoVoz');
   });
 });
 

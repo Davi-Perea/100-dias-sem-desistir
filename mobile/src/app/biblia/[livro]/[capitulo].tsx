@@ -10,7 +10,6 @@ import { updateSettings, useSettings } from '@/settings/settingsStore';
 import { BackBar } from '@/ui/BackBar';
 import { AppText, Button, Cap, Screen, StateView } from '@/ui/components';
 import { ChapterText } from '@/ui/biblia/ChapterText';
-import { DiagnosticoVoz } from '@/ui/biblia/DiagnosticoVoz';
 import { MiniPlayer } from '@/ui/biblia/MiniPlayer';
 import { PlaceholderNotice } from '@/ui/biblia/PlaceholderNotice';
 import { TextSizeButton } from '@/ui/biblia/TextSizeButton';
@@ -203,13 +202,6 @@ export default function BibleChapterScreen() {
           <StateView kind="loading" />
         ) : (
           <>
-            {/* Temporário, só no rascunho (EXPO_PUBLIC_DIAG_VOZ). Sai depois. */}
-            <DiagnosticoVoz
-              estado={leitura.estado}
-              vozEscolhida={leitura.vozEscolhida?.nome ?? null}
-              playerVisivel={ouvir !== null}
-            />
-
             <ChapterText
               verses={passage.verses}
               heading={passage.heading}

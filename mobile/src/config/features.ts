@@ -55,15 +55,3 @@ export const COMMUNITY_PHOTOS_ENABLED = false;
  * intercessão dos dias futuros.
  */
 export const FUTURE_DAYS_OPEN = true;
-
-/**
- * Diagnóstico de voz na tela. TEMPORÁRIO e SÓ NO RASCUNHO.
- *
- * Criado em 24/09/2026, quando o player de áudio não apareceu no aparelho do
- * fundador e adivinhar o motivo à distância não estava funcionando. Mostra o que
- * o navegador dele responde sobre as vozes instaladas.
- *
- * Nasce desligado: sem `EXPO_PUBLIC_DIAG_VOZ=true` o empacotador remove tudo.
- * SAI do código assim que a causa for confirmada.
- */
-export const DIAG_VOZ: boolean = process.env.EXPO_PUBLIC_DIAG_VOZ === 'true';
