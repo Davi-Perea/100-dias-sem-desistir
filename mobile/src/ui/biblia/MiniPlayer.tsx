@@ -16,13 +16,21 @@ import { MIN_TOUCH, spacing, useTheme } from '@/ui/theme';
  * uma faixa que se ignora enquanto se lê.
  *
  *   ┌──────────────────────────────────────────┐
- *   │ Gênesis 1                             1x │
- *   │           ⏮    ▶/⏸    ⏭                  │
+ *   │  ⏮  ▶/⏸  ⏭                           1x  │
  *   └──────────────────────────────────────────┘
+ *
+ * UMA LINHA SÓ (feedback do fundador, 24/09/2026, vendo no celular dele). Antes
+ * eram duas: o nome do capítulo em cima, os botões embaixo. No leitor do dia o
+ * player fica ACIMA do rodapé, e as duas barras juntas comiam um terço da tela
+ * de um celular — numa tela cujo assunto é o texto.
+ *
+ * O nome do capítulo SAIU daqui de propósito: a barra de topo das duas telas já
+ * diz "Gênesis 1". Repetir custava uma linha inteira para não informar nada. Ele
+ * continua no nome acessível da faixa e no botão de tocar, para quem não vê.
  *
  * "1x" é a velocidade normal DESTE app (0,90 no motor), não 100% do motor: quem
  * nunca tocou no controle não pode passar a ouvir mais rápido sem ter pedido.
- * Tocar no rótulo abre quatro opções numa fileira, ali mesmo — sem modal.
+ * Tocar no rótulo abre as opções numa fileira, ali mesmo — sem modal.
  *
  * Nada aqui fala nem cancela nada: o player só desenha e avisa. Quem manda na
  * fala é `useOuvirCapitulo`.
@@ -33,18 +41,21 @@ function Botao({
   rotulo,
   onPress,
   desabilitado = false,
-  grande = false,
+  cheio = false,
   testID,
 }: {
   icone: IconName;
   rotulo: string;
   onPress: () => void;
   desabilitado?: boolean;
-  grande?: boolean;
+  /** O botão de tocar: mesmo tamanho dos outros, mas pintado. */
+  cheio?: boolean;
   testID: string;
 }) {
   const { colors } = useTheme();
-  const lado = grande ? 56 : MIN_TOUCH;
+  // Todos do mesmo tamanho, e o menor que o dedo alcança: numa faixa de uma
+  // linha só, um botão de 56 obrigaria a faixa inteira a crescer com ele.
+  const lado = MIN_TOUCH;
   return (
     <Pressable
       onPress={onPress}
@@ -62,13 +73,13 @@ function Botao({
           justifyContent: 'center',
           // O botão do meio é o único cheio: num player, "tocar" tem de ser
           // óbvio à distância de um relance.
-          backgroundColor: grande ? colors.text : 'transparent',
+          backgroundColor: cheio ? colors.text : 'transparent',
         },
         pressed && { opacity: 0.72 },
         desabilitado && { opacity: 0.35 },
       ]}
     >
-      <Icon name={icone} size={grande ? 26 : 22} color={grande ? colors.background : colors.text} />
+      <Icon name={icone} size={cheio ? 22 : 20} color={cheio ? colors.background : colors.text} />
     </Pressable>
   );
 }
@@ -113,36 +124,14 @@ export function MiniPlayer({
       accessibilityLabel={`Ouvindo ${capitulo}`}
       style={{
         paddingHorizontal: spacing.lg,
-        paddingTop: spacing.sm,
-        paddingBottom: Math.max(spacing.sm, recuoInferior),
+        paddingTop: 2,
+        paddingBottom: Math.max(2, recuoInferior),
         gap: spacing.xs,
         backgroundColor: colors.surface,
         borderTopWidth: 1,
         borderTopColor: colors.border,
       }}
     >
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-        <AppText variant="rowLabel" numberOfLines={1} style={{ flex: 1 }} testID="mini-player-capitulo">
-          {capitulo}
-        </AppText>
-        <Pressable
-          onPress={() => setAbrindoVelocidade((v) => !v)}
-          accessibilityRole="button"
-          accessibilityLabel={`Velocidade da leitura: ${velocidade}. Tocar para mudar.`}
-          accessibilityState={{ expanded: abrindoVelocidade }}
-          testID="mini-player-velocidade"
-          // Alvo de 44 mesmo o rótulo sendo pequeno.
-          style={({ pressed }) => [
-            { minHeight: MIN_TOUCH, minWidth: MIN_TOUCH, alignItems: 'flex-end', justifyContent: 'center' },
-            pressed && { opacity: 0.72 },
-          ]}
-        >
-          <AppText variant="caption" style={{ color: abrindoVelocidade ? colors.text : colors.textMuted }}>
-            {velocidade}
-          </AppText>
-        </Pressable>
-      </View>
-
       {/* Sem modal: os rótulos no próprio player. Um modal para trocar
           velocidade seria mais tela do que decisão.
 
@@ -187,7 +176,7 @@ export function MiniPlayer({
         </View>
       ) : null}
 
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xl }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
         <Botao
           icone="skip-back"
           // "Ouvir o..." e não só "Capítulo anterior": no leitor do dia o rodapé
@@ -201,9 +190,9 @@ export function MiniPlayer({
         />
         <Botao
           icone={tocando ? 'pause' : 'play'}
-          rotulo={tocando ? 'Pausar a leitura' : 'Ouvir o capítulo'}
+          rotulo={tocando ? 'Pausar a leitura' : `Ouvir ${capitulo}`}
           onPress={onTocarOuPausar}
-          grande
+          cheio
           testID="mini-player-tocar"
         />
         <Botao
@@ -213,6 +202,26 @@ export function MiniPlayer({
           desabilitado={!temProximo}
           testID="mini-player-proximo"
         />
+
+        {/* Empurra a velocidade para a borda oposta, sem um View a mais. */}
+        <View style={{ flex: 1 }} />
+
+        <Pressable
+          onPress={() => setAbrindoVelocidade((v) => !v)}
+          accessibilityRole="button"
+          accessibilityLabel={`Velocidade da leitura: ${velocidade}. Tocar para mudar.`}
+          accessibilityState={{ expanded: abrindoVelocidade }}
+          testID="mini-player-velocidade"
+          // Alvo de 44 mesmo o rótulo sendo pequeno.
+          style={({ pressed }) => [
+            { minHeight: MIN_TOUCH, minWidth: MIN_TOUCH, alignItems: 'flex-end', justifyContent: 'center' },
+            pressed && { opacity: 0.72 },
+          ]}
+        >
+          <AppText variant="caption" style={{ color: abrindoVelocidade ? colors.text : colors.textMuted }}>
+            {velocidade}
+          </AppText>
+        </Pressable>
       </View>
     </View>
   );

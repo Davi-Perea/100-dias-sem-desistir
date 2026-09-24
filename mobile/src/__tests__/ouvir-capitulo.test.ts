@@ -540,3 +540,28 @@ describe('empilhar o player não cria dois botões com o mesmo nome', () => {
     expect(player).not.toContain('rotulo="Próximo capítulo"');
   });
 });
+
+describe('o player cabe numa faixa só', () => {
+  const player = () => readFileSync(join(__dirname, '..', 'ui', 'biblia', 'MiniPlayer.tsx'), 'utf8');
+
+  /**
+   * Feedback do fundador em 24/09/2026, vendo no celular: com o player ACIMA do
+   * rodapé no leitor do dia, duas barras comiam um terço da tela.
+   */
+  test('o nome do capítulo não ocupa uma linha: a barra de topo já o diz', () => {
+    expect(player()).not.toContain('mini-player-capitulo');
+  });
+
+  test('mas quem não vê continua sabendo qual capítulo é', () => {
+    // Sai da tela, não da acessibilidade.
+    expect(player()).toContain('accessibilityLabel={`Ouvindo ${capitulo}`}');
+    expect(player()).toContain('`Ouvir ${capitulo}`');
+  });
+
+  test('nenhum botão puxa a altura da faixa para cima do alvo mínimo', () => {
+    const fonte = player();
+    expect(fonte).toContain('const lado = MIN_TOUCH;');
+    // 56 era o botão de tocar da versão de duas linhas.
+    expect(fonte).not.toContain('grande ? 56');
+  });
+});
