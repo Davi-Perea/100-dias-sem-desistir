@@ -231,51 +231,70 @@ describe('a procura por vozes não desiste cedo', () => {
   });
 
   /**
-   * NENHUMA ferramenta de depuração de voz vai para a produção.
+   * A INVESTIGAÇÃO DE VOZES ESTÁ ENCERRADA (decisão do fundador, 24/09/2026).
    *
-   * Duas já existiram: a faixa de diagnóstico (`DiagnosticoVoz`) e a tela de
-   * identificação (`TesteDeVozes`, 24/09/2026, criada porque a Web Speech API
-   * não informa o sexo da voz e alguém precisava OUVIR). As duas cumpriram o
-   * papel e saíram. Este teste existe para que a terceira não fique.
+   * Três ferramentas de depuração existiram em dois dias — DiagnosticoVoz,
+   * TesteDeVozes e DiagnosticoDeVozes — e a última respondeu a pergunta: no
+   * iPhone só há Luciana e Joana, as duas femininas; a Apple não tem voz
+   * masculina de português; e o Safari não entrega voz baixada ao Web Speech.
+   *
+   * Não há mais o que diagnosticar, então não fica ferramenta de diagnóstico.
    */
-  test('o diagnóstico de voz nasce desligado', () => {
-    // Sem a variável no ambiente do build, o empacotador tira tudo do bundle.
-    expect(ler('config', 'features.ts')).toContain("process.env.EXPO_PUBLIC_DIAG_VOZ === 'true'");
-    expect(ler('ui', 'biblia', 'DiagnosticoDeVozes.tsx')).toContain('if (!DIAG_VOZ) return null;');
-    // As duas gerações anteriores saíram e não voltaram.
-    expect(existsSync(join(SRC, 'ui', 'biblia', 'TesteDeVozes.tsx'))).toBe(false);
-    expect(existsSync(join(SRC, 'ui', 'biblia', 'DiagnosticoVoz.tsx'))).toBe(false);
+  test('nenhuma ferramenta de depuração de voz sobrou no código', () => {
+    for (const nome of ['DiagnosticoVoz.tsx', 'TesteDeVozes.tsx', 'DiagnosticoDeVozes.tsx']) {
+      expect(existsSync(join(SRC, 'ui', 'biblia', nome))).toBe(false);
+    }
+    // Nem a chave que as ligava, nem desligada.
+    expect(ler('config', 'features.ts')).not.toContain('EXPO_PUBLIC_DIAG_VOZ');
+    expect(ler('app', 'reader', '[day].tsx')).not.toContain('Diagnostico');
+    expect(ler('app', 'biblia', '[livro]', '[capitulo].tsx')).not.toContain('Diagnostico');
   });
 
-  test('o diagnóstico fica onde o fundador está: no leitor do dia', () => {
-    // As duas versões anteriores viviam em /biblia. Ele usa /reader/<dia>.
-    expect(ler('app', 'reader', '[day].tsx')).toContain('<DiagnosticoDeVozes />');
-    expect(ler('app', 'biblia', '[livro]', '[capitulo].tsx')).not.toContain('DiagnosticoDeVozes');
+  /**
+   * As telas de diagnóstico tinham DUAS portas para os bastidores da escolha de
+   * voz. Sem elas, as portas fecham — senão sobra um jeito de o app falar com
+   * uma voz que a regra recusa, sem ninguém pedir.
+   */
+  test('não há como observar vozes fora da lista do produto', () => {
+    const fonte = ler('reader', 'audio', 'vozPtBr.ts');
+    // 1. `observarVozes` não aceita mais uma lista alternativa.
+    expect(fonte).toContain('export function observarVozes(aoMudar: (vozes: VozLocal[]) => void): () => void {');
+    expect(fonte).toContain('aoMudar(vozesLocaisPt())');
+    // 2. A lista sem filtro de sexo deixou de ser pública.
+    expect(fonte).toContain('function vozesPtLocaisTodas()');
+    expect(fonte).not.toContain('export function vozesPtLocaisTodas');
   });
 
-  test('o diagnóstico mostra tudo, mas só deixa FALAR voz local', () => {
-    const diag = ler('ui', 'biblia', 'DiagnosticoDeVozes.tsx');
-    // Lista também a voz de servidor: distinguir "não há voz" de "há, mas é
-    // remota" é metade do diagnóstico.
-    expect(diag).toContain('localService: ${v.local');
-    // E ela não fala. Guarda dupla: botão não desenhado + recusa na função.
-    expect(diag).toContain('if (!linha.local) return;');
-    expect(diag).toContain('{v.local ? (');
+  test('as duas exigências de privacidade e de sexo continuam de pé', () => {
+    const fonte = ler('reader', 'audio', 'vozPtBr.ts');
+    expect(fonte).toContain('.filter((v) => PT.test(v.lang) && ehLocal(v))');
+    expect(fonte).toContain("sexoDaVoz(v.nome.toLowerCase()) === 'masculina'");
   });
 
-  test('o diagnóstico não mexe no player nem no filtro do produto', () => {
-    const diag = ler('ui', 'biblia', 'DiagnosticoDeVozes.tsx');
-    expect(diag).not.toContain('MiniPlayer');
-    expect(diag).not.toContain('useOuvirCapitulo');
-    // O produto continua usando a lista filtrada por sexo.
-    expect(ler('reader', 'audio', 'vozPtBr.ts')).toContain(
-      "sexoDaVoz(v.nome.toLowerCase()) === 'masculina'",
-    );
+  /**
+   * O CASO DO IPHONE, agora um teste e não uma expectativa.
+   *
+   * Luciana (pt-BR) e Joana (pt-PT) são exatamente o que o Safari expõe no
+   * aparelho do fundador. As duas têm de ser classificadas como femininas, ou o
+   * filtro deixa passar e o app fala com a voz que a decisão recusa.
+   */
+  test('as vozes do iPhone são reconhecidas como femininas', () => {
+    expect(sexoDaVoz('luciana')).toBe('feminina');
+    expect(sexoDaVoz('joana')).toBe('feminina');
+    expect(sexoDaVoz('com.apple.voice.super-compact.pt-br.luciana')).toBe('feminina');
+    expect(sexoDaVoz('com.apple.voice.super-compact.pt-pt.joana')).toBe('feminina');
+    // E não há fallback: a lista do produto exige 'masculina', nunca "o que sobrou".
+    expect(ler('reader', 'audio', 'vozPtBr.ts')).not.toContain("=== 'feminina'");
   });
 
-  test('a regra de privacidade continua no lugar sem ela', () => {
-    // Era ela que relaxava o filtro de SEXO — e só ele. O de LOCAL nunca saiu.
-    expect(ler('reader', 'audio', 'vozPtBr.ts')).toContain('.filter((v) => PT.test(v.lang) && ehLocal(v))');
+  /** As vozes que DEVEM continuar tocando: Windows e Android. */
+  test('as vozes masculinas de Windows e Android continuam aceitas', () => {
+    expect(sexoDaVoz('microsoft daniel - portuguese (brazil)')).toBe('masculina');
+    // O marcador que o próprio motor do Android deixa no identificador.
+    expect(sexoDaVoz('pt-br-x-afs#male_1-local')).toBe('masculina');
+    // E a feminina do mesmo aparelho continua fora.
+    expect(sexoDaVoz('microsoft maria - portuguese (brazil)')).toBe('feminina');
+    expect(sexoDaVoz('pt-br-x-afs#female_1-local')).toBe('feminina');
   });
 });
 

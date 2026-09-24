@@ -56,18 +56,22 @@ export const COMMUNITY_PHOTOS_ENABLED = false;
  */
 export const FUTURE_DAYS_OPEN = true;
 
-/**
- * Diagnóstico de vozes. TEMPORÁRIO e SÓ NO RASCUNHO.
+/*
+ * NÃO existe aqui uma chave de diagnóstico de voz, e isso é de propósito.
  *
- * A pergunta em aberto desde 24/09/2026: o app fala com voz masculina local, a
- * Web Speech API NÃO informa o sexo da voz, e no aparelho do fundador nenhuma
- * voz é reconhecida — então o player não aparece. Sem alguém OUVIR as vozes
- * daquele aparelho, não há como classificar; e sem classificar, não há áudio.
+ * Existiram três, entre 23 e 24/09/2026 (DiagnosticoVoz, TesteDeVozes,
+ * DiagnosticoDeVozes). A pergunta que elas investigavam está RESPONDIDA, com
+ * evidência do aparelho do fundador e da própria Apple:
  *
- * O produto não muda por causa disto: o diagnóstico só LISTA e deixa ouvir.
+ *  - o iPhone dele expõe duas vozes de português, Luciana (pt-BR) e Joana
+ *    (pt-PT), as duas femininas;
+ *  - a Apple não tem voz masculina de português no catálogo: as vozes
+ *    masculinas que ela acrescentou no iOS 16 (grupo Eloquence) não cobrem
+ *    português;
+ *  - e o Safari não entrega ao Web Speech nenhuma voz baixada em Ajustes —
+ *    declarado por um engenheiro da Apple no fórum de desenvolvedores.
  *
- * Nasce desligado: sem `EXPO_PUBLIC_DIAG_VOZ=true` o empacotador tira tudo do
- * bundle. Já saiu do código duas vezes (DiagnosticoVoz, TesteDeVozes) e sai de
- * novo assim que a voz for identificada — não vai para a produção nem desligado.
+ * Ou seja: no iPhone o player não aparece, e isso é o comportamento correto, e
+ * não um defeito a diagnosticar de novo. Investigação encerrada para este
+ * lançamento (decisão do fundador, 24/09/2026).
  */
-export const DIAG_VOZ: boolean = process.env.EXPO_PUBLIC_DIAG_VOZ === 'true';

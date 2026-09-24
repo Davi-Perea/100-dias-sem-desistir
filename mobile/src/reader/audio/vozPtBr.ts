@@ -155,20 +155,25 @@ function pontuar(voz: SpeechSynthesisVoice): number {
  *
  * Lista vazia significa uma coisa só, e é a que interessa: o app não fala neste
  * aparelho. O player não é desenhado e o leitor fica como sempre foi.
+ *
+ * É o que acontece no iPhone, e é o comportamento correto: o Safari só expõe
+ * Luciana e Joana, as duas femininas, e a Apple não tem voz masculina de
+ * português para instalar. Melhor não ter áudio do que ter o áudio errado
+ * (decisão do fundador, 24/09/2026, depois de ver o diagnóstico no aparelho).
  */
 export function vozesLocaisPt(): VozLocal[] {
   return vozesPtLocaisTodas().filter((v) => sexoDaVoz(v.nome.toLowerCase()) === 'masculina');
 }
 
 /**
- * TODAS as vozes de português que rodam no aparelho, sem olhar o sexo.
+ * TODAS as vozes de português que rodam no aparelho, sem olhar o sexo. É a base
+ * de `vozesLocaisPt`, e existe separada para as duas exigências ficarem
+ * legíveis: primeiro "português e local", depois "masculina".
  *
- * Não é o que o produto usa: é a base de `vozesLocaisPt` e o que a tela de
- * identificação mostra, para alguém poder ouvir cada voz e dizer qual é
- * masculina. A exigência de rodar no aparelho continua valendo aqui — voz de
- * servidor não entra nem para teste.
+ * Não é exportada: o produto usa a lista filtrada, e só ela. Já foi pública
+ * para alimentar telas de diagnóstico; elas saíram, e a porta fechou junto.
  */
-export function vozesPtLocaisTodas(): VozLocal[] {
+function vozesPtLocaisTodas(): VozLocal[] {
   if (!sinteseDisponivel()) return [];
   let todas: SpeechSynthesisVoice[] = [];
   try {
@@ -202,19 +207,19 @@ export function vozesPtLocaisTodas(): VozLocal[] {
 /** Momentos de nova tentativa, em ms. Curtos no começo, esparsos depois. */
 const RETENTATIVAS_MS = [0, 250, 600, 1200, 2500, 5000, 9000];
 
-export function observarVozes(
-  aoMudar: (vozes: VozLocal[]) => void,
-  /** Qual lista observar. O produto usa a filtrada; a tela de identificação, a completa. */
-  listar: () => VozLocal[] = vozesLocaisPt,
-): () => void {
+export function observarVozes(aoMudar: (vozes: VozLocal[]) => void): () => void {
   if (!sinteseDisponivel()) {
     aoMudar([]);
     return () => {};
   }
 
   let vivo = true;
+  // Sempre a lista do PRODUTO. Houve um parâmetro aqui para as telas de
+  // diagnóstico observarem a lista sem filtro de sexo; elas saíram, e ele foi
+  // junto — um jeito de observar vozes que o produto não usa é um jeito de
+  // acidentalmente falar com uma voz que a regra recusa.
   const avisar = () => {
-    if (vivo) aoMudar(listar());
+    if (vivo) aoMudar(vozesLocaisPt());
   };
 
   // A assinatura NÃO é removida depois do primeiro aviso: o evento dispara mais
