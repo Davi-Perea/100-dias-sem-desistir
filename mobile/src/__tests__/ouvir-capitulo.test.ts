@@ -3,7 +3,13 @@ import { join } from 'node:path';
 
 import { ALTURA, taxaDe, VELOCIDADE, VELOCIDADE_PADRAO, VELOCIDADES } from '@/reader/audio/ajustes';
 import { agrupar, versiculoParaFala } from '@/reader/audio/textoParaFala';
-import { ehLocal, sexoDaVoz, sinteseDisponivel } from '@/reader/audio/vozPtBr';
+import {
+  ehLocal,
+  escolherVozes,
+  sexoDaVoz,
+  sinteseDisponivel,
+  type VozLocal,
+} from '@/reader/audio/vozPtBr';
 
 /**
  * OUVIR A BÍBLIA — aprovado para produção em 23/09/2026.
@@ -271,30 +277,92 @@ describe('a procura por vozes não desiste cedo', () => {
     expect(fonte).toContain("sexoDaVoz(v.nome.toLowerCase()) === 'masculina'");
   });
 
-  /**
-   * O CASO DO IPHONE, agora um teste e não uma expectativa.
-   *
-   * Luciana (pt-BR) e Joana (pt-PT) são exatamente o que o Safari expõe no
-   * aparelho do fundador. As duas têm de ser classificadas como femininas, ou o
-   * filtro deixa passar e o app fala com a voz que a decisão recusa.
-   */
-  test('as vozes do iPhone são reconhecidas como femininas', () => {
-    expect(sexoDaVoz('luciana')).toBe('feminina');
-    expect(sexoDaVoz('joana')).toBe('feminina');
-    expect(sexoDaVoz('com.apple.voice.super-compact.pt-br.luciana')).toBe('feminina');
-    expect(sexoDaVoz('com.apple.voice.super-compact.pt-pt.joana')).toBe('feminina');
-    // E não há fallback: a lista do produto exige 'masculina', nunca "o que sobrou".
-    expect(ler('reader', 'audio', 'vozPtBr.ts')).not.toContain("=== 'feminina'");
-  });
-
   /** As vozes que DEVEM continuar tocando: Windows e Android. */
   test('as vozes masculinas de Windows e Android continuam aceitas', () => {
     expect(sexoDaVoz('microsoft daniel - portuguese (brazil)')).toBe('masculina');
     // O marcador que o próprio motor do Android deixa no identificador.
     expect(sexoDaVoz('pt-br-x-afs#male_1-local')).toBe('masculina');
-    // E a feminina do mesmo aparelho continua fora.
+    // E a feminina do mesmo aparelho continua reconhecida como feminina.
     expect(sexoDaVoz('microsoft maria - portuguese (brazil)')).toBe('feminina');
     expect(sexoDaVoz('pt-br-x-afs#female_1-local')).toBe('feminina');
+  });
+});
+
+/**
+ * A ORDEM DE ESCOLHA DA VOZ (decisão do fundador, 24/09/2026, revista em
+ * 25/09 diante do resultado no iPhone dele).
+ *
+ * A regra "masculina ou nada" deixava o iPhone inteiro sem áudio: a Apple não
+ * tem voz masculina de português, e o Safari não entrega voz baixada ao Web
+ * Speech. Entre não ter o recurso e ter a Luciana, ele escolheu a Luciana.
+ *
+ * O que NÃO mudou: a masculina continua vindo primeiro onde existir, e nenhuma
+ * voz entra sem alguém ter escrito o nome dela aqui.
+ */
+describe('a ordem de escolha da voz', () => {
+  const voz = (nome: string, lang = 'pt-BR'): VozLocal =>
+    ({ nome, lang, pontos: 0, voz: {} as SpeechSynthesisVoice });
+  const nomes = (lista: readonly VozLocal[]) => escolherVozes(lista).map((v) => v.nome);
+
+  const DANIEL = voz('Microsoft Daniel - Portuguese (Brazil)');
+  const MARIA = voz('Microsoft Maria - Portuguese (Brazil)');
+  const LUCIANA = voz('Luciana');
+  const JOANA = voz('Joana', 'pt-PT');
+  const ANDROID_M = voz('pt-br-x-afs#male_1-local');
+  const ANDROID_F = voz('pt-br-x-afs#female_1-local');
+
+  test('Windows: Daniel ganha, e a Maria não entra junto', () => {
+    expect(nomes([DANIEL, MARIA])).toEqual([DANIEL.nome]);
+  });
+
+  test('Android: a voz com marcador masculino ganha', () => {
+    expect(nomes([ANDROID_F, ANDROID_M])).toEqual([ANDROID_M.nome]);
+  });
+
+  test('iPhone: sem masculina nenhuma, a Luciana assume', () => {
+    // Exatamente o que o Safari expõe no aparelho do fundador.
+    expect(nomes([LUCIANA, JOANA])).toEqual([LUCIANA.nome, JOANA.nome]);
+  });
+
+  test('Joana só quando nem a Luciana existir', () => {
+    expect(nomes([JOANA])).toEqual([JOANA.nome]);
+  });
+
+  test('a preferência masculina vem antes do último recurso', () => {
+    // Havendo masculina, as femininas nomeadas não entram nem no fim da fila.
+    expect(nomes([LUCIANA, DANIEL, JOANA])).toEqual([DANIEL.nome]);
+  });
+
+  test('o último recurso é uma lista NOMEADA, não "qualquer feminina"', () => {
+    // A Maria não está na lista: no Windows existe o Daniel, e cair para ela
+    // seria aceitar uma voz que ninguém escolheu.
+    expect(nomes([MARIA])).toEqual([]);
+    expect(nomes([ANDROID_F])).toEqual([]);
+    expect(nomes([voz('Catarina', 'pt-PT')])).toEqual([]);
+  });
+
+  test('sem voz nenhuma, continua sem áudio', () => {
+    expect(nomes([])).toEqual([]);
+  });
+
+  test('a escolha não fareja user-agent', () => {
+    // Luciana e Joana são vozes da Apple: só existem onde a Apple está. Checar
+    // o nome dá o mesmo resultado sem adivinhar aparelho — e farejar erra (um
+    // iPad se declara Mac). Os comentários saem antes: eles FALAM de aparelhos,
+    // e é justamente o código que não pode olhar para eles.
+    const codigo = ler('reader', 'audio', 'vozPtBr.ts')
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/\/\/.*$/gm, '');
+    expect(codigo).not.toContain('userAgent');
+    expect(codigo).not.toContain('navigator.');
+    expect(codigo).not.toMatch(/\biPhone\b|\biPad\b|\bios\b/i);
+  });
+
+  test('o último recurso NÃO afrouxa a regra de voz local', () => {
+    const fonte = ler('reader', 'audio', 'vozPtBr.ts');
+    // A lista que `escolherVozes` recebe já passou por "português + local".
+    expect(fonte).toContain('escolherVozes(vozesPtLocaisTodas())');
+    expect(fonte).toContain('.filter((v) => PT.test(v.lang) && ehLocal(v))');
   });
 });
 
@@ -419,28 +487,29 @@ describe('voz masculina', () => {
   });
 
   /**
-   * CORREÇÃO do fundador, no mesmo dia: a primeira versão pontuava o sexo e caía
-   * para a feminina quando não havia masculina. Ele inverteu — "se o áudio
-   * aparecer, que seja voz masculina" vale mais que "que apareça".
+   * O sexo NUNCA voltou a ser pontuação, e isso importa.
+   *
+   * A primeira versão (23/09) pontuava: a feminina perdia pontos e ganhava
+   * quando não havia masculina, sem ninguém decidir nada. O fundador inverteu no
+   * dia seguinte, e em 25/09 abriu UMA exceção nomeada para o iPhone — que é
+   * uma lista escrita à mão, não a volta da pontuação.
+   *
+   * A diferença é o controle: com pontuação, qualquer voz feminina nova entra
+   * sozinha no dia em que aparecer no aparelho de alguém. Com lista, não entra
+   * ninguém que não tenha nome escrito aqui.
    */
-  test('é FILTRO, não pontuação: só voz masculina entra na lista do produto', () => {
+  test('o sexo é degrau de decisão, nunca pontuação', () => {
     const fonte = ler('reader', 'audio', 'vozPtBr.ts');
-    expect(fonte).toContain(
-      "vozesPtLocaisTodas().filter((v) => sexoDaVoz(v.nome.toLowerCase()) === 'masculina')",
-    );
-    // O sexo não pontua mais: quem chega à nota já passou pelo filtro.
+    expect(fonte).toContain("sexoDaVoz(v.nome.toLowerCase()) === 'masculina'");
     expect(fonte).not.toContain("sexo === 'masculina') pontos");
+    expect(fonte).not.toContain("sexo === 'feminina') pontos");
   });
 
-  /**
-   * Regra 3 do pedido: sem masculina, é melhor uma feminina do que recurso
-   * nenhum. Por isso é pontuação e não filtro.
-   */
-  test('sem voz masculina, a feminina ainda é usada', () => {
+  test('a masculina é sempre o primeiro degrau', () => {
     const fonte = ler('reader', 'audio', 'vozPtBr.ts');
-    // Feminina não perde pontos nem é excluída: só não ganha o bônus.
-    expect(fonte).not.toContain("sexo === 'feminina') pontos -=");
-    expect(fonte).not.toContain("sexo !== 'feminina'");
+    // O retorno antecipado é o que garante a precedência: havendo masculina, a
+    // lista de último recurso não é sequer consultada.
+    expect(fonte).toContain('if (masculinas.length > 0) return masculinas;');
   });
 });
 
