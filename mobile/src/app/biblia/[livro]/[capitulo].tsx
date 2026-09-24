@@ -12,7 +12,6 @@ import { AppText, Button, Cap, Screen, StateView } from '@/ui/components';
 import { ChapterText } from '@/ui/biblia/ChapterText';
 import { MiniPlayer } from '@/ui/biblia/MiniPlayer';
 import { PlaceholderNotice } from '@/ui/biblia/PlaceholderNotice';
-import { TesteDeVozes } from '@/ui/biblia/TesteDeVozes';
 import { TextSizeButton } from '@/ui/biblia/TextSizeButton';
 import {
   backToBible,
@@ -210,9 +209,6 @@ export default function BibleChapterScreen() {
           <StateView kind="loading" />
         ) : (
           <>
-            {/* Temporário, só no rascunho (EXPO_PUBLIC_DIAG_VOZ). Sai depois. */}
-            <TesteDeVozes />
-
             <ChapterText
               verses={passage.verses}
               heading={passage.heading}

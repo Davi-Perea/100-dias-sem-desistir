@@ -56,14 +56,12 @@ export const COMMUNITY_PHOTOS_ENABLED = false;
  */
 export const FUTURE_DAYS_OPEN = true;
 
-/**
- * Tela de identificação de vozes. TEMPORÁRIA e SÓ NO RASCUNHO.
+/*
+ * NÃO existe aqui uma chave de diagnóstico de voz, e isso é de propósito.
  *
- * Criada em 24/09/2026: a regra de voz masculina virou filtro e o player sumiu
- * do aparelho do fundador — nenhuma voz de lá foi reconhecida como masculina. A
- * Web Speech API não informa o sexo da voz, então alguém precisa OUVIR e dizer.
- *
- * Nasce desligada: sem `EXPO_PUBLIC_DIAG_VOZ=true` o empacotador remove tudo.
- * SAI do código quando a voz for identificada e classificada.
+ * Existiu uma (`DIAG_VOZ`, com uma tela que listava as vozes do aparelho para
+ * alguém ouvir e identificar), em 24/09/2026. Cumpriu o papel e saiu antes de
+ * ir à produção: ferramenta de depuração não fica de pé "por garantia" num app
+ * que a igreja inteira vai abrir, nem desligada. Se a pergunta voltar, ela
+ * volta — num rascunho, e sai de novo.
  */
-export const DIAG_VOZ: boolean = process.env.EXPO_PUBLIC_DIAG_VOZ === 'true';

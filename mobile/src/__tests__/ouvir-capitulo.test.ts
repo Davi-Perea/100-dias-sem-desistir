@@ -231,29 +231,24 @@ describe('a procura por vozes não desiste cedo', () => {
   });
 
   /**
-   * A tela de identificação voltou em 24/09/2026: a regra de voz masculina virou
-   * filtro e escondeu o player no aparelho do fundador. Sem OUVIR não dá para
-   * saber qual voz é qual, porque a Web Speech API não informa o sexo.
+   * NENHUMA ferramenta de depuração de voz vai para a produção.
    *
-   * Ela relaxa o filtro de SEXO, e só ele.
+   * Duas já existiram: a faixa de diagnóstico (`DiagnosticoVoz`) e a tela de
+   * identificação (`TesteDeVozes`, 24/09/2026, criada porque a Web Speech API
+   * não informa o sexo da voz e alguém precisava OUVIR). As duas cumpriram o
+   * papel e saíram. Este teste existe para que a terceira não fique.
    */
-  test('a tela de identificação nasce desligada', () => {
-    expect(ler('config', 'features.ts')).toContain("process.env.EXPO_PUBLIC_DIAG_VOZ === 'true'");
-    expect(ler('ui', 'biblia', 'TesteDeVozes.tsx')).toContain('if (!DIAG_VOZ) return null;');
-    // A faixa antiga, essa sim, não voltou.
+  test('nenhuma tela de depuração de voz sobrou no código', () => {
+    expect(existsSync(join(SRC, 'ui', 'biblia', 'TesteDeVozes.tsx'))).toBe(false);
     expect(existsSync(join(SRC, 'ui', 'biblia', 'DiagnosticoVoz.tsx'))).toBe(false);
+    // Nem a chave que a ligava, nem desligada.
+    expect(ler('config', 'features.ts')).not.toContain('EXPO_PUBLIC_DIAG_VOZ');
+    expect(ler('app', 'biblia', '[livro]', '[capitulo].tsx')).not.toContain('TesteDeVozes');
   });
 
-  test('a tela de identificação NÃO relaxa a regra de privacidade', () => {
-    // Só vozes locais, mesmo para testar: privacidade não tem exceção de depuração.
-    expect(ler('ui', 'biblia', 'TesteDeVozes.tsx')).toContain('vozesPtLocaisTodas');
+  test('a regra de privacidade continua no lugar sem ela', () => {
+    // Era ela que relaxava o filtro de SEXO — e só ele. O de LOCAL nunca saiu.
     expect(ler('reader', 'audio', 'vozPtBr.ts')).toContain('.filter((v) => PT.test(v.lang) && ehLocal(v))');
-  });
-
-  test('a tela de identificação não mexe no player', () => {
-    const diag = ler('ui', 'biblia', 'TesteDeVozes.tsx');
-    expect(diag).not.toContain('MiniPlayer');
-    expect(diag).not.toContain('useOuvirCapitulo');
   });
 });
 
