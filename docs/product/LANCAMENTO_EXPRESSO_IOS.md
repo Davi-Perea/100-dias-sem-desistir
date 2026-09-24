@@ -217,15 +217,17 @@ fica como referência. Diferenças conferidas no código em 21/09: lá a descri�
 Você › Minhas reflexões) e diz "Leia no próprio app ou na sua Bíblia" (o leitor do dia mostra a Bíblia Livre); as
 notas ao revisor citam as abas reais (Jornada, Bíblia, Você) e dizem que os lembretes ficam em Você › Lembretes.
 
-**4.1 Nome** (máx. 30): `100 dias sem desistir` (21). Se já existir outro app com esse nome:
+**4.1 Nome** (máx. 30): `100 Dias Sem Desistir` (21) — decidido pelo fundador em 24/09. Se já existir outro app com esse nome:
 `100 dias sem desistir: guia` (27).
 
-**4.2 Subtítulo** (máx. 30): `Leitura e oração, dia a dia` (27).
+**4.2 Subtítulo** (máx. 30): `Jornada de leitura bíblica` (26) — decidido pelo fundador em 24/09, no lugar de
+`Leitura e oração, dia a dia`: diz em três palavras o que o app é, para quem nunca ouviu falar da campanha.
 
-**4.3 Palavras-chave** (máx. 100 bytes; sem repetir nome e subtítulo; 93 bytes):
+**4.3 Palavras-chave** (máx. 100 bytes; sem repetir nome e subtítulo; 99 bytes) — atualizada em 24/09 com os
+termos do fundador. Ver `FICHA_DE_LOJA_rascunho.md`, seção da decisão de 2026-09-24:
 
 ```
-biblia,plano,intercessao,devocional,igreja,jornada,guia,diario,consagracao,adoracao,capitulos
+biblia,devocional,fe,cristao,oracao,igreja,comunidade,crista,plano,intercessao,guia,diario,adoracao
 ```
 
 **4.4 Texto promocional** (máx. 170; 143):

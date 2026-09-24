@@ -286,7 +286,14 @@ export default ({ config, projectRoot }: ConfigContext): ExpoConfig => {
       // não há o que pré-renderizar que o cliente não monte de novo.
       // A V1 (main) continua em 'static'; esta mudança é só desta branch.
       output: 'single',
-      favicon: './assets/images/favicon.png',
+      // O MESMO ícone do app, e não o favicon do template do Expo.
+      //
+      // `assets/images/favicon.png` é o que vem no template: o losango azul do
+      // Expo. Ele era o que aparecia na aba do navegador e no atalho salvo na
+      // tela inicial — o app parecia de outra pessoa (achado em 24/09/2026).
+      // O arquivo é o mesmo `icone-ios.png` usado no iPhone e no Android; o
+      // Expo reduz para o tamanho de favicon no export.
+      favicon: './assets/icone/icone-ios.png',
     },
     plugins: [
       'expo-router',

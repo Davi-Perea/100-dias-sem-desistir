@@ -6,22 +6,24 @@
     "categories": ["REFERENCE", "LIFESTYLE"],
     "info": {
       "pt-BR": {
-        "title": "100 dias sem desistir",
-        "subtitle": "Leitura e oração, dia a dia",
+        "title": "100 Dias Sem Desistir",
+        "subtitle": "Jornada de leitura bíblica",
         "promoText": "De 23 de setembro a 31 de dezembro, a igreja caminha junta: a leitura de cada dia, a direção de oração e um lembrete na hora que você escolher.",
         "description": "100 dias sem desistir é o guia da campanha 100 Dias da [PREENCHER: nome da igreja], de 23 de setembro a 31 de dezembro de 2026.\n\nTodo dia o app mostra, num lugar só:\n\n• A leitura do dia: quais capítulos ler hoje, no plano da igreja para os 100 dias. Leia no próprio app ou na sua Bíblia e marque como lido.\n• A direção de oração: o tema, a ênfase e os motivos de intercessão do dia, do guia preparado pela igreja.\n• Modo altar: letra grande, passo a passo, para orar sozinho, em família ou no altar.\n• Sua reflexão: um espaço para escrever o que Deus falou com você. Fica só no seu celular.\n• Lembrete diário: na hora que você escolher. Um por dia.\n• Meu ministério: escolha o seu e veja os dias em que ele conduz o altar.\n• A Bíblia no app: leia qualquer livro e capítulo na Bíblia Livre, sem internet.\n\nEntrou depois do começo? Tudo bem. O app começa no dia de hoje, e os dias que ficaram para trás continuam abertos para você fazer no seu ritmo.\n\nA campanha começa em 23 de setembro. A partir dali, os 100 dias ficam abertos: se quiser, você pode ler adiantado. O app continua destacando o dia em que a igreja está, e marcar como lido vale para hoje e para os dias que já passaram.\n\nFunciona sem internet e sem cadastro. O que você marca e escreve fica só no seu celular. Não pedimos nome, e-mail nem telefone.\n\nRespeita o tamanho de letra do seu celular e o modo escuro.\n\nO conteúdo do guia é da [PREENCHER: nome da igreja] e é usado com autorização dela.\n\nTexto bíblico: Bíblia Livre (BLIVRE), © 2018 Diego Santos, Mario Sérgio e Marco Teles, licença Creative Commons Atribuição 4.0 Brasil (CC BY 4.0), obtida em ebible.org. Créditos completos dentro do app.\n\nDúvidas: [PREENCHER: e-mail de suporte]",
         "keywords": [
           "biblia",
+          "devocional",
+          "fe",
+          "cristao",
+          "oracao",
+          "igreja",
+          "comunidade",
+          "crista",
           "plano",
           "intercessao",
-          "devocional",
-          "igreja",
-          "jornada",
           "guia",
           "diario",
-          "consagracao",
-          "adoracao",
-          "capitulos"
+          "adoracao"
         ],
         "supportUrl": "[PREENCHER: URL publicada de site/suporte.html]",
         "privacyPolicyUrl": "[PREENCHER: URL publicada de site/politica-de-privacidade.html]"

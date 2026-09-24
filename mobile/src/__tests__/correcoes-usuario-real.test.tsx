@@ -82,8 +82,27 @@ describe('P0 · a altura do app segue a janela realmente visível', () => {
   });
 
   test('o título não diz "(dev)" para quem é da igreja', () => {
-    expect(marcacao).toContain('<title>100 dias sem desistir</title>');
+    // A marca vem primeiro, e o que o app É vem logo atrás (decisão do
+    // fundador, 24/09/2026): "100 Dias Sem Desistir" sozinho não conta a quem
+    // nunca ouviu falar da campanha que se trata de leitura bíblica.
+    expect(marcacao).toContain('<title>100 Dias Sem Desistir — Jornada de leitura bíblica</title>');
     expect(marcacao).not.toContain('(dev)');
+  });
+
+  /**
+   * O ATALHO NA TELA INICIAL E O CARTÃO DO LINK.
+   *
+   * Sem `apple-touch-icon`, o iPhone recorta uma foto da tela para o atalho e
+   * ele fica ilegível. Sem as etiquetas og:, o link colado no grupo da igreja
+   * aparece como texto cru. Os dois usam o mesmo "100" do app nativo.
+   */
+  test('a web usa o ícone do app, e não o do template do Expo', () => {
+    expect(marcacao).toContain('<link rel="apple-touch-icon" href="/icone-100.png" />');
+    expect(marcacao).toContain('content="https://100diassemdesistir.com.br/icone-100.png"');
+    // O favicon da aba também: o losango azul do Expo não é a marca de ninguém.
+    const config = readFileSync(join(SRC, '..', 'app.config.ts'), 'utf8');
+    expect(config).toContain("favicon: './assets/icone/icone-ios.png'");
+    expect(config).not.toContain("favicon: './assets/images/favicon.png'");
   });
 
   /** O Expo injeta os dois no export: escrevê-los aqui os duplicaria. */

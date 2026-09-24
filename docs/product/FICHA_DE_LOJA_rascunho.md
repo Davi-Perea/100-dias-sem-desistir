@@ -13,6 +13,55 @@
 
 ---
 
+---
+
+## DECISÃO DO FUNDADOR — 2026-09-24 (identidade e descoberta)
+
+Esta seção **prevalece** sobre as propostas de nome, subtítulo e palavras-chave do resto do documento.
+O que já está aplicado no código está em `mobile/store.config.json` (Apple) e em `mobile/public/index.html` (web).
+
+| Campo | Valor decidido | Medida | Onde já está aplicado |
+|---|---|---|---|
+| Nome (marca) | **100 Dias Sem Desistir** | 21 de 30 | `store.config.json`, título da web |
+| Identificação curta / subtítulo | **Jornada de leitura bíblica** | 26 de 30 | `store.config.json`, título da web |
+| Descrição curta | **Uma jornada de 100 dias para ler a Bíblia, fortalecer sua fé e caminhar em comunidade.** | 86 caracteres | `meta description` e `og:` da web |
+| Nome sob o ícone | **100 dias** (inalterado) | — | `app.config.ts`, `NAMES.production` |
+| Ícone | `assets/icone/icone-ios.png` — o "100" preto sobre amarelo que já existia | — | iOS, Android adaptativo, favicon e atalho da web |
+
+**A marca continua sendo "100 Dias Sem Desistir".** "Jornada de leitura bíblica" é identificação descritiva:
+existe para a pessoa entender o que o app é. Não é nome novo e não substitui a marca em lugar nenhum.
+
+### Três coisas que NÃO couberam como vieram
+
+**1. Descrição curta da Google Play: 86 caracteres, e o limite são 80.**
+
+O texto de 86 está na web, onde não há limite. Para a Play, a versão medida que preserva o sentido é
+`100 dias para ler a Bíblia, fortalecer sua fé e caminhar em comunidade.` (71). Sai só "Uma jornada de",
+que já está no subtítulo. **Pendente de decisão do fundador.**
+
+**2. Palavras-chave da Apple: a lista pedida dá 118 bytes, e o limite são 100.**
+
+A Apple indexa nome + subtítulo + palavras-chave juntos, então repetir "jornada", "leitura", "bíblica" e
+"100 dias" — que já estão no nome e no subtítulo — gastaria bytes sem ganhar alcance. Aplicado (99 bytes,
+sem acento: é assim que a pessoa digita, e acento custa 2 bytes):
+
+```
+biblia,devocional,fe,cristao,oracao,igreja,comunidade,crista,plano,intercessao,guia,diario,adoracao
+```
+
+Os oito primeiros são os termos do fundador. Os cinco últimos são os que já estavam aqui e couberam.
+
+**3. "caminhar em comunidade" descreve o Juntos, que NÃO está no build de loja.**
+
+Na web o Juntos está ligado e a frase é verdadeira. No primeiro envio à Apple a aba fica escondida, e
+descrever função que não existe é reprovação pela regra 2.3.1 (metadados precisos). **Enquanto o Juntos
+não entrar no build da loja, a descrição curta da loja não pode terminar em "e caminhar em comunidade".**
+
+Alternativa medida: `100 dias para ler a Bíblia, fortalecer sua fé e caminhar com a sua igreja.` (73).
+"Com a sua igreja" descreve a campanha coletiva, que existe no build, sem prometer feed.
+
+---
+
 ## O que mudou em 2026-09-21 (caminho expresso do iPhone)
 
 Decisão do fundador: o iPhone sai primeiro pela **conta Apple de pessoa física do Davi**, com transferência para a

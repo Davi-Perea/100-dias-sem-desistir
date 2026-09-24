@@ -57,11 +57,44 @@
     <meta charset="utf-8" />
     <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
-    <title>100 dias sem desistir</title>
+    <title>100 Dias Sem Desistir — Jornada de leitura bíblica</title>
     <meta
       name="description"
-      content="O guia diário dos 100 Dias da Lagoinha Brasília Capital: leitura, oração e intercessão, de 23 de setembro a 31 de dezembro de 2026."
+      content="Uma jornada de 100 dias para ler a Bíblia, fortalecer sua fé e caminhar em comunidade."
     />
+
+    <!--
+      MUDANÇA 4 — QUEM ENCONTRA O APP PRECISA ENTENDER O QUE ELE É.
+
+      O título traz a marca E o que o app faz: "100 Dias Sem Desistir" sozinho
+      não diz a ninguém que se trata de leitura bíblica. A marca continua sendo
+      só a primeira parte; o resto é identificação descritiva, não nome novo.
+
+      O ÍCONE. `apple-touch-icon` é o que o iPhone usa quando alguém salva o
+      site na tela inicial. Sem ele o iOS recorta uma foto da tela, e o atalho
+      fica ilegível. É o mesmo "100" do app nativo (assets/icone/icone-ios.png),
+      copiado para public/ porque precisa de um endereço fixo e servido.
+
+      O CARTÃO DO LINK. Este app é divulgado em grupo de WhatsApp: o que a
+      igreja vê antes de tocar é o cartão montado a partir das etiquetas og:.
+      Sem elas, o link aparece como texto cru. `og:image` exige endereço
+      absoluto — caminho relativo não é resolvido pela maioria dos mensageiros.
+    -->
+    <link rel="apple-touch-icon" href="/icone-100.png" />
+    <meta name="apple-mobile-web-app-title" content="100 dias" />
+    <meta name="theme-color" content="#FFD100" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="100 Dias Sem Desistir" />
+    <meta property="og:title" content="100 Dias Sem Desistir — Jornada de leitura bíblica" />
+    <meta
+      property="og:description"
+      content="Uma jornada de 100 dias para ler a Bíblia, fortalecer sua fé e caminhar em comunidade."
+    />
+    <meta property="og:url" content="https://100diassemdesistir.com.br/" />
+    <meta property="og:image" content="https://100diassemdesistir.com.br/icone-100.png" />
+    <meta property="og:locale" content="pt_BR" />
+    <meta name="twitter:card" content="summary" />
     <!-- The `react-native-web` recommended style reset: https://necolas.github.io/react-native-web/docs/setup/#root-element -->
     <style id="expo-reset">
       /* These styles make the body full-height */
