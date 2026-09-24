@@ -146,71 +146,23 @@ function pontuar(voz: SpeechSynthesisVoice): number {
 }
 
 /**
- * ÚLTIMO RECURSO: as vozes femininas nomeadas, e SÓ elas, na ordem exata.
- *
- * Não é "qualquer feminina". É esta lista, escrita à mão, porque cada nome
- * entrou por um motivo verificado num aparelho de verdade:
- *
- *  - Luciana é a única voz de pt-BR que o Safari do iPhone expõe;
- *  - Joana é pt-PT, sotaque de Portugal, e por isso vem depois.
- *
- * A Maria do Windows NÃO está aqui de propósito: naquele aparelho existe o
- * Daniel, e o recurso nunca precisa cair para ela.
- */
-const ULTIMO_RECURSO = [/\bluciana\b/, /\bjoana\b/];
-
-/**
- * As vozes que este app aceita usar, da melhor para a pior.
- *
- * DUAS EXIGÊNCIAS INEGOCIÁVEIS, antes de qualquer preferência:
+ * As vozes que este app aceita usar, da melhor para a pior. Três exigências, e
+ * todas as três são obrigatórias:
  *
  *   1. em português;
- *   2. que rodem NO APARELHO. Privacidade: nada de texto indo para servidor,
- *      e não existe caminho para voz remota em lugar nenhum deste arquivo.
+ *   2. que rodem NO APARELHO (privacidade: nada de texto indo para servidor);
+ *   3. reconhecidamente MASCULINAS (decisão do fundador, 24/09/2026).
  *
- * DEPOIS, a ordem de escolha (decisão do fundador, 24/09/2026, revista em
- * 25/09 diante do resultado no iPhone dele):
+ * Lista vazia significa uma coisa só, e é a que interessa: o app não fala neste
+ * aparelho. O player não é desenhado e o leitor fica como sempre foi.
  *
- *   a. voz MASCULINA reconhecida, pt-BR ou pt-PT. É a preferência, e continua
- *      valendo em todo aparelho que tenha uma — Daniel no Windows, a voz com
- *      marcador `#male_` no Android;
- *   b. não havendo NENHUMA masculina, as nomeadas em `ULTIMO_RECURSO`, nessa
- *      ordem: Luciana e depois Joana.
- *
- * POR QUE O DEGRAU (b) EXISTE: no iPhone a Apple não tem voz masculina de
- * português — nem pré-instalada, nem para baixar —, e o Safari sequer entrega
- * voz baixada ao Web Speech. A regra "masculina ou nada" deixava o iPhone
- * inteiro sem áudio, e o fundador preferiu a Luciana a não ter o recurso.
- *
- * POR QUE POR NOME, E NÃO POR "É IPHONE": a alternativa era farejar o
- * user-agent, que erra (o iPad se declara Mac) e envelhece mal. Luciana e
- * Joana são vozes da Apple: elas só existem onde a Apple está. Checar o nome
- * dá o mesmo resultado sem adivinhar aparelho — e mantém a promessa de que
- * nenhuma voz entra sem alguém ter dito o nome dela.
- *
- * Lista vazia continua significando o que sempre significou: o app não fala
- * neste aparelho, o player não é desenhado, e o leitor fica como sempre foi.
+ * É o que acontece no iPhone, e é o comportamento correto: o Safari só expõe
+ * Luciana e Joana, as duas femininas, e a Apple não tem voz masculina de
+ * português para instalar. Melhor não ter áudio do que ter o áudio errado
+ * (decisão do fundador, 24/09/2026, depois de ver o diagnóstico no aparelho).
  */
 export function vozesLocaisPt(): VozLocal[] {
-  return escolherVozes(vozesPtLocaisTodas());
-}
-
-/**
- * A regra de escolha, separada do navegador para poder ser testada com listas
- * de mentira. Recebe as vozes que já passaram por "português + local".
- */
-export function escolherVozes(todas: readonly VozLocal[]): VozLocal[] {
-  const masculinas = todas.filter((v) => sexoDaVoz(v.nome.toLowerCase()) === 'masculina');
-  if (masculinas.length > 0) return masculinas;
-
-  // Sem nenhuma masculina. A ordem aqui é a de `ULTIMO_RECURSO`, e não a da
-  // pontuação: quem manda no degrau (b) é a preferência escrita, não a nota.
-  const escolhidas: VozLocal[] = [];
-  for (const nomeada of ULTIMO_RECURSO) {
-    const achada = todas.find((v) => nomeada.test(v.nome.toLowerCase()));
-    if (achada) escolhidas.push(achada);
-  }
-  return escolhidas;
+  return vozesPtLocaisTodas().filter((v) => sexoDaVoz(v.nome.toLowerCase()) === 'masculina');
 }
 
 /**
