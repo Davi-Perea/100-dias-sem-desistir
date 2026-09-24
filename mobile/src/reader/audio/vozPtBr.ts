@@ -113,33 +113,54 @@ export function vozesLocaisPt(): VozLocal[] {
 }
 
 /**
- * A lista de vozes chega VAZIA no primeiro quadro em quase todo navegador: ela é
- * carregada de forma assíncrona e avisa por `voiceschanged`. Quem perguntar cedo
- * demais conclui "não há voz" e esconde o botão para sempre.
+/**
+ * OBSERVA a lista de vozes enquanto a tela viver, em vez de perguntar uma vez.
  *
- * Daí este aguardo: resolve no evento, ou desiste no tempo limite e responde com
- * o que houver — nunca fica pendurado.
+ * A primeira versão disto era uma promessa de tiro único: resolvia no primeiro
+ * `voiceschanged` ou desistia em 3 s. Ela ESCONDIA O PLAYER PARA SEMPRE em dois
+ * casos comuns, e foi o defeito relatado pelo fundador em 24/09/2026:
+ *
+ *  1. o `voiceschanged` dispara MAIS DE UMA VEZ, e a primeira lista pode vir
+ *     vazia ou incompleta. O tiro único acreditava na primeira;
+ *  2. em alguns navegadores o evento não dispara nunca — a lista só aparece
+ *     depois de `getVoices()` ser chamado algumas vezes —, e aí vencia o
+ *     tempo limite, com a lista ainda vazia.
+ *
+ * Agora: a assinatura fica de pé, e a consulta se repete em intervalos que
+ * crescem. Qualquer chegada tardia acende o recurso; nada decide "não tem" para
+ * sempre.
  */
-export function aguardarVozes(limiteMs = 3000): Promise<VozLocal[]> {
-  if (!sinteseDisponivel()) return Promise.resolve([]);
-  const jaTem = vozesLocaisPt();
-  if (jaTem.length > 0) return Promise.resolve(jaTem);
+/** Momentos de nova tentativa, em ms. Curtos no começo, esparsos depois. */
+const RETENTATIVAS_MS = [0, 250, 600, 1200, 2500, 5000, 9000];
 
-  return new Promise((resolve) => {
-    let encerrado = false;
-    const terminar = () => {
-      if (encerrado) return;
-      encerrado = true;
-      clearTimeout(timer);
-      globalThis.speechSynthesis.removeEventListener?.('voiceschanged', terminar);
-      resolve(vozesLocaisPt());
-    };
-    const timer = setTimeout(terminar, limiteMs);
-    globalThis.speechSynthesis.addEventListener?.('voiceschanged', terminar);
-    // Alguns navegadores só populam a lista depois de a primeira consulta
-    // acontecer; a chamada acima já serviu de gatilho.
-  });
+export function observarVozes(aoMudar: (vozes: VozLocal[]) => void): () => void {
+  if (!sinteseDisponivel()) {
+    aoMudar([]);
+    return () => {};
+  }
+
+  let vivo = true;
+  const avisar = () => {
+    if (vivo) aoMudar(vozesLocaisPt());
+  };
+
+  // A assinatura NÃO é removida depois do primeiro aviso: o evento dispara mais
+  // de uma vez, e a lista boa costuma ser a segunda.
+  globalThis.speechSynthesis.addEventListener?.('voiceschanged', avisar);
+
+  // Consultar é o gatilho em alguns navegadores, e a rede de segurança nos que
+  // nunca disparam o evento. Por isso a consulta repetida, e não um só timeout.
+  const timers = RETENTATIVAS_MS.map((ms) => setTimeout(avisar, ms));
+
+  return () => {
+    vivo = false;
+    timers.forEach(clearTimeout);
+    globalThis.speechSynthesis.removeEventListener?.('voiceschanged', avisar);
+  };
 }
+
+/** Quanto tempo depois da abertura ainda é cedo para dizer "não há voz". */
+export const ESPERA_MAXIMA_MS = RETENTATIVAS_MS[RETENTATIVAS_MS.length - 1] + 1000;
 
 /** Diagnóstico da POC: o que este aparelho tem, local ou não. Só para o relatório. */
 export function diagnosticoDeVozes(): { total: number; pt: number; ptLocais: number; naoLocais: string[] } {

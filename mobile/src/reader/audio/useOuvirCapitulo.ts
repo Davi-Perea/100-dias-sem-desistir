@@ -4,7 +4,7 @@ import { useSettings, updateSettings } from '@/settings/settingsStore';
 
 import { ALTURA, ALVO_DE_CARACTERES, PAUSA_ENTRE_TRECHOS_MS, taxaDe, VELOCIDADE_PADRAO } from './ajustes';
 import { agrupar, type Trecho } from './textoParaFala';
-import { aguardarVozes, sinteseDisponivel, type VozLocal } from './vozPtBr';
+import { ESPERA_MAXIMA_MS, observarVozes, sinteseDisponivel, type VozLocal } from './vozPtBr';
 
 /**
  * OUVIR O CAPÍTULO (aprovado pelo fundador em 23/09/2026).
@@ -104,16 +104,32 @@ export function useOuvirCapitulo(versiculos: readonly string[], chaveDoCapitulo:
   useEffect(() => {
     // Sem a API, o estado inicial já nasceu 'indisponivel': nada a fazer.
     if (!sinteseDisponivel()) return;
-    let vivo = true;
-    aguardarVozes().then((encontradas) => {
-      if (!vivo) return;
+
+    /*
+     * A lista de vozes é OBSERVADA, não perguntada uma vez. Enquanto a espera
+     * não terminar, o estado fica em 'carregando' — e não em 'indisponivel' —,
+     * porque concluir cedo demais é exatamente o defeito que escondia o player.
+     *
+     * Uma voz que chegue tarde ainda acende o recurso: a observação continua de
+     * pé enquanto a tela viver.
+     */
+    const pararDeObservar = observarVozes((encontradas) => {
       setVozes(encontradas);
-      // Sem voz LOCAL em português, o recurso simplesmente não existe aqui.
-      // Não há caminho alternativo para voz remota, de propósito.
-      setEstado(encontradas.length > 0 ? 'parado' : 'indisponivel');
+      if (encontradas.length > 0) {
+        // Só sai de 'carregando'/'indisponivel'; nunca interrompe uma leitura.
+        setEstado((atual) => (atual === 'carregando' || atual === 'indisponivel' ? 'parado' : atual));
+      }
     });
+
+    // Passado o prazo, sem nenhuma voz local em português, o recurso não existe
+    // neste aparelho. Não há caminho alternativo para voz remota, de propósito.
+    const desistir = setTimeout(() => {
+      setEstado((atual) => (atual === 'carregando' ? 'indisponivel' : atual));
+    }, ESPERA_MAXIMA_MS);
+
     return () => {
-      vivo = false;
+      pararDeObservar();
+      clearTimeout(desistir);
     };
   }, []);
 

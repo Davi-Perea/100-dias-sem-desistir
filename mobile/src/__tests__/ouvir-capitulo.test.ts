@@ -99,7 +99,7 @@ describe('só voz local', () => {
 
   test('sem voz local, o recurso fica indisponível — não há caminho para voz remota', () => {
     const hook = ler('reader', 'audio', 'useOuvirCapitulo.ts');
-    expect(hook).toContain("setEstado(encontradas.length > 0 ? 'parado' : 'indisponivel')");
+    expect(hook).toContain("setEstado((atual) => (atual === 'carregando' ? 'indisponivel' : atual))");
     // O portão mora na TELA: sem voz local, `ouvir` é null, o player não é
     // desenhado e o rodapé normal do leitor fica. Nem botão desligado, nem aviso.
     const tela = ler('app', 'biblia', '[livro]', '[capitulo].tsx');
@@ -111,6 +111,55 @@ describe('só voz local', () => {
   test('em plataforma sem Web Speech API a síntese é declarada indisponível', () => {
     // A suíte roda como app nativo, onde esta POC (que é só web) não existe.
     expect(sinteseDisponivel()).toBe(false);
+  });
+});
+
+describe('a procura por vozes não desiste cedo', () => {
+  /**
+   * O DEFEITO de 24/09/2026: o player não aparecia no aparelho do fundador. A
+   * versão anterior perguntava as vozes UMA vez — resolvia no primeiro
+   * `voiceschanged` ou desistia em 3 s — e concluía "não há voz" para sempre.
+   * Mas o evento dispara mais de uma vez, e a primeira lista pode vir vazia.
+   */
+  test('a assinatura de voiceschanged não é removida depois do primeiro aviso', () => {
+    const fonte = ler('reader', 'audio', 'vozPtBr.ts');
+    expect(fonte).toContain("addEventListener?.('voiceschanged', avisar)");
+    // Nada de promessa de tiro único.
+    expect(fonte).not.toContain('aguardarVozes');
+    expect(fonte).not.toContain('new Promise');
+  });
+
+  test('consulta de novo várias vezes, para o navegador que nunca dispara o evento', () => {
+    const fonte = ler('reader', 'audio', 'vozPtBr.ts');
+    expect(fonte).toContain('RETENTATIVAS_MS');
+    // Várias janelas, não uma só.
+    const inicio = fonte.indexOf('RETENTATIVAS_MS = [');
+    const dentro = fonte.slice(inicio + 'RETENTATIVAS_MS = ['.length, fonte.indexOf(']', inicio));
+    expect(dentro.split(',').length).toBeGreaterThanOrEqual(5);
+    // E a última é bem depois da abertura, para o motor lento ter chance.
+    const ultima = Number(dentro.split(',').pop());
+    expect(ultima).toBeGreaterThanOrEqual(5000);
+  });
+
+  test('enquanto procura, o estado é "carregando" e nunca "indisponivel"', () => {
+    const hook = ler('reader', 'audio', 'useOuvirCapitulo.ts');
+    // Só vira indisponível DEPOIS do prazo, e só se ainda estiver carregando.
+    expect(hook).toContain('ESPERA_MAXIMA_MS');
+    expect(hook).toContain("setEstado((atual) => (atual === 'carregando' ? 'indisponivel' : atual))");
+  });
+
+  test('voz que chega tarde ainda acende o recurso', () => {
+    const hook = ler('reader', 'audio', 'useOuvirCapitulo.ts');
+    expect(hook).toContain("atual === 'carregando' || atual === 'indisponivel' ? 'parado' : atual");
+  });
+
+  test('o diagnóstico é temporário e nasce desligado', () => {
+    expect(ler('config', 'features.ts')).toContain("process.env.EXPO_PUBLIC_DIAG_VOZ === 'true'");
+    const diag = ler('ui', 'biblia', 'DiagnosticoVoz.tsx');
+    expect(diag).toContain('if (!DIAG_VOZ');
+    // Só lê e mostra: não fala, não cancela, não escolhe.
+    expect(diag).not.toContain('speak(');
+    expect(diag).not.toContain('cancel()');
   });
 });
 
